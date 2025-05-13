@@ -31,12 +31,12 @@ const formatDate = (dateString: string | undefined | null): string => {
   try {
     const dateObj = new Date(dateString);
     if (isNaN(dateObj.getTime())) {
-      console.warn("Invalid date string encountered in AdminSubmissionsTable (formatDate):", dateString);
+      // console.warn("Invalid date string encountered in AdminSubmissionsTable (formatDate):", dateString);
       return 'تاريخ غير صالح';
     }
     return format(dateObj, "dd/MM/yyyy", { locale: arSA });
   } catch (error) {
-    console.error("Error formatting date in AdminSubmissionsTable (formatDate):", dateString, error);
+    // console.error("Error formatting date in AdminSubmissionsTable (formatDate):", dateString, error);
     return 'خطأ في التاريخ';
   }
 };
@@ -48,12 +48,12 @@ const formatDateTime = (dateString: string | undefined | null): string => {
   try {
     const dateObj = new Date(dateString);
     if (isNaN(dateObj.getTime())) {
-      console.warn("Invalid date string encountered in AdminSubmissionsTable (formatDateTime):", dateString);
+      // console.warn("Invalid date string encountered in AdminSubmissionsTable (formatDateTime):", dateString);
       return 'تاريخ غير صالح';
     }
     return format(dateObj, "dd/MM/yyyy HH:mm", { locale: arSA });
   } catch (error) {
-    console.error("Error formatting date/time in AdminSubmissionsTable (formatDateTime):", dateString, error);
+    // console.error("Error formatting date/time in AdminSubmissionsTable (formatDateTime):", dateString, error);
     return 'خطأ في التاريخ';
   }
 };
@@ -70,9 +70,8 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
     if (success) {
       toast({ title: "تم تحديث الحالة بنجاح." });
       onDataChange(); 
-    } else {
-      toast({ variant: "destructive", title: "خطأ", description: "لم يتم تحديث الحالة." });
     }
+    // No 'else' toast here; AuthContext will show a more detailed one on failure.
   };
 
   const handleDelete = async (id: string) => {
@@ -80,9 +79,8 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
     if (success) {
       toast({ title: "تم حذف السجل بنجاح." });
       onDataChange(); 
-    } else {
-      toast({ variant: "destructive", title: "خطأ", description: "لم يتم حذف السجل." });
     }
+    // AuthContext's deleteSubmission handles its own error toasts.
   };
   
   const getDistributionLabel = (value: string) => {
@@ -233,3 +231,4 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
     </div>
   );
 }
+
