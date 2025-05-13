@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCap
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { CheckCircle, Edit3, Trash2, MoreHorizontal, Eye, Phone, Users, CalendarDays, DollarSign, UserCircle, ListTree, Heart, MessageSquare, Receipt, FileText, CalendarCheck2, Loader2, Fingerprint, Mail, UserCog, User } from "lucide-react";
+import { CheckCircle, Edit3, Trash2, MoreHorizontal, Eye, Phone, Users, CalendarDays, DollarSign, UserCircle, ListTree, Heart, MessageSquare, Receipt, FileText, CalendarCheck2, Loader2, Fingerprint, Mail, UserCog, User, NotebookText, Handshake } from "lucide-react";
 import { format } from "date-fns";
 import { arSA } from "date-fns/locale";
 import { useAuth } from "@/hooks/useAuth";
@@ -171,8 +171,8 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
                             <ScrollArea className="max-h-[70vh] p-1">
                             <div className="grid gap-3 py-4 text-sm">
                                 <div className="grid grid-cols-2 gap-2 items-center"><strong><Fingerprint className="inline-block ml-1 h-4 w-4"/>معرف السجل (ID):</strong> <p className="truncate font-mono text-xs" title={sub.id}>{sub.id}</p></div>
-                                <div className="grid grid-cols-2 gap-2 items-center"><strong><UserCircle className="inline-block ml-1 h-4 w-4"/>مدخل البيانات:</strong> <p>{sub.submitterUsername || "غير متوفر"}</p></div>
-                                <div className="grid grid-cols-2 gap-2 items-center"><strong><User className="inline-block ml-1 h-4 w-4"/>معرف المستخدم (UserID):</strong> <p className="font-mono text-xs">{sub.userId || "غير متوفر"}</p></div>
+                                <div className="grid grid-cols-2 gap-2 items-center"><strong><User className="inline-block ml-1 h-4 w-4"/>مدخل البيانات (Username):</strong> <p>{sub.submitterUsername || "غير متوفر"}</p></div>
+                                <div className="grid grid-cols-2 gap-2 items-center"><strong><UserCircle className="inline-block ml-1 h-4 w-4"/>معرف المستخدم (UserID):</strong> <p className="font-mono text-xs">{sub.userId || "غير متوفر"}</p></div>
                                 <div className="grid grid-cols-2 gap-2 items-center"><strong><Mail className="inline-block ml-1 h-4 w-4"/>البريد الإلكتروني للمستخدم:</strong> <p>{sub.userEmail || "غير متوفر"}</p></div>
                                 <hr className="my-2 col-span-2"/>
                                 <div className="grid grid-cols-2 gap-2 items-center"><strong><UserCircle className="inline-block ml-1 h-4 w-4"/>اسم المتبرع:</strong> <p>{sub.donorName}</p></div>
@@ -181,7 +181,7 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
                                 <hr className="my-2 col-span-2"/>
                                 <div className="grid grid-cols-2 gap-2 items-center"><strong><CalendarCheck2 className="inline-block ml-1 h-4 w-4"/>يريد الحضور:</strong> <p>{sub.wantsToAttend ? "نعم" : "لا"}</p></div>
                                 <div className="grid grid-cols-2 gap-2 items-center"><strong><MessageSquare className="inline-block ml-1 h-4 w-4"/>يريد من الأضحية:</strong> <p>{sub.wantsFromSacrifice ? "نعم" : "لا"}</p></div>
-                                {sub.wantsFromSacrifice && <div className="grid grid-cols-2 gap-2 items-center"><strong>ماذا يريد:</strong> <p>{sub.sacrificeWishes || "-"}</p></div>}
+                                {sub.wantsFromSacrifice && <div className="grid grid-cols-2 gap-2 items-center"><strong><NotebookText className="inline-block ml-1 h-4 w-4" /> ماذا يريد:</strong> <p>{sub.sacrificeWishes || "-"}</p></div>}
                                 <hr className="my-2 col-span-2"/>
                                 <div className="grid grid-cols-2 gap-2 items-center"><strong><DollarSign className="inline-block ml-1 h-4 w-4"/>تم الدفع:</strong> <p>{sub.paymentConfirmed ? "نعم" : "لا"}</p></div>
                                 {sub.paymentConfirmed && (
@@ -192,7 +192,7 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
                                 )}
                                 <hr className="my-2 col-span-2"/>
                                 <div className="grid grid-cols-2 gap-2 items-center"><strong><Users className="inline-block ml-1 h-4 w-4"/>عن طريق وسيط:</strong> <p>{sub.throughIntermediary ? "نعم" : "لا"}</p></div>
-                                {sub.throughIntermediary && <div className="grid grid-cols-2 gap-2 items-center"><strong>اسم الوسيط:</strong> <p>{sub.intermediaryName || "-"}</p></div>}
+                                {sub.throughIntermediary && <div className="grid grid-cols-2 gap-2 items-center"><strong><Handshake className="inline-block ml-1 h-4 w-4" />اسم الوسيط:</strong> <p>{sub.intermediaryName || "-"}</p></div>}
                                 <div className="grid grid-cols-2 gap-2 items-center"><strong><ListTree className="inline-block ml-1 h-4 w-4"/>توزع لـ:</strong> <p>{getDistributionLabel(sub.distributionPreference)}</p></div>
                                 <hr className="my-2 col-span-2"/>
                                 <div className="grid grid-cols-2 gap-2 items-center"><strong><CalendarDays className="inline-block ml-1 h-4 w-4"/>تاريخ التسجيل:</strong> <p>{formatDateTime(sub.submissionDate)}</p></div>
@@ -255,3 +255,4 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
     </div>
   );
 }
+
