@@ -21,7 +21,33 @@ const exportToXlsx = (data: AdahiSubmission[], filename: string) => {
         return;
       }
 
-      const worksheet = XLSX.utils.json_to_sheet(data);
+      // Headers in the order they should appear from right to left in an RTL sheet
+      const headers = [
+        "رقم تسلسلي",
+        "اسم المتبرع",
+        "الاضحية عن",
+        "يريد الحضور",
+        "رقم التلفون",
+        "اسم المستخدم"
+      ];
+
+      const mappedData = data.map((sub, index) => ({
+        "رقم تسلسلي": index + 1,
+        "اسم المتبرع": sub.donorName,
+        "الاضحية عن": sub.sacrificeFor,
+        "يريد الحضور": sub.wantsToAttend ? "نعم" : "لا",
+        "رقم التلفون": sub.phoneNumber,
+        "اسم المستخدم": sub.submitterUsername || sub.userEmail || sub.userId || "غير متوفر",
+      }));
+      
+      // Create worksheet with specified header order
+      const worksheet = XLSX.utils.json_to_sheet(mappedData, { header: headers });
+
+      // Set sheet to RTL
+      if (worksheet) {
+        worksheet['!RTL'] = true;
+      }
+      
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Submissions");
       
@@ -77,8 +103,7 @@ export default function AdminDashboardPage() {
   }, [allSubmissionsForAdmin]);
   
   const handleDataChange = async () => {
-     await refreshData(); // Ensure data is up-to-date
-     // The useEffect above will recalculate submissions and counts based on allSubmissionsForAdmin
+     await refreshData(); 
   };
 
   const handleExportAll = async () => {
@@ -99,7 +124,7 @@ export default function AdminDashboardPage() {
     toast({ title: "جاري تصدير البيانات حسب المستخدم...", description: "سيتم تحميل عدة ملفات Excel (XLSX)." });
     const submissionsByUser: { [key: string]: AdahiSubmission[] } = {};
     submissions.forEach(sub => {
-      const userKey = sub.userEmail || sub.userId || "unknown_user"; 
+      const userKey = sub.submitterUsername || sub.userEmail || sub.userId || "unknown_user"; 
       if (!submissionsByUser[userKey]) {
         submissionsByUser[userKey] = [];
       }
