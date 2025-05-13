@@ -4,8 +4,8 @@
 import type { AdahiSubmission } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns"; // Correct import for named export
-import { arSA } from "date-fns/locale"; // For Arabic date formatting
+import { format } from "date-fns"; 
+import { arSA } from "date-fns/locale"; 
 
 interface UserSubmissionsTableProps {
   submissions: AdahiSubmission[];
@@ -38,7 +38,8 @@ export default function UserSubmissionsTable({ submissions }: UserSubmissionsTab
               <TableCell>{sub.phoneNumber}</TableCell>
               <TableCell>{sub.wantsToAttend ? "نعم" : "لا"}</TableCell>
               <TableCell>
-                {format(new Date(sub.submissionDate), "dd/MM/yyyy", { locale: arSA })}
+                {/* Ensure submissionDate is a valid Date object or string for `new Date()` */}
+                {sub.submissionDate ? format(new Date(sub.submissionDate), "dd/MM/yyyy", { locale: arSA }) : 'N/A'}
               </TableCell>
               <TableCell>
                 <Badge variant={sub.status === "entered" ? "default" : "secondary"} 
@@ -53,4 +54,3 @@ export default function UserSubmissionsTable({ submissions }: UserSubmissionsTab
     </div>
   );
 }
-

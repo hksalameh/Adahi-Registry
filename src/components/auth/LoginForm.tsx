@@ -16,7 +16,7 @@ import { LogIn, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const loginSchema = z.object({
-  identifier: z.string().min(1, "الرجاء إدخال اسم المستخدم أو البريد الإلكتروني"),
+  email: z.string().email("الرجاء إدخال بريد إلكتروني صالح"),
   password: z.string().min(1, "الرجاء إدخال كلمة المرور"),
 });
 
@@ -41,14 +41,14 @@ export default function LoginForm() {
   const onSubmit: SubmitHandler<LoginFormInputs> = async (data) => {
     setIsLoading(true);
     setError(null);
-    const success = await login(data.identifier, data.password);
+    const success = await login(data.email, data.password);
     setIsLoading(false);
     if (success) {
       toast({ title: "تم تسجيل الدخول بنجاح!", description: "مرحباً بك." });
       const redirectUrl = searchParams.get('redirect') || '/dashboard';
       router.push(redirectUrl);
     } else {
-      setError("اسم المستخدم/البريد الإلكتروني أو كلمة المرور غير صحيحة.");
+      setError("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
       toast({ variant: "destructive", title: "خطأ في تسجيل الدخول", description: "البيانات المدخلة غير صحيحة." });
     }
   };
@@ -72,9 +72,9 @@ export default function LoginForm() {
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="identifier">اسم المستخدم أو البريد الإلكتروني</Label>
-              <Input id="identifier" type="text" {...register("identifier")} placeholder="مثال: user@example.com" />
-              {errors.identifier && <p className="text-sm text-destructive">{errors.identifier.message}</p>}
+              <Label htmlFor="email">البريد الإلكتروني</Label>
+              <Input id="email" type="email" {...register("email")} placeholder="user@example.com" />
+              {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">كلمة المرور</Label>

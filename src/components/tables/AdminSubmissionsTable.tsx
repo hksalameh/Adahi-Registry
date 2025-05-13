@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCap
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { CheckCircle, Edit3, Trash2, MoreHorizontal, Eye, Phone, Users, CalendarDays, DollarSign, UserCircle, ListTree } from "lucide-react";
+import { CheckCircle, Edit3, Trash2, MoreHorizontal, Eye, Phone, Users, CalendarDays, DollarSign, UserCircle, ListTree, Heart, MessageSquare, Receipt, FileText, CalendarCheck2 } from "lucide-react";
 import { format } from "date-fns";
 import { arSA } from "date-fns/locale";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,21 +21,21 @@ import { distributionOptions } from "@/lib/types";
 
 interface AdminSubmissionsTableProps {
   submissions: AdahiSubmission[];
-  onDataChange: () => void; // Callback to refresh data
+  onDataChange: () => void; 
 }
 
 export default function AdminSubmissionsTable({ submissions, onDataChange }: AdminSubmissionsTableProps) {
   const { updateSubmissionStatus, deleteSubmission } = useAuth();
   const { toast } = useToast();
   const [editingSubmission, setEditingSubmission] = useState<AdahiSubmission | null>(null);
-  const [viewingSubmission, setViewingSubmission] = useState<AdahiSubmission | null>(null);
+  // const [viewingSubmission, setViewingSubmission] = useState<AdahiSubmission | null>(null); // Not strictly needed if view is inline in Dialog
 
 
   const handleStatusUpdate = async (id: string, newStatus: 'pending' | 'entered') => {
     const success = await updateSubmissionStatus(id, newStatus);
     if (success) {
       toast({ title: "تم تحديث الحالة بنجاح." });
-      onDataChange();
+      // onDataChange might not be needed if onSnapshot handles updates
     } else {
       toast({ variant: "destructive", title: "خطأ", description: "لم يتم تحديث الحالة." });
     }
@@ -45,7 +45,7 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
     const success = await deleteSubmission(id);
     if (success) {
       toast({ title: "تم حذف السجل بنجاح." });
-      onDataChange();
+      // onDataChange might not be needed if onSnapshot handles updates
     } else {
       toast({ variant: "destructive", title: "خطأ", description: "لم يتم حذف السجل." });
     }
@@ -61,7 +61,7 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
   
   const closeEditDialog = () => {
     setEditingSubmission(null);
-    onDataChange();
+    // onDataChange might not be needed if onSnapshot handles updates
   }
 
   return (
@@ -70,7 +70,7 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
         <TableCaption>عرض جميع الأضاحي المسجلة. مجموع الأضاحي الكلي: {submissions.length}</TableCaption>
         <TableHeader>
           <TableRow>
-            <TableHead>اسم المستخدم</TableHead>
+            <TableHead>مدخل البيانات</TableHead>
             <TableHead>اسم المتبرع</TableHead>
             <TableHead>الأضحية عن</TableHead>
             <TableHead>رقم التلفون</TableHead>
@@ -87,7 +87,8 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
               <TableCell>{sub.sacrificeFor}</TableCell>
               <TableCell>{sub.phoneNumber}</TableCell>
               <TableCell>
-                {format(new Date(sub.submissionDate), "dd/MM/yyyy", { locale: arSA })}
+                {/* Ensure submissionDate is a valid Date object or string for `new Date()` */}
+                {sub.submissionDate ? format(new Date(sub.submissionDate), "dd/MM/yyyy", { locale: arSA }) : 'N/A'}
               </TableCell>
               <TableCell>
                 <Badge variant={sub.status === "entered" ? "default" : "secondary"}
@@ -96,13 +97,13 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
                 </Badge>
               </TableCell>
               <TableCell className="text-center">
-                <Dialog> {/* Edit Dialog */}
+                <Dialog open={editingSubmission?.id === sub.id} onOpenChange={(isOpen) => !isOpen && setEditingSubmission(null)}>
                     <DialogTrigger asChild>
                         <Button variant="ghost" size="icon" className="text-blue-600 hover:text-blue-800" onClick={() => setEditingSubmission(sub)}>
                             <Edit3 className="h-4 w-4" />
                         </Button>
                     </DialogTrigger>
-                    {editingSubmission && editingSubmission.id === sub.id && (
+                    {editingSubmission && editingSubmission.id === sub.id && ( // Redundant check if Dialog `open` is used correctly
                          <DialogContent className="sm:max-w-[600px] md:max-w-[800px]">
                             <DialogHeader>
                             <DialogTitle>تعديل بيانات الأضحية لـ: {editingSubmission.donorName}</DialogTitle>
@@ -121,7 +122,7 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuLabel>إجراءات</DropdownMenuLabel>
-                    <Dialog> {/* View Dialog */}
+                    <Dialog> 
                         <DialogTrigger asChild>
                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-pointer">
                                 <Eye className="mr-2 h-4 w-4" /> عرض التفاصيل
@@ -134,23 +135,23 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
                             <ScrollArea className="max-h-[60vh] p-1">
                             <div className="grid gap-3 py-4 text-sm">
                                 <div className="grid grid-cols-2 gap-2"><strong><UserCircle className="inline-block mr-1 h-4 w-4"/>اسم المتبرع:</strong> <p>{sub.donorName}</p></div>
-                                <div className="grid grid-cols-2 gap-2"><strong><UserCircle className="inline-block mr-1 h-4 w-4"/>اسم المستخدم:</strong> <p>{sub.userEmail || sub.userId}</p></div>
+                                <div className="grid grid-cols-2 gap-2"><strong><UserCircle className="inline-block mr-1 h-4 w-4"/>مدخل البيانات:</strong> <p>{sub.userEmail || sub.userId}</p></div>
                                 <div className="grid grid-cols-2 gap-2"><strong><Heart className="inline-block mr-1 h-4 w-4"/>الأضحية عن:</strong> <p>{sub.sacrificeFor}</p></div>
                                 <div className="grid grid-cols-2 gap-2"><strong><Phone className="inline-block mr-1 h-4 w-4"/>رقم الهاتف:</strong> <p>{sub.phoneNumber}</p></div>
                                 <div className="grid grid-cols-2 gap-2"><strong><CalendarCheck2 className="inline-block mr-1 h-4 w-4"/>يريد الحضور:</strong> <p>{sub.wantsToAttend ? "نعم" : "لا"}</p></div>
                                 <div className="grid grid-cols-2 gap-2"><strong><MessageSquare className="inline-block mr-1 h-4 w-4"/>يريد من الأضحية:</strong> <p>{sub.wantsFromSacrifice ? "نعم" : "لا"}</p></div>
-                                {sub.wantsFromSacrifice && <div className="grid grid-cols-2 gap-2"><strong>ماذا يريد:</strong> <p>{sub.sacrificeWishes}</p></div>}
+                                {sub.wantsFromSacrifice && <div className="grid grid-cols-2 gap-2"><strong>ماذا يريد:</strong> <p>{sub.sacrificeWishes || "-"}</p></div>}
                                 <div className="grid grid-cols-2 gap-2"><strong><DollarSign className="inline-block mr-1 h-4 w-4"/>تم الدفع:</strong> <p>{sub.paymentConfirmed ? "نعم" : "لا"}</p></div>
                                 {sub.paymentConfirmed && (
                                 <>
-                                    <div className="grid grid-cols-2 gap-2"><strong><Receipt className="inline-block mr-1 h-4 w-4"/>رقم الدفتر:</strong> <p>{sub.receiptBookNumber}</p></div>
-                                    <div className="grid grid-cols-2 gap-2"><strong><FileText className="inline-block mr-1 h-4 w-4"/>رقم السند:</strong> <p>{sub.voucherNumber}</p></div>
+                                    <div className="grid grid-cols-2 gap-2"><strong><Receipt className="inline-block mr-1 h-4 w-4"/>رقم الدفتر:</strong> <p>{sub.receiptBookNumber || "-"}</p></div>
+                                    <div className="grid grid-cols-2 gap-2"><strong><FileText className="inline-block mr-1 h-4 w-4"/>رقم السند:</strong> <p>{sub.voucherNumber || "-"}</p></div>
                                 </>
                                 )}
                                 <div className="grid grid-cols-2 gap-2"><strong><Users className="inline-block mr-1 h-4 w-4"/>عن طريق وسيط:</strong> <p>{sub.throughIntermediary ? "نعم" : "لا"}</p></div>
-                                {sub.throughIntermediary && <div className="grid grid-cols-2 gap-2"><strong>اسم الوسيط:</strong> <p>{sub.intermediaryName}</p></div>}
+                                {sub.throughIntermediary && <div className="grid grid-cols-2 gap-2"><strong>اسم الوسيط:</strong> <p>{sub.intermediaryName || "-"}</p></div>}
                                 <div className="grid grid-cols-2 gap-2"><strong><ListTree className="inline-block mr-1 h-4 w-4"/>توزع لـ:</strong> <p>{getDistributionLabel(sub.distributionPreference)}</p></div>
-                                <div className="grid grid-cols-2 gap-2"><strong><CalendarDays className="inline-block mr-1 h-4 w-4"/>تاريخ التسجيل:</strong> <p>{format(new Date(sub.submissionDate), "dd/MM/yyyy HH:mm", { locale: arSA })}</p></div>
+                                <div className="grid grid-cols-2 gap-2"><strong><CalendarDays className="inline-block mr-1 h-4 w-4"/>تاريخ التسجيل:</strong> <p>{sub.submissionDate ? format(new Date(sub.submissionDate), "dd/MM/yyyy HH:mm", { locale: arSA }) : 'N/A'}</p></div>
                                 <div className="grid grid-cols-2 gap-2"><strong>الحالة:</strong> <Badge variant={sub.status === "entered" ? "default" : "secondary"} className={sub.status === "entered" ? "bg-green-500 text-white" : "bg-yellow-400 text-black"}>{sub.status === "entered" ? "مدخلة" : "غير مدخلة"}</Badge></div>
                             </div>
                             </ScrollArea>

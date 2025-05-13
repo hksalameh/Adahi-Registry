@@ -1,18 +1,19 @@
 
+// Firebase uses `uid` for user IDs.
 export interface User {
-  id: string;
+  id: string; // Firebase UID
   username: string;
   email: string;
-  password?: string; // Only for registration/mock storage, not for client state
+  // password?: string; // No longer storing password in client-side User object
   isAdmin: boolean;
 }
 
 export type DistributionPreference = 'ramtha' | 'gaza' | 'donor' | 'fund';
 
 export interface AdahiSubmission {
-  id: string;
-  userId: string;
-  userEmail?: string; // For admin display
+  id: string; // Firestore document ID
+  userId: string; // Firebase UID of the user who submitted
+  userEmail?: string; // For admin display convenience
   donorName: string;
   sacrificeFor: string;
   phoneNumber: string;
@@ -25,8 +26,8 @@ export interface AdahiSubmission {
   throughIntermediary: boolean;
   intermediaryName?: string;
   distributionPreference: DistributionPreference;
-  submissionDate: string; // ISO string date
-  status: 'pending' | 'entered'; // pending = غير مدخلة, entered = مدخلة
+  submissionDate: string; // Stored as ISO string. Firestore Timestamps will be converted.
+  status: 'pending' | 'entered';
 }
 
 export const distributionOptions: { value: DistributionPreference; label: string }[] = [
