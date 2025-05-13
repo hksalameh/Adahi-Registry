@@ -12,12 +12,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Save, UserCircle, Heart, Phone, CalendarCheck2, DollarSign, Users, ListTree, MessageSquare, Receipt, FileText } from "lucide-react";
+import { Save, UserCircle, Heart, Phone, CalendarCheck2, DollarSign, Users, ListTree, MessageSquare, Receipt, FileText, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import type { AdahiSubmission, DistributionPreference } from "@/lib/types";
 import { distributionOptions } from "@/lib/types";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
 
 const submissionSchema = z.object({
   donorName: z.string().min(1, "اسم المتبرع مطلوب"),
@@ -75,10 +76,11 @@ interface AdahiSubmissionFormProps {
 }
 
 export default function AdahiSubmissionForm({ onFormSubmit, defaultValues, isEditing = false }: AdahiSubmissionFormProps) {
-  // user from useAuth will be null. AuthContext handles adding submissions without user specifics.
-  const { addSubmission, updateSubmission } = useAuth(); 
+  const { user, addSubmission, updateSubmission, loading: authLoading } = useAuth(); 
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
   
   const form = useForm<SubmissionFormInputs>({
     resolver: zodResolver(submissionSchema),
@@ -98,13 +100,29 @@ export default function AdahiSubmissionForm({ onFormSubmit, defaultValues, isEdi
     },
   });
 
+  useEffect(() => {
+    if (!authLoading && !user && !isEditing) { // Only redirect if not editing and not authenticated
+      toast({
+        title: "مطلوب تسجيل الدخول",
+        description: "يجب تسجيل الدخول أولاً لإضافة أضحية.",
+        variant: "destructive",
+      });
+      router.push(`/auth/login?redirect=${pathname}`);
+    }
+  }, [user, authLoading, router, pathname, toast, isEditing]);
+
+
   const wantsFromSacrificeValue = form.watch("wantsFromSacrifice");
   const paymentConfirmedValue = form.watch("paymentConfirmed");
   const throughIntermediaryValue = form.watch("throughIntermediary");
 
   const processSubmit: SubmitHandler<SubmissionFormInputs> = async (data) => {
+    if (!user) {
+      toast({ variant: "destructive", title: "غير مصرح به", description: "يجب تسجيل الدخول لحفظ البيانات."});
+      router.push(`/auth/login?redirect=${pathname}`);
+      return;
+    }
     setIsSubmitting(true);
-    // userId and userEmail are no longer attached here; AuthContext handles submission creation.
     const submissionData = {
       ...data,
       wantsToAttend: data.wantsToAttend === "yes",
@@ -116,7 +134,6 @@ export default function AdahiSubmissionForm({ onFormSubmit, defaultValues, isEdi
 
     let success = false;
     if (isEditing && defaultValues?.id) {
-        // Ensure data passed to updateSubmission matches its expected type (Omit id, userId, userEmail)
         const result = await updateSubmission(defaultValues.id, submissionData);
         success = !!result;
     } else {
@@ -128,27 +145,51 @@ export default function AdahiSubmissionForm({ onFormSubmit, defaultValues, isEdi
 
     if (success) {
       toast({ title: isEditing ? "تم تحديث البيانات بنجاح!" : "تم حفظ البيانات بنجاح!", description: "شكراً لمساهمتك." });
-      form.reset({ 
-        donorName: "",
-        sacrificeFor: "",
-        phoneNumber: "",
-        wantsToAttend: "no",
-        wantsFromSacrifice: "no",
-        sacrificeWishes: "",
-        paymentConfirmed: "no",
-        receiptBookNumber: "",
-        voucherNumber: "",
-        throughIntermediary: "no",
-        intermediaryName: "",
-        distributionPreference: undefined,
-      });
+      if (!isEditing) { // Only reset form if it was a new submission
+        form.reset({ 
+          donorName: "",
+          sacrificeFor: "",
+          phoneNumber: "",
+          wantsToAttend: "no",
+          wantsFromSacrifice: "no",
+          sacrificeWishes: "",
+          paymentConfirmed: "no",
+          receiptBookNumber: "",
+          voucherNumber: "",
+          throughIntermediary: "no",
+          intermediaryName: "",
+          distributionPreference: undefined,
+        });
+      }
       if (onFormSubmit) onFormSubmit();
     } else {
       toast({ variant: "destructive", title: "خطأ", description: "لم يتم حفظ البيانات. الرجاء المحاولة مرة أخرى." });
     }
   };
   
-  // if (!user) return null; // Removed this check as form should always be available.
+  if (authLoading) {
+    return (
+      <Card className="w-full shadow-lg">
+        <CardHeader>
+          <CardTitle className="text-2xl flex items-center gap-2 text-primary">
+            <Loader2 className="animate-spin" /> {isEditing ? "تحميل بيانات التعديل..." : "تحميل نموذج الإضافة..."}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex justify-center items-center h-40">
+          <p className="text-muted-foreground">جاري التحميل...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+  
+  // Do not render the form if user is not logged in (except for edit mode, which is handled by layout)
+  // The useEffect above will redirect for new submissions.
+  // For editing, the AdminLayout or DashboardLayout should handle auth.
+  // However, an extra check here for non-editing mode is fine.
+  if (!user && !isEditing) {
+    return null; // Or a message, but redirect is preferred
+  }
+
 
   return (
     <Card className="w-full shadow-lg">
@@ -398,8 +439,9 @@ export default function AdahiSubmissionForm({ onFormSubmit, defaultValues, isEdi
               )}
             />
             
-            <Button type="submit" className="w-full md:w-auto" disabled={isSubmitting}>
-              <Save className="ml-2 h-5 w-5" /> {isSubmitting ? (isEditing ? "جاري التحديث..." : "جاري الحفظ...") : (isEditing ? "تحديث البيانات" : "حفظ البيانات")}
+            <Button type="submit" className="w-full md:w-auto" disabled={isSubmitting || authLoading || (!user && !isEditing)}>
+              {isSubmitting ? <Loader2 className="ml-2 h-5 w-5 animate-spin" /> : <Save className="ml-2 h-5 w-5" />}
+              {isSubmitting ? (isEditing ? "جاري التحديث..." : "جاري الحفظ...") : (isEditing ? "تحديث البيانات" : "حفظ البيانات")}
             </Button>
           </form>
         </Form>

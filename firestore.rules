@@ -1,34 +1,28 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // مجموعة "submissions" (الأضاحي)
-    match /submissions/{submissionId} {
-      // أي شخص يمكنه قراءة جميع الأضاحي (لأن الجداول عامة الآن)
-      allow read: if true;
-
-      // أي شخص يمكنه إنشاء أضحية جديدة (لأن النموذج عام الآن)
-      allow create: if true;
-
-      // لا أحد يمكنه تعديل أو حذف الأضاحي حاليًا (لأننا ألغينا تسجيل الدخول)
-      // عند إعادة تفعيل تسجيل الدخول، يمكنك تغييرها إلى:
-      // allow update, delete: if request.auth != null && (request.auth.uid == resource.data.userId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
-      allow update, delete: if false;
+    // Users collection
+    // - Anyone can create a user document during registration (if request.auth.uid matches the document ID).
+    // - Authenticated users can read their own user document.
+    // - Admin can read/write any user document.
+    match /users/{userId} {
+      allow read: if request.auth != null && (request.auth.uid == userId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
+      allow create: if request.auth != null && request.auth.uid == userId; // Ensure user creates their own doc
+      allow update: if request.auth != null && (request.auth.uid == userId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true); // Admins or self can update
+      // Delete typically not allowed by users for their own accounts through client, admin only
+      allow delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
 
-    // مجموعة "users" (المستخدمون)
-    match /users/{userId} {
-      // لا أحد يمكنه قراءة بيانات المستخدمين حاليًا (لأننا ألغينا تسجيل الدخول)
-      // عند إعادة تفعيل تسجيل الدخول، يمكنك تغييرها إلى:
-      // allow read: if request.auth != null && (request.auth.uid == userId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
-      allow read: if false;
-
-      // لا أحد يمكنه إنشاء أو تعديل بيانات المستخدمين حاليًا
-      // عند إعادة تفعيل تسجيل الدخول، يمكنك تغييرها إلى:
-      // allow create: if request.auth != null && request.auth.uid == userId;
-      // allow update: if request.auth != null && request.auth.uid == userId;
-      allow write: if false;
+    // Submissions collection
+    // - Authenticated users can create submissions.
+    // - Authenticated users can read/update/delete their own submissions.
+    // - Admin can read/write any submission.
+    match /submissions/{submissionId} {
+      allow create: if request.auth != null; // User must be logged in
+      allow read: if request.auth != null && (resource.data.userId == request.auth.uid || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
+      allow update, delete: if request.auth != null && (resource.data.userId == request.auth.uid || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
     }
   }
 }

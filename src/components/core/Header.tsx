@@ -1,22 +1,23 @@
 
 "use client";
 
-// import { useAuth } from "@/hooks/useAuth"; // No longer needed for user state
+import { useAuth } from "@/hooks/useAuth"; 
 import { Button } from "@/components/ui/button";
-// import { LogOut, UserCircle, ShieldCheck } from "lucide-react"; // User icons removed
+import { LogOut, UserCircle, ShieldCheck, LogIn, UserPlus } from "lucide-react"; 
 import { Logo } from "./Logo";
 import Link from "next/link";
 
 export default function Header() {
-  // const { user, logout } = useAuth(); // User is always null, logout is simplified
+  const { user, logout, loading } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-card shadow-sm">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Logo />
-        <div className="flex items-center gap-4">
-          {/* User-specific elements removed */}
-          {/* {user && (
+        <div className="flex items-center gap-2 sm:gap-4">
+          {loading ? (
+            <span className="text-sm text-muted-foreground">جاري التحميل...</span>
+          ) : user ? (
             <>
               <span className="text-sm text-muted-foreground flex items-center gap-1">
                 <UserCircle className="h-5 w-5" /> مرحبا, {user.username}
@@ -24,25 +25,33 @@ export default function Header() {
               </span>
               {user.isAdmin && (
                  <Button variant="ghost" asChild>
-                    <Link href="/admin">لوحة التحكم للمدير</Link>
+                    <Link href="/admin">الإدارة</Link>
                  </Button>
               )}
                <Button variant="ghost" asChild>
                   <Link href="/dashboard">لوحة التحكم</Link>
                </Button>
               <Button variant="outline" size="sm" onClick={logout}>
-                <LogOut className="mr-2 h-4 w-4" />
+                <LogOut className="ml-2 h-4 w-4" />
                 تسجيل الخروج
               </Button>
             </>
-          )} */}
-          {/* Keep navigation links, they are now public */}
-          <Button variant="ghost" asChild>
-            <Link href="/admin">لوحة تحكم المدير</Link>
-          </Button>
-          <Button variant="ghost" asChild>
-            <Link href="/dashboard">لوحة التحكم</Link>
-          </Button>
+          ) : (
+            <>
+              <Button variant="ghost" asChild>
+                <Link href="/auth/login" className="flex items-center gap-1">
+                  <LogIn className="h-4 w-4" />
+                  تسجيل الدخول
+                </Link>
+              </Button>
+              <Button variant="default" asChild>
+                <Link href="/auth/register" className="flex items-center gap-1">
+                  <UserPlus className="h-4 w-4" />
+                  إنشاء حساب
+                </Link>
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </header>

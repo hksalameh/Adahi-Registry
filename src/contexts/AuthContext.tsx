@@ -21,12 +21,10 @@ import {
   updateDoc,
   deleteDoc,
   query,
-  // where, // Removed for user-specific queries
+  where, 
   onSnapshot,
-  // Timestamp, // Not directly used here
   orderBy,
   serverTimestamp,
-  // writeBatch, // Not used
 } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 
@@ -44,6 +42,8 @@ interface AuthContextType {
   allSubmissionsForAdmin: AdahiSubmission[];
   fetchUserById: (userId: string) => Promise<AppUser | null>;
 }
+
+const ADMIN_UID = "vqhrldpAdeWGcCgcMpWWRGdslOS2"; // Define the admin UID
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -66,9 +66,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const userDocRef = doc(db, "users", userId);
       const userDocSnap = await getDoc(userDocRef);
       if (userDocSnap.exists()) {
-        return { id: userDocSnap.id, ...userDocSnap.data() } as AppUser;
+        const userData = userDocSnap.data();
+        // Explicitly check if this user is the admin
+        const isAdmin = userId === ADMIN_UID || userData.isAdmin === true;
+        return { id: userDocSnap.id, ...userData, isAdmin } as AppUser;
       } else {
-        console.log("No such user document!");
+        // If user doc doesn't exist, but it's the admin UID, create a minimal admin user object
+        if (userId === ADMIN_UID) {
+            return {
+                id: userId,
+                email: "admin@example.com", // Placeholder, will be updated by auth
+                username: "Admin",
+                isAdmin: true,
+            };
+        }
+        console.log("No such user document for non-admin user!");
         return null;
       }
     } catch (error) {
@@ -89,16 +101,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (firebaseUser) {
         const appUser = await fetchUserById(firebaseUser.uid);
         if (appUser) {
-            setUser(appUser);
+            setUser({...appUser, email: firebaseUser.email || appUser.email}); // Ensure email from auth is preferred
         } else {
-            // This case might happen if user exists in Auth but not in Firestore 'users' collection
-            // Or if fetchUserById failed. Handle as appropriate.
             console.warn(`User with UID ${firebaseUser.uid} authenticated but no Firestore record found or fetch failed.`);
-            setUser({ // Create a minimal user object or handle logout
+            setUser({ 
                 id: firebaseUser.uid,
                 email: firebaseUser.email || "",
                 username: firebaseUser.displayName || firebaseUser.email || "User",
-                isAdmin: false, // Default to false if no Firestore record
+                isAdmin: firebaseUser.uid === ADMIN_UID, 
             });
         }
       } else {
@@ -110,19 +120,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (loading || !db) return;
+    if (loading || !db || !user) { // Require user for fetching submissions
+        setSubmissions([]);
+        setAllSubmissions([]);
+        return;
+    }
 
     let q;
-    if (user && user.isAdmin) {
+    if (user.isAdmin) {
       q = query(collection(db, "submissions"), orderBy("submissionDate", "desc"));
-    } else if (user) {
-      q = query(collection(db, "submissions"), where("userId", "==", user.id), orderBy("submissionDate", "desc"));
     } else {
-      // No user logged in, or public view, fetch no submissions or all depending on requirements
-      // For now, let's fetch all if no user (or adjust based on desired public behavior)
-      // This matches the removed login requirement behavior
-      q = query(collection(db, "submissions"), orderBy("submissionDate", "desc"));
-    }
+      q = query(collection(db, "submissions"), where("userId", "==", user.id), orderBy("submissionDate", "desc"));
+    } 
     
     const unsubscribeSubmissions = onSnapshot(q, (querySnapshot) => {
       const subs = querySnapshot.docs.map(docSnapshot => {
@@ -130,18 +139,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         let submissionDateStr: string;
 
         if (data.submissionDate && typeof data.submissionDate.toDate === 'function') {
-          // Firestore Timestamp
           submissionDateStr = data.submissionDate.toDate().toISOString();
         } else if (typeof data.submissionDate === 'string') {
-          // Already a string (hopefully ISO)
           submissionDateStr = data.submissionDate;
         } else if (data.submissionDate instanceof Date) {
-          // JavaScript Date object
           submissionDateStr = data.submissionDate.toISOString();
         } else {
-          // Fallback for missing, null, undefined, or unexpected types
           console.warn(`Submission ${docSnapshot.id} has invalid or missing submissionDate:`, data.submissionDate, ". Using epoch as fallback.");
-          submissionDateStr = new Date(0).toISOString(); // Default to Epoch or a noticeable invalid date
+          submissionDateStr = new Date(0).toISOString(); 
         }
         
         return { 
@@ -151,13 +156,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } as AdahiSubmission;
       });
 
-      if (user && user.isAdmin) {
+      if (user.isAdmin) {
         setAllSubmissions(subs);
-        setSubmissions([]); // Admin doesn't have "their" submissions in this view typically
+        setSubmissions([]); 
       } else {
         setSubmissions(subs);
-        // If all users should see all submissions on their dashboard, uncomment next line
-        // setAllSubmissions(subs); 
       }
     }, (error) => {
       console.error("Error fetching submissions:", error);
@@ -177,17 +180,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, pass);
       const firebaseUser = userCredential.user;
-      // onAuthStateChanged will fetch user doc and set user state
-      // But to return the user immediately:
       const appUser = await fetchUserById(firebaseUser.uid);
       setLoading(false);
       if (appUser) {
         toast({title: "تم تسجيل الدخول بنجاح"});
-        return appUser;
+        setUser({...appUser, email: firebaseUser.email || appUser.email}); // Update state immediately
+        return {...appUser, email: firebaseUser.email || appUser.email};
       }
-      // Fallback if user doc not found immediately, onAuthStateChanged should still set it
+      // Fallback if user doc not found immediately
+      const minimalUser = {
+        id: firebaseUser.uid, 
+        email: firebaseUser.email || "", 
+        username: firebaseUser.displayName || firebaseUser.email || "", 
+        isAdmin: firebaseUser.uid === ADMIN_UID 
+      };
+      setUser(minimalUser);
       toast({title: "تم تسجيل الدخول, جاري جلب بيانات المستخدم..."});
-      return {id: firebaseUser.uid, email: firebaseUser.email || "", username: firebaseUser.displayName || firebaseUser.email || "", isAdmin: false };
+      return minimalUser;
 
     } catch (error: any) {
       console.error("Login error:", error);
@@ -216,20 +225,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
       const firebaseUser = userCredential.user;
       
-      const newUser: AppUser = {
-        id: firebaseUser.uid,
-        username,
-        email: firebaseUser.email || email, // Ensure email is set
-        isAdmin: false, 
-      };
-      await setDoc(doc(db, "users", firebaseUser.uid), {
+      const isAdmin = firebaseUser.uid === ADMIN_UID; // Check if registering user is the admin
+      const newUserFirestoreData = {
         username,
         email: firebaseUser.email || email,
-        isAdmin: false,
-      });
+        isAdmin: isAdmin, 
+      };
+      await setDoc(doc(db, "users", firebaseUser.uid), newUserFirestoreData);
+      
+      const appUser: AppUser = {
+        id: firebaseUser.uid,
+        ...newUserFirestoreData
+      };
+
       setLoading(false);
       toast({title: "تم التسجيل بنجاح! يمكنك الآن تسجيل الدخول."});
-      return newUser;
+      return appUser;
     } catch (error: any) {
       console.error("Registration error:", error);
       setUser(null);
@@ -260,9 +271,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSubmissions([]);
         setAllSubmissions([]);
         toast({title: "تم تسجيل الخروج بنجاح"});
-        if (pathname !== '/' && !pathname.startsWith('/auth')) {
-          router.push("/auth/login");
-        }
+        router.push("/auth/login");
+        
     } catch (error) {
         console.error("Logout error:", error);
         toast({variant: "destructive", title: "خطأ", description: "فشل تسجيل الخروج."});
@@ -277,6 +287,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     if (!user) {
         toast({ variant: "destructive", title: "غير مصرح به", description: "يجب تسجيل الدخول لإضافة أضحية."});
+        router.push(`/auth/login?redirect=${pathname}`);
         return null;
     }
     try {
@@ -295,7 +306,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         userId: user.id,
         userEmail: user.email,
         status: "pending",
-        submissionDate: new Date().toISOString() // Represent as ISO string for consistency
+        submissionDate: new Date().toISOString() 
       };
       return clientSideRepresentation;
     } catch (error) {
@@ -351,7 +362,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         return { id: updatedDocSnap.id, ...updatedData, submissionDate: submissionDateStr } as AdahiSubmission;
       }
-      return null; // Should not happen if update was successful and doc existed
+      return null; 
     } catch (error) {
       console.error("Error updating submission:", error);
       toast({ variant: "destructive", title: "خطأ", description: "فشل في تحديث البيانات." });
