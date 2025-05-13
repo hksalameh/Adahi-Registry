@@ -1,4 +1,3 @@
-
 "use client";
 
 import AdahiSubmissionForm from "@/components/forms/AdahiSubmissionForm";
@@ -24,7 +23,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-10">
       <header className="space-y-2 pb-6 border-b">
-        <h1 className="text-4xl font-bold tracking-tight">لوحة التحكم</h1>
+        <h1 className="text-4xl font-bold tracking-tight">سجل أضحية</h1>
         <p className="text-lg text-muted-foreground">
           أضف أضحية جديدة أو اطلع على الأضاحي المسجلة.
         </p>

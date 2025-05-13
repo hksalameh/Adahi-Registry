@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useAuth } from "@/hooks/useAuth"; 
@@ -6,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { LogOut, UserCircle, ShieldCheck, LogIn, UserPlus } from "lucide-react"; 
 import { Logo } from "./Logo";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 export default function Header() {
   const { user, logout, loading } = useAuth();
+  const pathname = usePathname();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-card shadow-sm">
@@ -28,9 +29,11 @@ export default function Header() {
                     <Link href="/admin">الإدارة</Link>
                  </Button>
               )}
-               <Button variant="ghost" asChild>
-                  <Link href="/dashboard">لوحة التحكم</Link>
-               </Button>
+              {pathname !== "/dashboard" && (
+                <Button variant="ghost" asChild>
+                    <Link href="/dashboard">لوحة التحكم</Link>
+                </Button>
+              )}
               <Button variant="outline" size="sm" onClick={logout}>
                 <LogOut className="ml-2 h-4 w-4" />
                 تسجيل الخروج
