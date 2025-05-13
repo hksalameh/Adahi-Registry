@@ -9,10 +9,11 @@ import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import type { AdahiSubmission } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import * as XLSX from 'xlsx';
 
-// Function to export data to CSV (Excel can open CSV files)
-const exportToCsv = (data: AdahiSubmission[], filename: string) => {
-  console.log(`Exporting data to ${filename}.csv:`, data);
+// Function to export data to XLSX (Excel format)
+const exportToXlsx = (data: AdahiSubmission[], filename: string) => {
+  console.log(`Exporting data to ${filename}.xlsx:`, data);
   return new Promise<void>((resolve) => {
     setTimeout(() => { // Simulate async operation
       if (data.length === 0) {
@@ -20,21 +21,11 @@ const exportToCsv = (data: AdahiSubmission[], filename: string) => {
         return;
       }
 
-      const replacer = (key: any, value: any) => value === null || value === undefined ? '' : String(value).replace(/"/g, '""'); // Handle null/undefined and escape double quotes
-      const header = Object.keys(data[0]);
-      let csv = data.map(row => header.map(fieldName => JSON.stringify((row as any)[fieldName], replacer)).join(','));
-      csv.unshift(header.join(','));
-      const csvString = csv.join('\r\n');
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Submissions");
       
-      const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${filename}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      XLSX.writeFile(workbook, `${filename}.xlsx`);
       resolve();
     }, 500);
   });
@@ -48,7 +39,7 @@ interface DistributionCounts {
 }
 
 export default function AdminDashboardPage() {
-  const { allSubmissionsForAdmin, loading } = useAuth(); 
+  const { allSubmissionsForAdmin, loading, refreshData } = useAuth(); 
   const { toast } = useToast();
   const [submissions, setSubmissions] = useState<AdahiSubmission[]>([]);
   const [distributionCounts, setDistributionCounts] = useState<DistributionCounts>({
@@ -85,30 +76,9 @@ export default function AdminDashboardPage() {
     }
   }, [allSubmissionsForAdmin]);
   
-  const handleDataChange = () => {
-     const validSubmissions = allSubmissionsForAdmin.filter(sub => sub && sub.distributionPreference);
-     setSubmissions(validSubmissions); 
-      if (validSubmissions.length > 0) {
-        const counts = validSubmissions.reduce(
-          (acc, sub) => {
-            if (sub.distributionPreference === 'ramtha' || sub.distributionPreference === 'donor') {
-              acc.adahiRamthaDonor += 1;
-            } else if (sub.distributionPreference === 'gaza') {
-              acc.adahiGaza += 1;
-            } else if (sub.distributionPreference === 'fund') {
-              acc.adahiFund += 1;
-            }
-            return acc;
-          },
-          { adahiRamthaDonor: 0, adahiGaza: 0, adahiFund: 0 }
-        );
-        setDistributionCounts({
-          ...counts,
-          total: validSubmissions.length
-        });
-      } else {
-        setDistributionCounts({ adahiRamthaDonor: 0, adahiGaza: 0, adahiFund: 0, total: 0 });
-      }
+  const handleDataChange = async () => {
+     await refreshData(); // Ensure data is up-to-date
+     // The useEffect above will recalculate submissions and counts based on allSubmissionsForAdmin
   };
 
   const handleExportAll = async () => {
@@ -116,9 +86,9 @@ export default function AdminDashboardPage() {
         toast({ title: "لا توجد بيانات لتصديرها.", variant: "destructive" });
         return;
     }
-    toast({ title: "جاري تصدير جميع البيانات...", description: "سيتم تحميل ملف CSV (يمكن فتحه بواسطة Excel)." });
-    await exportToCsv(submissions, "all_adahi_submissions");
-    toast({ title: "تم تصدير جميع البيانات بنجاح (CSV).", description: "تحقق من مجلد التنزيلات." });
+    toast({ title: "جاري تصدير جميع البيانات...", description: "سيتم تحميل ملف Excel (XLSX)." });
+    await exportToXlsx(submissions, "all_adahi_submissions");
+    toast({ title: "تم تصدير جميع البيانات بنجاح (Excel - XLSX).", description: "تحقق من مجلد التنزيلات." });
   };
 
   const handleExportByUser = async () => {
@@ -126,7 +96,7 @@ export default function AdminDashboardPage() {
         toast({ title: "لا توجد بيانات لتصديرها.", variant: "destructive"});
         return;
     }
-    toast({ title: "جاري تصدير البيانات حسب المستخدم...", description: "سيتم تحميل عدة ملفات CSV (يمكن فتحها بواسطة Excel)." });
+    toast({ title: "جاري تصدير البيانات حسب المستخدم...", description: "سيتم تحميل عدة ملفات Excel (XLSX)." });
     const submissionsByUser: { [key: string]: AdahiSubmission[] } = {};
     submissions.forEach(sub => {
       const userKey = sub.userEmail || sub.userId || "unknown_user"; 
@@ -137,9 +107,9 @@ export default function AdminDashboardPage() {
     });
 
     for (const userKey in submissionsByUser) {
-      await exportToCsv(submissionsByUser[userKey], `adahi_submissions_${userKey.replace(/[^a-zA-Z0-9]/g, '_')}`);
+      await exportToXlsx(submissionsByUser[userKey], `adahi_submissions_${userKey.replace(/[^a-zA-Z0-9]/g, '_')}`);
     }
-    toast({ title: "تم تصدير البيانات حسب المستخدم بنجاح (CSV).", description: "تحقق من مجلد التنزيلات." });
+    toast({ title: "تم تصدير البيانات حسب المستخدم بنجاح (Excel - XLSX).", description: "تحقق من مجلد التنزيلات." });
   };
   
   return (
@@ -159,21 +129,18 @@ export default function AdminDashboardPage() {
               إجراءات التصدير
             </CardTitle>
             <CardDescription>
-              تصدير بيانات الأضاحي المسجلة كملفات CSV (يمكن فتحها بواسطة Excel).
+              تصدير بيانات الأضاحي المسجلة كملفات Excel (XLSX).
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-col sm:flex-row gap-4">
               <Button onClick={handleExportAll} variant="outline" className="bg-accent text-accent-foreground hover:bg-accent/90 shadow-md flex-1 sm:flex-initial">
-                <FileDown className="ml-2 h-5 w-5" /> تصدير البيانات كاملة (Excel - CSV)
+                <FileDown className="ml-2 h-5 w-5" /> تصدير البيانات كاملة (Excel - XLSX)
               </Button>
               <Button onClick={handleExportByUser} variant="outline" className="bg-accent text-accent-foreground hover:bg-accent/90 shadow-md flex-1 sm:flex-initial">
-                <FileDown className="ml-2 h-5 w-5" /> تصدير البيانات حسب المستخدم (Excel - CSV)
+                <FileDown className="ml-2 h-5 w-5" /> تصدير البيانات حسب المستخدم (Excel - XLSX)
               </Button>
             </div>
-            <p className="text-sm text-muted-foreground pt-2">
-              ملاحظة: يتم تصدير البيانات كملفات CSV، والتي يمكن فتحها وتعديلها بسهولة باستخدام Microsoft Excel أو برامج جداول البيانات الأخرى. للحصول على ملفات .xlsx أصلية، قد تكون هناك حاجة إلى مكتبة متخصصة.
-            </p>
           </CardContent>
         </Card>
       </section>
