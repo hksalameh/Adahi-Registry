@@ -15,9 +15,9 @@ This project uses Firebase for authentication and database services. To connect 
 
 2.  **Configure Environment Variables:**
     *   In the root directory of this project (next to `package.json`), locate the file named `.env.local.example`.
-    *   **Rename or copy** this file to create a new file named `.env.local` in the same directory.
-    *   Open your newly created `.env.local` file.
-    *   Replace the placeholder values (like `YOUR_API_KEY`, `YOUR_PROJECT_ID`) in `.env.local` with the actual values from your Firebase project's `firebaseConfig` object. You can find these values in your Firebase project settings under "General" -> "Your apps" -> Select your web app -> "SDK setup and configuration".
+    *   **Rename or copy** this file to create a new file named `.env.local` in the same directory. If `.env.local` already exists, ensure it has all the necessary variables.
+    *   Open your newly created or existing `.env.local` file.
+    *   Replace the placeholder values (like `YOUR_API_KEY`, `YOUR_PROJECT_ID`, `YOUR_AUTH_DOMAIN`) in `.env.local` with the actual values from your Firebase project's `firebaseConfig` object. You can find these values in your Firebase project settings under "General" -> "Your apps" -> Select your web app -> "SDK setup and configuration".
 
     **Example content for `.env.local` (after you fill it with your values):**
     ```env
@@ -46,16 +46,16 @@ This project uses Firebase for authentication and database services. To connect 
 
 ## Troubleshooting Firebase Configuration Errors
 
-If you encounter an `auth/invalid-api-key` error or similar Firebase configuration errors (like "Missing environment variable NEXT_PUBLIC_FIREBASE_API_KEY"), it usually means:
-*   The Firebase API key (or other configuration values) in your `.env.local` file are incorrect, missing, or still placeholders. Ensure all `NEXT_PUBLIC_FIREBASE_...` variables in `.env.local` have correct values from your Firebase project.
+If you encounter an `auth/invalid-api-key` error or similar Firebase configuration errors (like "Missing environment variable NEXT_PUBLIC_FIREBASE_API_KEY" or "Missing environment variable NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN"), it usually means:
+*   The Firebase API key, auth domain, or other configuration values in your `.env.local` file are incorrect, missing, or still placeholders. Ensure all `NEXT_PUBLIC_FIREBASE_...` variables in `.env.local` have correct values from your Firebase project.
 *   The environment variable names in `.env.local` do not start with `NEXT_PUBLIC_`. All Firebase environment variables used by the client-side code **must** start with `NEXT_PUBLIC_`.
 *   **The development server was not restarted after creating or updating the `.env.local` file.** This is the most common reason. Next.js only loads environment variables from `.env.local` when the server starts. Stop your server (Ctrl+C) and restart it (`npm run dev --turbopack -p 9002`).
 *   You might have copied the values incorrectly from the Firebase console. Double-check them meticulously.
 *   The `.env.local` file is not in the root directory of the project (i.e., it's not in the same folder as `package.json`).
 *   There might be a typo in the variable names within `.env.local` or in how they are accessed in `src/lib/firebase.ts`.
 
-**Specifically for "Missing environment variable NEXT_PUBLIC_FIREBASE_API_KEY":**
+**Specifically for "Missing environment variable NEXT_PUBLIC_FIREBASE_API_KEY" or "Missing environment variable NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN":**
 1. Ensure `.env.local` exists in the project root.
-2. Ensure it contains the line `NEXT_PUBLIC_FIREBASE_API_KEY=YourActualApiKey` (replace `YourActualApiKey` with your key).
+2. Ensure it contains the lines `NEXT_PUBLIC_FIREBASE_API_KEY=YourActualApiKey` and `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=YourActualAuthDomain` (replace placeholders with your actual values).
 3. **Stop and restart the development server.**
 ```
