@@ -1,0 +1,34 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // مجموعة "submissions" (الأضاحي)
+    match /submissions/{submissionId} {
+      // أي شخص يمكنه قراءة جميع الأضاحي (لأن الجداول عامة الآن)
+      allow read: if true;
+
+      // أي شخص يمكنه إنشاء أضحية جديدة (لأن النموذج عام الآن)
+      allow create: if true;
+
+      // لا أحد يمكنه تعديل أو حذف الأضاحي حاليًا (لأننا ألغينا تسجيل الدخول)
+      // عند إعادة تفعيل تسجيل الدخول، يمكنك تغييرها إلى:
+      // allow update, delete: if request.auth != null && (request.auth.uid == resource.data.userId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
+      allow update, delete: if false;
+    }
+
+    // مجموعة "users" (المستخدمون)
+    match /users/{userId} {
+      // لا أحد يمكنه قراءة بيانات المستخدمين حاليًا (لأننا ألغينا تسجيل الدخول)
+      // عند إعادة تفعيل تسجيل الدخول، يمكنك تغييرها إلى:
+      // allow read: if request.auth != null && (request.auth.uid == userId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
+      allow read: if false;
+
+      // لا أحد يمكنه إنشاء أو تعديل بيانات المستخدمين حاليًا
+      // عند إعادة تفعيل تسجيل الدخول، يمكنك تغييرها إلى:
+      // allow create: if request.auth != null && request.auth.uid == userId;
+      // allow update: if request.auth != null && request.auth.uid == userId;
+      allow write: if false;
+    }
+  }
+}
