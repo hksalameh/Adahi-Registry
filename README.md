@@ -11,14 +11,14 @@ This project uses Firebase for authentication and database services. To connect 
 1.  **Create a Firebase Project:**
     *   Go to the [Firebase Console](https://console.firebase.google.com/) and create a new project or use an existing one.
     *   In your project settings, add a new Web App (`</>`).
-    *   Copy the `firebaseConfig` object values provided during the app registration.
+    *   During the app registration, Firebase will provide you with a `firebaseConfig` object. You will need the values from this object.
 
 2.  **Configure Environment Variables:**
-    *   Create a file named `.env.local` in the root directory of this project (next to `package.json`).
-    *   Copy the content of `.env.local.example` into `.env.local`.
-    *   Replace the placeholder values (like `YOUR_API_KEY`) in `.env.local` with the actual values from your Firebase project's `firebaseConfig`.
+    *   In the root directory of this project (next to `package.json`), create a new file named `.env.local`.
+    *   Copy the content of the `.env.local.example` file (also in the root directory) into your newly created `.env.local` file.
+    *   Replace the placeholder values (like `YOUR_API_KEY`) in `.env.local` with the actual values from your Firebase project's `firebaseConfig` object.
 
-    Example content for `.env.local`:
+    **Example content for `.env.local` (after you fill it with your values):**
     ```env
     NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyXXXXXXXXXXXXXXXXXXXXXXX
     NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project-id.firebaseapp.com
@@ -30,16 +30,21 @@ This project uses Firebase for authentication and database services. To connect 
     ```
 
 3.  **Enable Authentication Methods:**
-    *   In the Firebase Console, go to "Authentication" -> "Sign-in method".
+    *   In the Firebase Console, go to "Authentication" -> "Sign-in method" (or "Build" -> "Authentication" -> "Sign-in method" tab).
     *   Enable the sign-in providers you want to use (e.g., Email/Password).
 
-4.  **Firestore (Database) Setup (If not already done by the template):**
-    *   In the Firebase Console, go to "Firestore Database".
+4.  **Firestore (Database) Setup (If not already done):**
+    *   In the Firebase Console, go to "Firestore Database" (or "Build" -> "Firestore Database").
     *   Click "Create database".
-    *   Choose "Start in **test mode**" for initial development (be sure to set up proper security rules before production).
+    *   Choose "Start in **test mode**" for initial development. **Important:** Remember to set up proper security rules before deploying to production.
     *   Select a location for your database.
 
 5.  **Restart Your Development Server:**
-    *   If your development server (`npm run dev`) is running, stop it (Ctrl+C) and restart it to load the new environment variables.
+    *   **This is a crucial step!** If your development server (`npm run dev`) is running, stop it (Ctrl+C in the terminal) and then restart it by running `npm run dev` again. This allows Next.js to load the new environment variables from your `.env.local` file.
 
-If you encounter an `auth/invalid-api-key` error, it means the Firebase API key (or other configuration values) in your `.env.local` file are incorrect or missing, or the development server was not restarted after updating the file.
+If you encounter an `auth/invalid-api-key` error or similar Firebase configuration errors, it usually means:
+*   The Firebase API key (or other configuration values) in your `.env.local` file are incorrect or missing.
+*   The environment variable names in `.env.local` do not start with `NEXT_PUBLIC_`.
+*   The development server was not restarted after updating the `.env.local` file.
+*   You might have copied the values incorrectly from the Firebase console. Double-check them.
+```
