@@ -37,7 +37,7 @@ for (const key of requiredConfigKeys) {
 if (!configError) {
   firebaseConfig = firebaseConfigValues as FirebaseOptions;
 } else {
-  console.error("Firebase initialization failed due to missing configuration. Please check your .env.local file and ensure all NEXT_PUBLIC_FIREBASE_ variables are set.");
+  console.error("Firebase initialization failed due to missing configuration. Please check your .env.local file and ensure all NEXT_PUBLIC_FIREBASE_ variables are set, then restart your development server.");
 }
 
 // Initialize Firebase
@@ -54,7 +54,7 @@ if (!getApps().length && firebaseConfig) {
   app = getApp();
 } else {
   // App cannot be initialized
-  console.error("Firebase app could not be initialized because firebaseConfig is null.");
+  console.error("Firebase app could not be initialized because firebaseConfig is null. This usually means environment variables are not set correctly or the server was not restarted after setting them.");
 }
 
 // Export firebase services
