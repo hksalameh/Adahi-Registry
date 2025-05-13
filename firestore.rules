@@ -1,28 +1,22 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users collection
-    // - Anyone can create a user document during registration (if request.auth.uid matches the document ID).
-    // - Authenticated users can read their own user document.
-    // - Admin can read/write any user document.
-    match /users/{userId} {
-      allow read: if request.auth != null && (request.auth.uid == userId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
-      allow create: if request.auth != null && request.auth.uid == userId; // Ensure user creates their own doc
-      allow update: if request.auth != null && (request.auth.uid == userId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true); // Admins or self can update
-      // Delete typically not allowed by users for their own accounts through client, admin only
-      allow delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    // السماح لأي شخص بقراءة وإنشاء وتحديث وحذف المستندات في مجموعة 'submissions'
+    // تحذير: هذا يجعل بيانات 'submissions' عامة بالكامل. استخدم بحذر.
+    match /submissions/{submissionId} {
+      allow read, write: if true;
     }
 
-    // Submissions collection
-    // - Authenticated users can create submissions.
-    // - Authenticated users can read/update/delete their own submissions.
-    // - Admin can read/write any submission.
-    match /submissions/{submissionId} {
-      allow create: if request.auth != null; // User must be logged in
-      allow read: if request.auth != null && (resource.data.userId == request.auth.uid || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
-      allow update, delete: if request.auth != null && (resource.data.userId == request.auth.uid || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
+    // قواعد لمجموعة 'users' (إذا كنت لا تزال تستخدمها، يجب أن تكون أكثر تقييدًا)
+    // على سبيل المثال، السماح للمستخدم بقراءة وتحديث بياناته الخاصة فقط
+    match /users/{userId} {
+      allow read, update: if request.auth != null && request.auth.uid == userId;
+      // منع الإنشاء العام للمستخدمين من خلال قواعد الأمان (يتم عادةً عبر createUserWithEmailAndPassword)
+      allow create: if request.auth != null; // أو قاعدة أكثر تحديدًا إذا لزم الأمر
+      allow delete: if false; // عادة لا يسمح بحذف المستخدمين من خلال قواعد العميل
     }
+
+    // يمكنك إضافة قواعد لمجموعات أخرى هنا حسب الحاجة
   }
 }

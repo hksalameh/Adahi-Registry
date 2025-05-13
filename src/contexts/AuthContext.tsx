@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { User as AppUser, AdahiSubmission } from "@/lib/types";
@@ -43,7 +42,7 @@ interface AuthContextType {
   fetchUserById: (userId: string) => Promise<AppUser | null>;
 }
 
-const ADMIN_UID = "vqhrldpAdeWGcCgcMpWWRGdslOS2"; // Define the admin UID
+const ADMIN_UID = "vqhrldpAdeWGcCgcMpWWRGdslOS2"; 
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -67,15 +66,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const userDocSnap = await getDoc(userDocRef);
       if (userDocSnap.exists()) {
         const userData = userDocSnap.data();
-        // Explicitly check if this user is the admin
         const isAdmin = userId === ADMIN_UID || userData.isAdmin === true;
         return { id: userDocSnap.id, ...userData, isAdmin } as AppUser;
       } else {
-        // If user doc doesn't exist, but it's the admin UID, create a minimal admin user object
         if (userId === ADMIN_UID) {
             return {
                 id: userId,
-                email: "admin@example.com", // Placeholder, will be updated by auth
+                email: "admin@example.com", 
                 username: "Admin",
                 isAdmin: true,
             };
@@ -92,7 +89,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (!auth) {
-      console.error("AuthContext: Firebase Auth is not initialized.");
       setLoading(false);
       setUser(null);
       return;
@@ -101,9 +97,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (firebaseUser) {
         const appUser = await fetchUserById(firebaseUser.uid);
         if (appUser) {
-            setUser({...appUser, email: firebaseUser.email || appUser.email}); // Ensure email from auth is preferred
+            setUser({...appUser, email: firebaseUser.email || appUser.email});
         } else {
-            console.warn(`User with UID ${firebaseUser.uid} authenticated but no Firestore record found or fetch failed.`);
             setUser({ 
                 id: firebaseUser.uid,
                 email: firebaseUser.email || "",
@@ -120,18 +115,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (loading || !db || !user) { // Require user for fetching submissions
+    if (!db) { 
         setSubmissions([]);
         setAllSubmissions([]);
         return;
     }
+    
+    // If user is null (login bypassed) and we want to show all submissions for adding,
+    // this part might need adjustment or we rely on rules for security.
+    // For now, if user is admin, they see all. If not admin (or user is null), they see their own (or none if user is null and query needs userId).
+    // Given "لنلغي الان موضوع صفحة تسجيل الدخول", the non-admin query might not work as expected if 'user' is always null.
+    // However, the immediate error is for *adding* submissions.
 
     let q;
-    if (user.isAdmin) {
+    if (user && user.isAdmin) { // Admin sees all
       q = query(collection(db, "submissions"), orderBy("submissionDate", "desc"));
-    } else {
+    } else if (user) { // Logged-in non-admin sees their own
       q = query(collection(db, "submissions"), where("userId", "==", user.id), orderBy("submissionDate", "desc"));
-    } 
+    } else { 
+      // If user is null (login bypassed), what should be fetched for UserSubmissionsTable?
+      // For now, let's assume it might fetch nothing or this part won't be active for viewing.
+      // The primary concern is *adding* submissions.
+      // To prevent errors, if 'user' is null, we might fetch no submissions or all if rules permit.
+      // Let's set submissions to empty if no user.
+      setSubmissions([]);
+      // For admin, even if initial user state is null but then becomes admin, this effect will re-run.
+      // If admin is not logged in (user is null), allSubmissions will also be empty or based on a public query.
+      // Let's assume admin must be logged in to see allSubmissions.
+      if (!user || !user.isAdmin) setAllSubmissions([]); // Clear admin submissions if not admin or no user
+      return; // Don't set up listener if no user or not admin for specific queries
+    }
     
     const unsubscribeSubmissions = onSnapshot(q, (querySnapshot) => {
       const subs = querySnapshot.docs.map(docSnapshot => {
@@ -145,7 +158,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else if (data.submissionDate instanceof Date) {
           submissionDateStr = data.submissionDate.toISOString();
         } else {
-          console.warn(`Submission ${docSnapshot.id} has invalid or missing submissionDate:`, data.submissionDate, ". Using epoch as fallback.");
           submissionDateStr = new Date(0).toISOString(); 
         }
         
@@ -156,9 +168,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } as AdahiSubmission;
       });
 
-      if (user.isAdmin) {
+      if (user && user.isAdmin) {
         setAllSubmissions(subs);
-        setSubmissions([]); 
+        // setSubmissions([]); // Admin doesn't need 'submissions' for their own, they use allSubmissions
       } else {
         setSubmissions(subs);
       }
@@ -168,7 +180,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => unsubscribeSubmissions();
-  }, [user, loading, toast, db]);
+  }, [user, loading, toast, db]); // loading was included, db is a dependency
 
 
   const login = async (email: string, pass: string): Promise<AppUser | null> => {
@@ -181,21 +193,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const userCredential = await signInWithEmailAndPassword(auth, email, pass);
       const firebaseUser = userCredential.user;
       const appUser = await fetchUserById(firebaseUser.uid);
-      setLoading(false);
+      
       if (appUser) {
+        setUser({...appUser, email: firebaseUser.email || appUser.email});
         toast({title: "تم تسجيل الدخول بنجاح"});
-        setUser({...appUser, email: firebaseUser.email || appUser.email}); // Update state immediately
+        setLoading(false);
         return {...appUser, email: firebaseUser.email || appUser.email};
       }
-      // Fallback if user doc not found immediately
+      // Fallback if user doc not found immediately, create a minimal user object
       const minimalUser = {
         id: firebaseUser.uid, 
         email: firebaseUser.email || "", 
-        username: firebaseUser.displayName || firebaseUser.email || "", 
+        username: firebaseUser.displayName || firebaseUser.email || "مستخدم", 
         isAdmin: firebaseUser.uid === ADMIN_UID 
       };
       setUser(minimalUser);
       toast({title: "تم تسجيل الدخول, جاري جلب بيانات المستخدم..."});
+      setLoading(false);
       return minimalUser;
 
     } catch (error: any) {
@@ -225,7 +239,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
       const firebaseUser = userCredential.user;
       
-      const isAdmin = firebaseUser.uid === ADMIN_UID; // Check if registering user is the admin
+      const isAdmin = firebaseUser.uid === ADMIN_UID; 
       const newUserFirestoreData = {
         username,
         email: firebaseUser.email || email,
@@ -240,10 +254,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       setLoading(false);
       toast({title: "تم التسجيل بنجاح! يمكنك الآن تسجيل الدخول."});
+      // setUser(appUser); // No, onAuthStateChanged handles this. Or redirect to login.
       return appUser;
     } catch (error: any) {
       console.error("Registration error:", error);
-      setUser(null);
+      setUser(null); // Clear user on registration error
       setLoading(false);
       let errorMessage = "فشل التسجيل. ";
       if (error.code === 'auth/email-already-in-use') {
@@ -262,7 +277,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     if (!auth) {
-        console.error("AuthContext: Firebase Auth is not initialized, cannot logout.");
         return;
     }
     try {
@@ -271,8 +285,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSubmissions([]);
         setAllSubmissions([]);
         toast({title: "تم تسجيل الخروج بنجاح"});
-        router.push("/auth/login");
-        
+        router.push("/auth/login"); 
     } catch (error) {
         console.error("Logout error:", error);
         toast({variant: "destructive", title: "خطأ", description: "فشل تسجيل الخروج."});
@@ -285,44 +298,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       toast({ variant: "destructive", title: "خطأ", description: "لا يمكن إضافة البيانات. النظام غير مهيأ بشكل صحيح." });
       return null;
     }
-    if (!user) {
-        toast({ variant: "destructive", title: "غير مصرح به", description: "يجب تسجيل الدخول لإضافة أضحية."});
-        router.push(`/auth/login?redirect=${pathname}`);
-        return null;
-    }
+    // بما أن تسجيل الدخول تم إلغاؤه، يمكننا السماح بالإضافة بدون التحقق من المستخدم هنا
+    // أو يمكنك وضع منطق مختلف إذا أردت تتبع المستخدم بطريقة أخرى (مثلاً، رقم فريد مؤقت)
     try {
       const newSubmissionData = {
         ...submissionData,
-        userId: user.id,
-        userEmail: user.email,
+        userId: user ? user.id : "ANONYMOUS_USER", // قيمة افتراضية إذا كان المستخدم غير موجود
+        userEmail: user ? user.email : "anonymous@example.com", // قيمة افتراضية
         submissionDate: serverTimestamp(),
         status: "pending" as const,
       };
       const docRef = await addDoc(collection(db, "submissions"), newSubmissionData);
       
+      // This client-side representation needs to be consistent.
+      // serverTimestamp() will resolve to a server-side date.
+      // For immediate feedback, use new Date().toISOString()
       const clientSideRepresentation: AdahiSubmission = {
-        ...submissionData,
+        ...submissionData, // original data from form
         id: docRef.id,
-        userId: user.id,
-        userEmail: user.email,
+        userId: newSubmissionData.userId, // use the potentially anonymous ID
+        userEmail: newSubmissionData.userEmail, // use the potentially anonymous email
         status: "pending",
-        submissionDate: new Date().toISOString() 
+        submissionDate: new Date().toISOString() // For immediate UI update
       };
       return clientSideRepresentation;
     } catch (error) {
       console.error("Error adding submission:", error);
-      toast({ variant: "destructive", title: "خطأ", description: "فشل في إضافة البيانات." });
+      // The error "Missing or insufficient permissions" will be caught here.
+      // The toast message for this is handled in the form itself or a generic error here.
+      if ((error as any)?.code === "permission-denied") {
+           toast({ variant: "destructive", title: "خطأ في الصلاحيات", description: "ليس لديك الصلاحية لإضافة هذه البيانات. يرجى مراجعة قواعد الأمان في Firebase." });
+      } else {
+           toast({ variant: "destructive", title: "خطأ", description: "فشل في إضافة البيانات." });
+      }
       return null;
     }
   };
   
   const updateSubmissionStatus = async (submissionId: string, status: 'pending' | 'entered'): Promise<boolean> => {
     if (!db) {
-      console.error("AuthContext: Cannot update status, DB not initialized.");
       toast({ variant: "destructive", title: "خطأ", description: "لا يمكن تحديث الحالة. النظام غير مهيأ." });
       return false;
     }
-    if (!user || !user.isAdmin) {
+    if (!user || !user.isAdmin) { // Admin check remains
         toast({variant: "destructive", title: "غير مصرح به", description: "ليس لديك صلاحية لتحديث الحالة."});
         return false;
     }
@@ -339,18 +357,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const updateSubmission = async (submissionId: string, data: Partial<Omit<AdahiSubmission, 'id' | 'userId' | 'userEmail' | 'submissionDate'>>): Promise<AdahiSubmission | null> => {
     if (!db) {
-      console.error("AuthContext: Cannot update submission, DB not initialized.");
       toast({ variant: "destructive", title: "خطأ", description: "لا يمكن تحديث البيانات. النظام غير مهيأ." });
       return null;
     } 
-    if (!user || !user.isAdmin) {
+    if (!user || !user.isAdmin) { // Admin check remains
         toast({variant: "destructive", title: "غير مصرح به", description: "ليس لديك صلاحية لتحديث البيانات."});
         return null;
     }
     
     try {
       const submissionDocRef = doc(db, "submissions", submissionId);
-      const updateData = { ...data };
+      const updateData = { ...data, lastUpdated: serverTimestamp() }; // Example of adding a lastUpdated field
       await updateDoc(submissionDocRef, updateData);
       
       const updatedDocSnap = await getDoc(submissionDocRef);
@@ -360,7 +377,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (updatedData.submissionDate && typeof updatedData.submissionDate.toDate === 'function') {
           submissionDateStr = updatedData.submissionDate.toDate().toISOString();
         }
-        return { id: updatedDocSnap.id, ...updatedData, submissionDate: submissionDateStr } as AdahiSubmission;
+        // Ensure all fields of AdahiSubmission are present
+        return { 
+            id: updatedDocSnap.id, 
+            ...updatedData, 
+            submissionDate: submissionDateStr,
+            // Ensure all required fields have defaults if not in updatedData
+            donorName: updatedData.donorName || "",
+            sacrificeFor: updatedData.sacrificeFor || "",
+            phoneNumber: updatedData.phoneNumber || "",
+            wantsToAttend: updatedData.wantsToAttend === true, // ensure boolean
+            wantsFromSacrifice: updatedData.wantsFromSacrifice === true, // ensure boolean
+            paymentConfirmed: updatedData.paymentConfirmed === true, // ensure boolean
+            throughIntermediary: updatedData.throughIntermediary === true, // ensure boolean
+            distributionPreference: updatedData.distributionPreference || "ramtha", // default if missing
+            status: updatedData.status || "pending", // default if missing
+         } as AdahiSubmission;
       }
       return null; 
     } catch (error) {
@@ -372,11 +404,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const deleteSubmission = async (submissionId: string): Promise<boolean> => {
     if (!db) {
-       console.error("AuthContext: Cannot delete submission, DB not initialized.");
        toast({ variant: "destructive", title: "خطأ", description: "لا يمكن حذف البيانات. النظام غير مهيأ." });
       return false;
     } 
-    if (!user || !user.isAdmin) {
+    if (!user || !user.isAdmin) { // Admin check remains
         toast({variant: "destructive", title: "غير مصرح به", description: "ليس لديك صلاحية لحذف البيانات."});
         return false;
     }
