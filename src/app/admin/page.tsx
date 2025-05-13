@@ -4,7 +4,7 @@
 import AdminSubmissionsTable from "@/components/tables/AdminSubmissionsTable";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { FileDown, Settings2, TableIcon, BarChart3, Sheep, HandHelping, PiggyBank } from "lucide-react"; 
+import { FileDown, Settings2, TableIcon, BarChart3, Archive, HandHelping, PiggyBank } from "lucide-react"; 
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import type { AdahiSubmission } from "@/lib/types";
@@ -82,6 +82,28 @@ export default function AdminDashboardPage() {
      // Forcing a re-evaluation if allSubmissionsForAdmin reference doesn't change but content does:
      const validSubmissions = allSubmissionsForAdmin.filter(sub => sub && sub.distributionPreference);
      setSubmissions(validSubmissions); 
+     // Recalculate distribution counts as well
+      if (validSubmissions.length > 0) {
+        const counts = validSubmissions.reduce(
+          (acc, sub) => {
+            if (sub.distributionPreference === 'ramtha' || sub.distributionPreference === 'donor') {
+              acc.adahiRamthaDonor += 1;
+            } else if (sub.distributionPreference === 'gaza') {
+              acc.adahiGaza += 1;
+            } else if (sub.distributionPreference === 'fund') {
+              acc.adahiFund += 1;
+            }
+            return acc;
+          },
+          { adahiRamthaDonor: 0, adahiGaza: 0, adahiFund: 0 }
+        );
+        setDistributionCounts({
+          ...counts,
+          total: validSubmissions.length
+        });
+      } else {
+        setDistributionCounts({ adahiRamthaDonor: 0, adahiGaza: 0, adahiFund: 0, total: 0 });
+      }
   };
 
   const handleExportAll = async () => {
@@ -158,7 +180,7 @@ export default function AdminDashboardPage() {
                 إدارة الأضاحي
             </h2>
             <p className="text-muted-foreground">
-                عرض وتعديل وحذف جميع الأضاحي المسجلة في النظام.
+                عرض وتعديل وحذف جميع الأضاحي المسجلة في النظام. إجمالي عدد الأضاحي: {distributionCounts.total}
             </p>
         </div>
 
@@ -166,12 +188,12 @@ export default function AdminDashboardPage() {
           <CardHeader>
             <CardTitle className="text-xl flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-primary" />
-              إحصائيات توزيع الأضاحي (الإجمالي: {distributionCounts.total})
+              إحصائيات توزيع الأضاحي
             </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
             <div className="p-4 border rounded-lg shadow-sm bg-secondary/30">
-              <Sheep className="h-8 w-8 mx-auto text-primary mb-2" />
+              <Archive className="h-8 w-8 mx-auto text-primary mb-2" data-ai-hint="sheep livestock" />
               <p className="text-md font-semibold">أضاحي (الرمثا والمتبرع)</p>
               <p className="text-2xl font-bold text-primary">{distributionCounts.adahiRamthaDonor}</p>
             </div>
@@ -193,3 +215,4 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
+
