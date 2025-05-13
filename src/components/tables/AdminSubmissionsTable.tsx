@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCap
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { CheckCircle, Edit3, Trash2, MoreHorizontal, Eye, Phone, Users, CalendarDays, DollarSign, UserCircle, ListTree, Heart, MessageSquare, Receipt, FileText, CalendarCheck2, Loader2 } from "lucide-react";
+import { CheckCircle, Edit3, Trash2, MoreHorizontal, Eye, Phone, Users, CalendarDays, DollarSign, UserCircle, ListTree, Heart, MessageSquare, Receipt, FileText, CalendarCheck2, Loader2, Fingerprint, Mail, UserCog, User } from "lucide-react";
 import { format } from "date-fns";
 import { arSA } from "date-fns/locale";
 import { useAuth } from "@/hooks/useAuth";
@@ -56,11 +56,11 @@ const formatDateTime = (dateString: string | undefined | null): string => {
 
 
 export default function AdminSubmissionsTable({ submissions, onDataChange }: AdminSubmissionsTableProps) {
-  const { updateSubmissionStatus, deleteSubmission, refreshData } = useAuth(); // Added refreshData
+  const { updateSubmissionStatus, deleteSubmission, refreshData } = useAuth();
   const { toast } = useToast();
   const [editingSubmission, setEditingSubmission] = useState<AdahiSubmission | null>(null);
-  const [isUpdatingStatus, setIsUpdatingStatus] = useState<string | null>(null); // For specific row status update
-  const [isDeleting, setIsDeleting] = useState<string | null>(null); // For specific row deletion
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
 
   const handleStatusUpdate = async (id: string, newStatus: 'pending' | 'entered') => {
@@ -68,8 +68,9 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
     const success = await updateSubmissionStatus(id, newStatus);
     if (success) {
       toast({ title: "تم تحديث الحالة بنجاح." });
-      // onDataChange(); // onSnapshot should handle this
-      await refreshData(); // Explicitly refresh to ensure UI consistency after action
+      await refreshData(); 
+    } else {
+      toast({ title: "فشل تحديث الحالة.", variant: "destructive" });
     }
     setIsUpdatingStatus(null);
   };
@@ -79,13 +80,15 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
     const success = await deleteSubmission(id);
     if (success) {
       toast({ title: "تم حذف السجل بنجاح." });
-      // onDataChange(); // onSnapshot should handle this
-      await refreshData(); // Explicitly refresh
+      await refreshData();
+    } else {
+      toast({ title: "فشل حذف السجل.", variant: "destructive" });
     }
     setIsDeleting(null);
   };
 
-  const getDistributionLabel = (value: string) => {
+  const getDistributionLabel = (value?: string) => {
+    if (!value) return "غير محدد";
     return distributionOptions.find(opt => opt.value === value)?.label || value;
   };
 
@@ -95,8 +98,7 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
 
   const closeEditDialog = async () => {
     setEditingSubmission(null);
-    // onDataChange(); // onSnapshot should handle this
-    await refreshData(); // Explicitly refresh after edit dialog closes
+    await refreshData();
   }
 
   return (
@@ -166,29 +168,38 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
                             <DialogHeader>
                                 <DialogTitle>تفاصيل أضحية: {sub.donorName}</DialogTitle>
                             </DialogHeader>
-                            <ScrollArea className="max-h-[60vh] p-1">
+                            <ScrollArea className="max-h-[70vh] p-1">
                             <div className="grid gap-3 py-4 text-sm">
-                                <div className="grid grid-cols-2 gap-2"><strong><UserCircle className="inline-block mr-1 h-4 w-4"/>مدخل البيانات:</strong> <p>{sub.submitterUsername || sub.userEmail || sub.userId || "غير متوفر"}</p></div>
-                                <div className="grid grid-cols-2 gap-2"><strong><UserCircle className="inline-block mr-1 h-4 w-4"/>اسم المتبرع:</strong> <p>{sub.donorName}</p></div>
-                                <div className="grid grid-cols-2 gap-2"><strong><Heart className="inline-block mr-1 h-4 w-4"/>الأضحية عن:</strong> <p>{sub.sacrificeFor}</p></div>
-                                <div className="grid grid-cols-2 gap-2"><strong><Phone className="inline-block mr-1 h-4 w-4"/>رقم الهاتف:</strong> <p>{sub.phoneNumber}</p></div>
-                                <div className="grid grid-cols-2 gap-2"><strong><CalendarCheck2 className="inline-block mr-1 h-4 w-4"/>يريد الحضور:</strong> <p>{sub.wantsToAttend ? "نعم" : "لا"}</p></div>
-                                <div className="grid grid-cols-2 gap-2"><strong><MessageSquare className="inline-block mr-1 h-4 w-4"/>يريد من الأضحية:</strong> <p>{sub.wantsFromSacrifice ? "نعم" : "لا"}</p></div>
-                                {sub.wantsFromSacrifice && <div className="grid grid-cols-2 gap-2"><strong>ماذا يريد:</strong> <p>{sub.sacrificeWishes || "-"}</p></div>}
-                                <div className="grid grid-cols-2 gap-2"><strong><DollarSign className="inline-block mr-1 h-4 w-4"/>تم الدفع:</strong> <p>{sub.paymentConfirmed ? "نعم" : "لا"}</p></div>
+                                <div className="grid grid-cols-2 gap-2 items-center"><strong><Fingerprint className="inline-block ml-1 h-4 w-4"/>معرف السجل (ID):</strong> <p className="truncate font-mono text-xs" title={sub.id}>{sub.id}</p></div>
+                                <div className="grid grid-cols-2 gap-2 items-center"><strong><UserCircle className="inline-block ml-1 h-4 w-4"/>مدخل البيانات:</strong> <p>{sub.submitterUsername || "غير متوفر"}</p></div>
+                                <div className="grid grid-cols-2 gap-2 items-center"><strong><User className="inline-block ml-1 h-4 w-4"/>معرف المستخدم (UserID):</strong> <p className="font-mono text-xs">{sub.userId || "غير متوفر"}</p></div>
+                                <div className="grid grid-cols-2 gap-2 items-center"><strong><Mail className="inline-block ml-1 h-4 w-4"/>البريد الإلكتروني للمستخدم:</strong> <p>{sub.userEmail || "غير متوفر"}</p></div>
+                                <hr className="my-2 col-span-2"/>
+                                <div className="grid grid-cols-2 gap-2 items-center"><strong><UserCircle className="inline-block ml-1 h-4 w-4"/>اسم المتبرع:</strong> <p>{sub.donorName}</p></div>
+                                <div className="grid grid-cols-2 gap-2 items-center"><strong><Heart className="inline-block ml-1 h-4 w-4"/>الأضحية عن:</strong> <p>{sub.sacrificeFor}</p></div>
+                                <div className="grid grid-cols-2 gap-2 items-center"><strong><Phone className="inline-block ml-1 h-4 w-4"/>رقم الهاتف:</strong> <p>{sub.phoneNumber}</p></div>
+                                <hr className="my-2 col-span-2"/>
+                                <div className="grid grid-cols-2 gap-2 items-center"><strong><CalendarCheck2 className="inline-block ml-1 h-4 w-4"/>يريد الحضور:</strong> <p>{sub.wantsToAttend ? "نعم" : "لا"}</p></div>
+                                <div className="grid grid-cols-2 gap-2 items-center"><strong><MessageSquare className="inline-block ml-1 h-4 w-4"/>يريد من الأضحية:</strong> <p>{sub.wantsFromSacrifice ? "نعم" : "لا"}</p></div>
+                                {sub.wantsFromSacrifice && <div className="grid grid-cols-2 gap-2 items-center"><strong>ماذا يريد:</strong> <p>{sub.sacrificeWishes || "-"}</p></div>}
+                                <hr className="my-2 col-span-2"/>
+                                <div className="grid grid-cols-2 gap-2 items-center"><strong><DollarSign className="inline-block ml-1 h-4 w-4"/>تم الدفع:</strong> <p>{sub.paymentConfirmed ? "نعم" : "لا"}</p></div>
                                 {sub.paymentConfirmed && (
                                 <>
-                                    <div className="grid grid-cols-2 gap-2"><strong><Receipt className="inline-block mr-1 h-4 w-4"/>رقم الدفتر:</strong> <p>{sub.receiptBookNumber || "-"}</p></div>
-                                    <div className="grid grid-cols-2 gap-2"><strong><FileText className="inline-block mr-1 h-4 w-4"/>رقم السند:</strong> <p>{sub.voucherNumber || "-"}</p></div>
+                                    <div className="grid grid-cols-2 gap-2 items-center"><strong><Receipt className="inline-block ml-1 h-4 w-4"/>رقم الدفتر:</strong> <p>{sub.receiptBookNumber || "-"}</p></div>
+                                    <div className="grid grid-cols-2 gap-2 items-center"><strong><FileText className="inline-block ml-1 h-4 w-4"/>رقم السند:</strong> <p>{sub.voucherNumber || "-"}</p></div>
                                 </>
                                 )}
-                                <div className="grid grid-cols-2 gap-2"><strong><Users className="inline-block mr-1 h-4 w-4"/>عن طريق وسيط:</strong> <p>{sub.throughIntermediary ? "نعم" : "لا"}</p></div>
-                                {sub.throughIntermediary && <div className="grid grid-cols-2 gap-2"><strong>اسم الوسيط:</strong> <p>{sub.intermediaryName || "-"}</p></div>}
-                                <div className="grid grid-cols-2 gap-2"><strong><ListTree className="inline-block mr-1 h-4 w-4"/>توزع لـ:</strong> <p>{getDistributionLabel(sub.distributionPreference)}</p></div>
-                                <div className="grid grid-cols-2 gap-2"><strong><CalendarDays className="inline-block mr-1 h-4 w-4"/>تاريخ التسجيل:</strong> <p>{formatDateTime(sub.submissionDate)}</p></div>
-                                <div className="grid grid-cols-2 gap-2"><strong><CalendarDays className="inline-block mr-1 h-4 w-4"/>آخر تحديث:</strong> <p>{formatDateTime(sub.lastUpdated)}</p></div>
-                                <div className="grid grid-cols-2 gap-2"><strong><UserCircle className="inline-block mr-1 h-4 w-4"/>آخر تحديث بواسطة:</strong> <p>{sub.lastUpdatedByEmail || sub.lastUpdatedBy || "غير معروف"}</p></div>
-                                <div className="grid grid-cols-2 gap-2"><strong>الحالة:</strong> <Badge variant={sub.status === "entered" ? "default" : "secondary"} className={sub.status === "entered" ? "bg-green-500 text-white" : "bg-yellow-400 text-black"}>{sub.status === "entered" ? "مدخلة" : "غير مدخلة"}</Badge></div>
+                                <hr className="my-2 col-span-2"/>
+                                <div className="grid grid-cols-2 gap-2 items-center"><strong><Users className="inline-block ml-1 h-4 w-4"/>عن طريق وسيط:</strong> <p>{sub.throughIntermediary ? "نعم" : "لا"}</p></div>
+                                {sub.throughIntermediary && <div className="grid grid-cols-2 gap-2 items-center"><strong>اسم الوسيط:</strong> <p>{sub.intermediaryName || "-"}</p></div>}
+                                <div className="grid grid-cols-2 gap-2 items-center"><strong><ListTree className="inline-block ml-1 h-4 w-4"/>توزع لـ:</strong> <p>{getDistributionLabel(sub.distributionPreference)}</p></div>
+                                <hr className="my-2 col-span-2"/>
+                                <div className="grid grid-cols-2 gap-2 items-center"><strong><CalendarDays className="inline-block ml-1 h-4 w-4"/>تاريخ التسجيل:</strong> <p>{formatDateTime(sub.submissionDate)}</p></div>
+                                <div className="grid grid-cols-2 gap-2 items-center"><strong><CalendarDays className="inline-block ml-1 h-4 w-4"/>آخر تحديث:</strong> <p>{formatDateTime(sub.lastUpdated)}</p></div>
+                                <div className="grid grid-cols-2 gap-2 items-center"><strong><UserCog className="inline-block ml-1 h-4 w-4"/>آخر تحديث بواسطة (إيميل):</strong> <p>{sub.lastUpdatedByEmail || "غير معروف"}</p></div>
+                                <div className="grid grid-cols-2 gap-2 items-center"><strong><UserCog className="inline-block ml-1 h-4 w-4"/>معرف آخر محدث (ID):</strong> <p className="font-mono text-xs">{sub.lastUpdatedBy || "غير معروف"}</p></div>
+                                <div className="grid grid-cols-2 gap-2 items-center"><strong>الحالة:</strong> <Badge variant={sub.status === "entered" ? "default" : "secondary"} className={sub.status === "entered" ? "bg-green-500 text-white" : "bg-yellow-400 text-black w-fit"}>{sub.status === "entered" ? "مدخلة" : "غير مدخلة"}</Badge></div>
                             </div>
                             </ScrollArea>
                         </DialogContent>
@@ -201,9 +212,9 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
                       disabled={isUpdatingStatus === sub.id}
                     >
                       {isUpdatingStatus === sub.id ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Loader2 className="ml-2 h-4 w-4 animate-spin" />
                       ) : (
-                        <CheckCircle className="mr-2 h-4 w-4" />
+                        <CheckCircle className="ml-2 h-4 w-4" />
                       )}
                       {sub.status === "pending" ? "تأكيد الإدخال" : "إرجاع لـ (غير مدخلة)"}
                     </DropdownMenuItem>
@@ -212,9 +223,9 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
                         <AlertDialogTrigger asChild>
                             <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive cursor-pointer" disabled={isDeleting === sub.id}>
                                 {isDeleting === sub.id ? (
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  <Loader2 className="ml-2 h-4 w-4 animate-spin" />
                                 ) : (
-                                 <Trash2 className="mr-2 h-4 w-4" />
+                                 <Trash2 className="ml-2 h-4 w-4" />
                                 )}
                                 حذف
                             </DropdownMenuItem>
@@ -244,4 +255,3 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
     </div>
   );
 }
-
