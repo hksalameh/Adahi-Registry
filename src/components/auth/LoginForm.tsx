@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useForm } from "react-hook-form";
@@ -38,12 +37,10 @@ export default function LoginForm() {
   const onSubmit = async (data: LoginFormInputs) => {
     setIsLoading(true);
     let emailToLogin = data.identifier;
-    // Basic check to see if it might be an email.
-    // A more robust email validation might be needed if usernames can contain '@'.
+    
     const isPotentiallyEmail = data.identifier.includes('@') && data.identifier.includes('.');
 
     if (!isPotentiallyEmail) {
-      // Assume it's a username, try to fetch the user's email
       const userProfile = await fetchUserByUsername(data.identifier);
       if (userProfile && userProfile.email) {
         emailToLogin = userProfile.email;
@@ -51,7 +48,7 @@ export default function LoginForm() {
         toast({
           variant: "destructive",
           title: "خطأ في تسجيل الدخول",
-          description: "اسم المستخدم غير موجود أو لم يتم العثور على بريد إلكتروني مطابق.",
+          description: "اسم المستخدم غير موجود أو غير مطابق تمامًا لما تم تسجيله (يرجى مراعاة حالة الأحرف)، أو لم يتم العثور على بريد إلكتروني مطابق.",
         });
         setIsLoading(false);
         return;
@@ -62,11 +59,10 @@ export default function LoginForm() {
     setIsLoading(false);
 
     if (loggedInUser) {
-      toast({ title: "تم تسجيل الدخول بنجاح" }); // Moved success toast here
+      toast({ title: "تم تسجيل الدخول بنجاح" });
       const redirectUrl = searchParams.get("redirect") || (loggedInUser.isAdmin ? "/admin" : "/dashboard");
       router.push(redirectUrl);
     }
-    // Failure toasts are handled within the login function in AuthContext
   };
 
   return (
