@@ -41,13 +41,21 @@ This project uses Firebase for authentication and database services. To connect 
     *   Select a location for your database.
 
 5.  **Restart Your Development Server:**
-    *   **This is a crucial step!** If your development server (`npm run dev --turbopack -p 9002` in Firebase Studio) is running, stop it (Ctrl+C in the terminal window within Firebase Studio).
+    *   **THIS IS A CRUCIAL STEP!** If your development server (`npm run dev --turbopack -p 9002` in Firebase Studio) is running, stop it (Ctrl+C in the terminal window within Firebase Studio).
     *   Then, restart it by running `npm run dev --turbopack -p 9002` again. This allows Next.js to load the new environment variables from your `.env.local` file.
 
-If you encounter an `auth/invalid-api-key` error or similar Firebase configuration errors (like "Missing environment variable"), it usually means:
-*   The Firebase API key (or other configuration values) in your `.env.local` file are incorrect, missing, or still placeholders.
-*   The environment variable names in `.env.local` do not start with `NEXT_PUBLIC_`.
-*   The development server was not restarted after creating or updating the `.env.local` file.
-*   You might have copied the values incorrectly from the Firebase console. Double-check them.
-*   The `.env.local` file is not in the root directory of the project.
+## Troubleshooting Firebase Configuration Errors
+
+If you encounter an `auth/invalid-api-key` error or similar Firebase configuration errors (like "Missing environment variable NEXT_PUBLIC_FIREBASE_API_KEY"), it usually means:
+*   The Firebase API key (or other configuration values) in your `.env.local` file are incorrect, missing, or still placeholders. Ensure all `NEXT_PUBLIC_FIREBASE_...` variables in `.env.local` have correct values from your Firebase project.
+*   The environment variable names in `.env.local` do not start with `NEXT_PUBLIC_`. All Firebase environment variables used by the client-side code **must** start with `NEXT_PUBLIC_`.
+*   **The development server was not restarted after creating or updating the `.env.local` file.** This is the most common reason. Next.js only loads environment variables from `.env.local` when the server starts. Stop your server (Ctrl+C) and restart it (`npm run dev --turbopack -p 9002`).
+*   You might have copied the values incorrectly from the Firebase console. Double-check them meticulously.
+*   The `.env.local` file is not in the root directory of the project (i.e., it's not in the same folder as `package.json`).
+*   There might be a typo in the variable names within `.env.local` or in how they are accessed in `src/lib/firebase.ts`.
+
+**Specifically for "Missing environment variable NEXT_PUBLIC_FIREBASE_API_KEY":**
+1. Ensure `.env.local` exists in the project root.
+2. Ensure it contains the line `NEXT_PUBLIC_FIREBASE_API_KEY=YourActualApiKey` (replace `YourActualApiKey` with your key).
+3. **Stop and restart the development server.**
 ```
