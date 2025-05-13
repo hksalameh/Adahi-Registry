@@ -8,6 +8,7 @@ import { FileDown, Settings2, TableIcon, BarChart3, Archive, HandHelping, PiggyB
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import type { AdahiSubmission } from "@/lib/types";
+import { distributionOptions } from "@/lib/types"; // Import distributionOptions
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import * as XLSX from 'xlsx';
 
@@ -26,8 +27,11 @@ const exportToXlsx = (data: AdahiSubmission[], filename: string) => {
         "رقم تسلسلي",
         "اسم المتبرع",
         "الاضحية عن",
-        "يريد الحضور",
         "رقم التلفون",
+        "يريد الحضور",
+        "تم الدفع",
+        "الاضحية عن طريق",
+        "لمن ستوزع الاضحية",
         "اسم المستخدم"
       ];
 
@@ -35,8 +39,13 @@ const exportToXlsx = (data: AdahiSubmission[], filename: string) => {
         "رقم تسلسلي": index + 1,
         "اسم المتبرع": sub.donorName,
         "الاضحية عن": sub.sacrificeFor,
-        "يريد الحضور": sub.wantsToAttend ? "نعم" : "لا",
         "رقم التلفون": sub.phoneNumber,
+        "يريد الحضور": sub.wantsToAttend ? "نعم" : "لا",
+        "تم الدفع": sub.paymentConfirmed ? "نعم" : "لا",
+        "الاضحية عن طريق": sub.throughIntermediary 
+          ? `نعم${sub.intermediaryName ? ` (${sub.intermediaryName})` : ''}` 
+          : "لا",
+        "لمن ستوزع الاضحية": distributionOptions.find(opt => opt.value === sub.distributionPreference)?.label || sub.distributionPreference || "غير محدد",
         "اسم المستخدم": sub.submitterUsername || sub.userEmail || sub.userId || "غير متوفر",
       }));
       
