@@ -11,6 +11,24 @@ interface UserSubmissionsTableProps {
   submissions: AdahiSubmission[];
 }
 
+const formatDate = (dateString: string | undefined | null): string => {
+  if (!dateString) {
+    return 'N/A';
+  }
+  try {
+    const dateObj = new Date(dateString);
+    // Check if dateObj is a valid date
+    if (isNaN(dateObj.getTime())) {
+      console.warn("Invalid date string encountered in UserSubmissionsTable:", dateString);
+      return 'تاريخ غير صالح';
+    }
+    return format(dateObj, "dd/MM/yyyy", { locale: arSA });
+  } catch (error) {
+    console.error("Error formatting date in UserSubmissionsTable:", dateString, error);
+    return 'خطأ في التاريخ';
+  }
+};
+
 export default function UserSubmissionsTable({ submissions }: UserSubmissionsTableProps) {
   if (!submissions || submissions.length === 0) {
     return <p className="text-center text-muted-foreground mt-8">لا توجد أضاحي مسجلة حالياً.</p>;
@@ -38,8 +56,7 @@ export default function UserSubmissionsTable({ submissions }: UserSubmissionsTab
               <TableCell>{sub.phoneNumber}</TableCell>
               <TableCell>{sub.wantsToAttend ? "نعم" : "لا"}</TableCell>
               <TableCell>
-                {/* Ensure submissionDate is a valid Date object or string for `new Date()` */}
-                {sub.submissionDate ? format(new Date(sub.submissionDate), "dd/MM/yyyy", { locale: arSA }) : 'N/A'}
+                {formatDate(sub.submissionDate)}
               </TableCell>
               <TableCell>
                 <Badge variant={sub.status === "entered" ? "default" : "secondary"} 

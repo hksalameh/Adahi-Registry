@@ -24,9 +24,43 @@ interface AdminSubmissionsTableProps {
   onDataChange: () => void; 
 }
 
+const formatDate = (dateString: string | undefined | null): string => {
+  if (!dateString) {
+    return 'N/A';
+  }
+  try {
+    const dateObj = new Date(dateString);
+    if (isNaN(dateObj.getTime())) {
+      console.warn("Invalid date string encountered in AdminSubmissionsTable (formatDate):", dateString);
+      return 'تاريخ غير صالح';
+    }
+    return format(dateObj, "dd/MM/yyyy", { locale: arSA });
+  } catch (error) {
+    console.error("Error formatting date in AdminSubmissionsTable (formatDate):", dateString, error);
+    return 'خطأ في التاريخ';
+  }
+};
+
+const formatDateTime = (dateString: string | undefined | null): string => {
+  if (!dateString) {
+    return 'N/A';
+  }
+  try {
+    const dateObj = new Date(dateString);
+    if (isNaN(dateObj.getTime())) {
+      console.warn("Invalid date string encountered in AdminSubmissionsTable (formatDateTime):", dateString);
+      return 'تاريخ غير صالح';
+    }
+    return format(dateObj, "dd/MM/yyyy HH:mm", { locale: arSA });
+  } catch (error) {
+    console.error("Error formatting date/time in AdminSubmissionsTable (formatDateTime):", dateString, error);
+    return 'خطأ في التاريخ';
+  }
+};
+
+
 export default function AdminSubmissionsTable({ submissions, onDataChange }: AdminSubmissionsTableProps) {
-  // User checks in these functions (isAdmin) are removed in AuthContext
-  const { updateSubmissionStatus, deleteSubmission, updateSubmission } = useAuth();
+  const { updateSubmissionStatus, deleteSubmission } = useAuth();
   const { toast } = useToast();
   const [editingSubmission, setEditingSubmission] = useState<AdahiSubmission | null>(null);
 
@@ -35,7 +69,7 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
     const success = await updateSubmissionStatus(id, newStatus);
     if (success) {
       toast({ title: "تم تحديث الحالة بنجاح." });
-      onDataChange(); // Notify parent of change
+      onDataChange(); 
     } else {
       toast({ variant: "destructive", title: "خطأ", description: "لم يتم تحديث الحالة." });
     }
@@ -45,7 +79,7 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
     const success = await deleteSubmission(id);
     if (success) {
       toast({ title: "تم حذف السجل بنجاح." });
-      onDataChange(); // Notify parent of change
+      onDataChange(); 
     } else {
       toast({ variant: "destructive", title: "خطأ", description: "لم يتم حذف السجل." });
     }
@@ -61,7 +95,7 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
   
   const closeEditDialog = () => {
     setEditingSubmission(null);
-    onDataChange(); // Notify parent of change after edit
+    onDataChange(); 
   }
 
   return (
@@ -87,7 +121,7 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
               <TableCell>{sub.sacrificeFor}</TableCell>
               <TableCell>{sub.phoneNumber}</TableCell>
               <TableCell>
-                {sub.submissionDate ? format(new Date(sub.submissionDate), "dd/MM/yyyy", { locale: arSA }) : 'N/A'}
+                {formatDate(sub.submissionDate)}
               </TableCell>
               <TableCell>
                 <Badge variant={sub.status === "entered" ? "default" : "secondary"}
@@ -150,7 +184,7 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
                                 <div className="grid grid-cols-2 gap-2"><strong><Users className="inline-block mr-1 h-4 w-4"/>عن طريق وسيط:</strong> <p>{sub.throughIntermediary ? "نعم" : "لا"}</p></div>
                                 {sub.throughIntermediary && <div className="grid grid-cols-2 gap-2"><strong>اسم الوسيط:</strong> <p>{sub.intermediaryName || "-"}</p></div>}
                                 <div className="grid grid-cols-2 gap-2"><strong><ListTree className="inline-block mr-1 h-4 w-4"/>توزع لـ:</strong> <p>{getDistributionLabel(sub.distributionPreference)}</p></div>
-                                <div className="grid grid-cols-2 gap-2"><strong><CalendarDays className="inline-block mr-1 h-4 w-4"/>تاريخ التسجيل:</strong> <p>{sub.submissionDate ? format(new Date(sub.submissionDate), "dd/MM/yyyy HH:mm", { locale: arSA }) : 'N/A'}</p></div>
+                                <div className="grid grid-cols-2 gap-2"><strong><CalendarDays className="inline-block mr-1 h-4 w-4"/>تاريخ التسجيل:</strong> <p>{formatDateTime(sub.submissionDate)}</p></div>
                                 <div className="grid grid-cols-2 gap-2"><strong>الحالة:</strong> <Badge variant={sub.status === "entered" ? "default" : "secondary"} className={sub.status === "entered" ? "bg-green-500 text-white" : "bg-yellow-400 text-black"}>{sub.status === "entered" ? "مدخلة" : "غير مدخلة"}</Badge></div>
                             </div>
                             </ScrollArea>
