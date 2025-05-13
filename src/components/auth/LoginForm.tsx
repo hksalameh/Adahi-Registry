@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useForm } from "react-hook-form";
@@ -14,14 +13,14 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 
 const loginSchema = z.object({
-  email: z.string().email("البريد الإلكتروني غير صالح").min(1, "البريد الإلكتروني مطلوب"),
+  identifier: z.string().min(1, "البريد الإلكتروني أو اسم المستخدم مطلوب"),
   password: z.string().min(6, "كلمة المرور يجب أن تكون 6 أحرف على الأقل"),
 });
 
 type LoginFormInputs = z.infer<typeof loginSchema>;
 
 export default function LoginForm() {
-  const { login } = useAuth();
+  const { login, fetchUserByUsername } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -30,20 +29,40 @@ export default function LoginForm() {
   const form = useForm<LoginFormInputs>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "",
+      identifier: "",
       password: "",
     },
   });
 
   const onSubmit = async (data: LoginFormInputs) => {
     setIsLoading(true);
-    const user = await login(data.email, data.password);
+    let emailToLogin = data.identifier;
+    const isEmail = data.identifier.includes('@');
+
+    if (!isEmail) {
+      // This is a username, try to fetch the user's email
+      const userProfile = await fetchUserByUsername(data.identifier);
+      if (userProfile && userProfile.email) {
+        emailToLogin = userProfile.email;
+      } else {
+        toast({
+          variant: "destructive",
+          title: "خطأ في تسجيل الدخول",
+          description: "اسم المستخدم غير موجود أو لم يتم العثور على بريد إلكتروني مطابق.",
+        });
+        setIsLoading(false);
+        return;
+      }
+    }
+
+    const loggedInUser = await login(emailToLogin, data.password);
     setIsLoading(false);
-    if (user) {
-      const redirectUrl = searchParams.get("redirect") || (user.isAdmin ? "/admin" : "/dashboard");
+
+    if (loggedInUser) {
+      const redirectUrl = searchParams.get("redirect") || (loggedInUser.isAdmin ? "/admin" : "/dashboard");
       router.push(redirectUrl);
     }
-    // Toast messages are handled within the login function in AuthContext
+    // Toast messages for login success/failure are handled within the login function in AuthContext
   };
 
   return (
@@ -51,12 +70,12 @@ export default function LoginForm() {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <FormField
           control={form.control}
-          name="email"
+          name="identifier"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>البريد الإلكتروني</FormLabel>
+              <FormLabel>البريد الإلكتروني أو اسم المستخدم</FormLabel>
               <FormControl>
-                <Input type="email" placeholder="example@example.com" {...field} />
+                <Input placeholder="example@example.com أو اسم_المستخدم" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>

@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { User as AppUser, AdahiSubmission } from "@/lib/types";
@@ -17,6 +16,7 @@ import {
   doc,
   addDoc,
   getDoc, 
+  getDocs, // Import getDocs for querying
   setDoc, 
   updateDoc,
   deleteDoc,
@@ -37,10 +37,11 @@ interface AuthContextType {
   submissions: AdahiSubmission[];
   addSubmission: (submission: Omit<AdahiSubmission, "id" | "submissionDate" | "status" | "userId" | "userEmail">) => Promise<AdahiSubmission | null>;
   updateSubmissionStatus: (submissionId: string, status: 'pending' | 'entered') => Promise<boolean>;
-  updateSubmission: (submissionId: string, data: Partial<Omit<AdahiSubmission, 'id' | 'userId' | 'userEmail' | 'submissionDate'>>) => Promise<AdahiSubmission | null>;
+  updateSubmission: (submissionId: string, data: Partial<Omit<AdahiSubmission, 'id' | 'userId' | 'userEmail' | 'submissionDate' | 'lastUpdated'>>) => Promise<AdahiSubmission | null>;
   deleteSubmission: (submissionId: string) => Promise<boolean>;
   allSubmissionsForAdmin: AdahiSubmission[];
   fetchUserById: (userId: string) => Promise<AppUser | null>;
+  fetchUserByUsername: (username: string) => Promise<AppUser | null>; // Added this
 }
 
 const ADMIN_UID = "vqhrldpAdeWGcCgcMpWWRGdslOS2"; 
@@ -59,7 +60,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchUserById = async (userId: string): Promise<AppUser | null> => {
     if (!db) {
-      console.error("AuthContext: Firestore DB is not initialized.");
+      console.error("AuthContext: Firestore DB is not initialized for fetchUserById.");
       return null;
     }
     try {
@@ -67,14 +68,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const userDocSnap = await getDoc(userDocRef);
       if (userDocSnap.exists()) {
         const userData = userDocSnap.data();
-        // Ensure isAdmin is correctly derived
         const isAdmin = userId === ADMIN_UID || userData.isAdmin === true;
         return { id: userDocSnap.id, ...userData, email: userData.email || "", username: userData.username || "", isAdmin } as AppUser;
       } else {
-        if (userId === ADMIN_UID) { // Handle case where admin user doc might not exist but UID matches
+        if (userId === ADMIN_UID) { 
             return {
                 id: userId,
-                email: "admin@example.com", // Placeholder, will be overridden by auth state if available
+                email: "admin@example.com", 
                 username: "Admin",
                 isAdmin: true,
             };
@@ -84,6 +84,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (error) {
       console.error("Error fetching user by ID:", error);
+      return null;
+    }
+  };
+
+  const fetchUserByUsername = async (username: string): Promise<AppUser | null> => {
+    if (!db) {
+      console.error("AuthContext: Firestore DB is not initialized for fetchUserByUsername.");
+      toast({ variant: "destructive", title: "خطأ في النظام", description: "قاعدة البيانات غير مهيأة." });
+      return null;
+    }
+    try {
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("username", "==", username));
+      const querySnapshot = await getDocs(q); // Use getDocs for one-time fetch
+
+      if (querySnapshot.empty) {
+        console.log(`No user found with username: ${username}`);
+        return null;
+      }
+
+      // Assuming username is unique, there should be only one doc
+      const userDoc = querySnapshot.docs[0];
+      const userData = userDoc.data();
+      const isAdmin = userDoc.id === ADMIN_UID || userData.isAdmin === true;
+      return { id: userDoc.id, ...userData, email: userData.email || "", username: userData.username || "", isAdmin } as AppUser;
+
+    } catch (error) {
+      console.error("Error fetching user by username:", error);
+      toast({ variant: "destructive", title: "خطأ", description: "فشل في جلب بيانات المستخدم." });
       return null;
     }
   };
@@ -100,13 +129,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (firebaseUser) {
         const appUser = await fetchUserById(firebaseUser.uid);
         if (appUser) {
-            setUser({...appUser, email: firebaseUser.email || appUser.email}); // Ensure email from auth is prioritized
+            setUser({...appUser, email: firebaseUser.email || appUser.email, username: appUser.username || firebaseUser.displayName || firebaseUser.email || "مستخدم"}); 
         } else {
-            // Fallback if fetchUserById returns null but firebaseUser exists (e.g., new user not yet in DB or admin case)
             setUser({ 
                 id: firebaseUser.uid,
                 email: firebaseUser.email || "",
-                username: firebaseUser.displayName || firebaseUser.email || "User",
+                username: firebaseUser.displayName || firebaseUser.email || "مستخدم",
                 isAdmin: firebaseUser.uid === ADMIN_UID, 
             });
         }
@@ -116,7 +144,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
     });
     return () => unsubscribe();
-  }, []); // Removed db from dependencies as fetchUserById checks it
+  }, []); 
 
   useEffect(() => {
     if (!db || !user) { 
@@ -146,15 +174,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else if (data.submissionDate instanceof Date) {
           submissionDateStr = data.submissionDate.toISOString();
         } else {
-           // Fallback for unexpected date format, or if date is missing
-          submissionDateStr = new Date().toISOString(); // Or handle as 'N/A' or skip item
+          submissionDateStr = new Date().toISOString(); 
           console.warn("Submission has invalid or missing submissionDate:", docSnapshot.id, data.submissionDate);
+        }
+
+        let lastUpdatedStr = data.lastUpdated;
+         if (data.lastUpdated && typeof data.lastUpdated.toDate === 'function') {
+            lastUpdatedStr = data.lastUpdated.toDate().toISOString();
+        } else if (typeof data.lastUpdated === 'string') {
+            lastUpdatedStr = data.lastUpdated;
+        } else if (data.lastUpdated instanceof Date) {
+            lastUpdatedStr = data.lastUpdated.toISOString();
         }
         
         return { 
           id: docSnapshot.id, 
           ...data, 
-          submissionDate: submissionDateStr 
+          submissionDate: submissionDateStr,
+          lastUpdated: lastUpdatedStr,
         } as AdahiSubmission;
       });
 
@@ -169,7 +206,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => unsubscribeSubmissions();
-  }, [user, toast]); // db removed as it's checked inside, loading not needed here
+  }, [user, toast]); 
 
 
   const login = async (email: string, pass: string): Promise<AppUser | null> => {
@@ -181,15 +218,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, pass);
       const firebaseUser = userCredential.user;
-      // onAuthStateChanged will fetch user doc and set user state
-      // But to return the user immediately:
       const appUser = await fetchUserById(firebaseUser.uid);
       
       if (appUser) {
-        // setUser({...appUser, email: firebaseUser.email || appUser.email }); // Handled by onAuthStateChanged
         toast({title: "تم تسجيل الدخول بنجاح"});
         setLoading(false);
-        return {...appUser, email: firebaseUser.email || appUser.email};
+        return {...appUser, email: firebaseUser.email || appUser.email, username: appUser.username || firebaseUser.displayName || firebaseUser.email || "مستخدم" };
       }
       
       const minimalUser: AppUser = {
@@ -198,17 +232,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         username: firebaseUser.displayName || firebaseUser.email || "مستخدم", 
         isAdmin: firebaseUser.uid === ADMIN_UID 
       };
-      // setUser(minimalUser); // Handled by onAuthStateChanged
       toast({title: "تم تسجيل الدخول, جاري جلب بيانات المستخدم..."});
       setLoading(false);
       return minimalUser;
 
     } catch (error: any) {
       console.error("Login error:", error);
-      // setUser(null); // Handled by onAuthStateChanged if auth state changes
       setLoading(false);
       let errorMessage = "فشل تسجيل الدخول. ";
-      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-email') {
         errorMessage += "البيانات المدخلة غير صحيحة.";
       } else if (error.code === 'auth/network-request-failed') {
         errorMessage += "مشكلة في الاتصال بالشبكة.";
@@ -225,6 +257,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         toast({variant: "destructive", title: "خطأ في التهيئة", description: "نظام التسجيل غير جاهز."});
         return null;
     }
+    // Check if username already exists
+    const existingUserByUsername = await fetchUserByUsername(username);
+    if (existingUserByUsername) {
+        toast({variant: "destructive", title: "خطأ في التسجيل", description: "اسم المستخدم هذا موجود بالفعل. الرجاء اختيار اسم آخر."});
+        return null;
+    }
+
     setLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
@@ -233,7 +272,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const isAdmin = firebaseUser.uid === ADMIN_UID; 
       const newUserFirestoreData = {
         username,
-        email: firebaseUser.email || email, // Prioritize email from auth
+        email: firebaseUser.email || email, 
         isAdmin: isAdmin, 
       };
       await setDoc(doc(db, "users", firebaseUser.uid), newUserFirestoreData);
@@ -248,7 +287,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return appUser;
     } catch (error: any) {
       console.error("Registration error:", error);
-      // setUser(null); // Let onAuthStateChanged handle if needed
       setLoading(false);
       let errorMessage = "فشل التسجيل. ";
       if (error.code === 'auth/email-already-in-use') {
@@ -272,9 +310,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     try {
         await signOut(auth);
-        // setUser(null); // Handled by onAuthStateChanged
-        // setSubmissions([]);
-        // setAllSubmissions([]);
         toast({title: "تم تسجيل الخروج بنجاح"});
         router.push("/auth/login"); 
     } catch (error: any) {
@@ -297,9 +332,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const newSubmissionData = {
         ...submissionData,
         userId: user.id,
-        userEmail: user.email,
+        userEmail: user.email, // Storing email for admin convenience
         submissionDate: serverTimestamp(),
         status: "pending" as const,
+        lastUpdated: serverTimestamp(),
       };
       const docRef = await addDoc(collection(db, "submissions"), newSubmissionData);
       
@@ -309,7 +345,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         userId: newSubmissionData.userId,
         userEmail: newSubmissionData.userEmail,
         status: "pending",
-        submissionDate: new Date().toISOString()
+        submissionDate: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
       };
       return clientSideRepresentation;
     } catch (error: any) {
@@ -336,7 +373,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     try {
       const submissionDocRef = doc(db, "submissions", submissionId);
-      await updateDoc(submissionDocRef, { status });
+      await updateDoc(submissionDocRef, { status, lastUpdated: serverTimestamp() });
       return true;
     } catch (error: any) {
       console.error("Error updating submission status:", error);
@@ -351,7 +388,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const updateSubmission = async (submissionId: string, data: Partial<Omit<AdahiSubmission, 'id' | 'userId' | 'userEmail' | 'submissionDate'>>): Promise<AdahiSubmission | null> => {
+  const updateSubmission = async (submissionId: string, data: Partial<Omit<AdahiSubmission, 'id' | 'userId' | 'userEmail' | 'submissionDate' | 'lastUpdated'>>): Promise<AdahiSubmission | null> => {
     if (!db) {
       toast({ variant: "destructive", title: "خطأ", description: "قاعدة البيانات غير مهيأة." });
       return null;
@@ -377,7 +414,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else if (updatedData.submissionDate instanceof Date) {
             submissionDateStr = updatedData.submissionDate.toISOString();
         } else {
-            submissionDateStr = new Date().toISOString(); // Fallback
+            submissionDateStr = new Date().toISOString(); 
         }
 
         let lastUpdatedStr = updatedData.lastUpdated;
@@ -408,7 +445,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             userId: updatedData.userId || "",
             userEmail: updatedData.userEmail || "",
             submissionDate: submissionDateStr,
-            lastUpdated: lastUpdatedStr, // Include lastUpdated if it exists
+            lastUpdated: lastUpdatedStr, 
          } as AdahiSubmission;
       }
       return null; 
@@ -452,9 +489,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, submissions, addSubmission, updateSubmissionStatus, updateSubmission, deleteSubmission, allSubmissionsForAdmin: allSubmissions, fetchUserById }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, submissions, addSubmission, updateSubmissionStatus, updateSubmission, deleteSubmission, allSubmissionsForAdmin: allSubmissions, fetchUserById, fetchUserByUsername }}>
       {children}
     </AuthContext.Provider>
   );
 };
-
