@@ -12,8 +12,8 @@ export type DistributionPreference = 'ramtha' | 'gaza' | 'donor' | 'fund';
 
 export interface AdahiSubmission {
   id: string; // Firestore document ID
-  userId: string; // Firebase UID of the user who submitted
-  userEmail?: string; // For admin display convenience
+  userId?: string; // Firebase UID of the user who submitted - now optional
+  userEmail?: string; // For admin display convenience - now optional
   donorName: string;
   sacrificeFor: string;
   phoneNumber: string;

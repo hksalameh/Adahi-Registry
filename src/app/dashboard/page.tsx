@@ -4,38 +4,36 @@
 import AdahiSubmissionForm from "@/components/forms/AdahiSubmissionForm";
 import UserSubmissionsTable from "@/components/tables/UserSubmissionsTable";
 import { useAuth } from "@/hooks/useAuth";
-import { useState, useEffect } from "react"; // useEffect to re-fetch/re-filter submissions
+import { useState, useEffect } from "react";
+import type { AdahiSubmission } from "@/lib/types";
 
 export default function DashboardPage() {
-  const { user, submissions: initialSubmissions } = useAuth();
-  // Local state to manage submissions, possibly to trigger re-renders if AuthContext updates aren't immediate
-  const [userSubmissions, setUserSubmissions] = useState(initialSubmissions);
+  // user from useAuth will always be null now.
+  const { submissions: initialSubmissions } = useAuth(); 
+  const [currentSubmissions, setCurrentSubmissions] = useState<AdahiSubmission[]>(initialSubmissions);
 
   useEffect(() => {
-    setUserSubmissions(initialSubmissions);
+    setCurrentSubmissions(initialSubmissions);
   }, [initialSubmissions]);
 
   const handleFormSubmit = () => {
-    // This function can be used to trigger a refresh of the submissions list if needed.
-    // For now, AuthContext handles updates, so this might not be strictly necessary
-    // but can be expanded if direct re-fetching is required.
-    // Example: fetchUserSubmissions().then(setUserSubmissions);
-    // The submissions state in AuthContext should re-render the table automatically.
+    // The submissions state in AuthContext should re-render the table automatically
+    // due to onSnapshot. This callback can be used for other side effects if needed.
   };
 
-  if (!user) {
-    // This should ideally be caught by the layout, but as a fallback.
-    return <p className="text-center p-8">الرجاء تسجيل الدخول لعرض هذه الصفحة.</p>;
-  }
+  // if (!user) { // Removed this check as user is always null and page is public
+  //   return <p className="text-center p-8">الرجاء تسجيل الدخول لعرض هذه الصفحة.</p>;
+  // }
 
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">لوحة التحكم الخاصة بك</h1>
-        <p className="text-muted-foreground">أضف أضحية جديدة أو اطلع على أضاحيك المسجلة.</p>
+        <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">لوحة التحكم</h1>
+        <p className="text-muted-foreground">أضف أضحية جديدة أو اطلع على الأضاحي المسجلة.</p>
       </div>
       <AdahiSubmissionForm onFormSubmit={handleFormSubmit} />
-      <UserSubmissionsTable submissions={userSubmissions} />
+      {/* UserSubmissionsTable will now display all submissions as AuthContext.submissions is updated */}
+      <UserSubmissionsTable submissions={currentSubmissions} />
     </div>
   );
 }

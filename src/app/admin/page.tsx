@@ -12,12 +12,6 @@ import type { AdahiSubmission } from "@/lib/types";
 // Mock export function (replace with actual Excel export logic if library is added)
 const exportToExcel = (data: AdahiSubmission[], filename: string) => {
   console.log(`Exporting data to ${filename}.xlsx:`, data);
-  // Placeholder: In a real app, use a library like 'xlsx' here.
-  // For example:
-  // const worksheet = XLSX.utils.json_to_sheet(data);
-  // const workbook = XLSX.utils.book_new();
-  // XLSX.utils.book_append_sheet(workbook, worksheet, "Submissions");
-  // XLSX.writeFile(workbook, `${filename}.xlsx`);
   return new Promise<void>((resolve) => {
     setTimeout(() => { // Simulate async operation
         const jsonData = JSON.stringify(data, null, 2);
@@ -37,7 +31,8 @@ const exportToExcel = (data: AdahiSubmission[], filename: string) => {
 
 
 export default function AdminDashboardPage() {
-  const { user, allSubmissionsForAdmin } = useAuth();
+  // user from useAuth will always be null. allSubmissionsForAdmin now contains all submissions.
+  const { allSubmissionsForAdmin } = useAuth(); 
   const { toast } = useToast();
   const [submissions, setSubmissions] = useState<AdahiSubmission[]>(allSubmissionsForAdmin);
 
@@ -46,7 +41,9 @@ export default function AdminDashboardPage() {
   }, [allSubmissionsForAdmin]);
   
   const handleDataChange = () => {
-     setSubmissions([...allSubmissionsForAdmin]); // Create new array ref to trigger re-render
+     // This might be called by AdminSubmissionsTable after an edit/delete.
+     // AuthContext's onSnapshot should handle updates, but forcing a new ref can help.
+     setSubmissions([...allSubmissionsForAdmin]); 
   };
 
   const handleExportAll = async () => {
@@ -63,7 +60,7 @@ export default function AdminDashboardPage() {
     toast({ title: "جاري تصدير البيانات حسب المستخدم..." });
     const submissionsByUser: { [key: string]: AdahiSubmission[] } = {};
     submissions.forEach(sub => {
-      const userKey = sub.userEmail || sub.userId;
+      const userKey = sub.userEmail || sub.userId || "unknown_user"; // Handle missing user info
       if (!submissionsByUser[userKey]) {
         submissionsByUser[userKey] = [];
       }
@@ -76,9 +73,9 @@ export default function AdminDashboardPage() {
     toast({ title: "تم تصدير البيانات حسب المستخدم بنجاح (JSON mock)." });
   };
 
-  if (!user || !user.isAdmin) {
-    return <p className="text-center p-8">ليس لديك صلاحية الوصول لهذه الصفحة.</p>;
-  }
+  // if (!user || !user.isAdmin) { // Removed check as page is public and no admin concept
+  //   return <p className="text-center p-8">ليس لديك صلاحية الوصول لهذه الصفحة.</p>;
+  // }
   
   return (
     <div className="space-y-8">

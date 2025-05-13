@@ -69,13 +69,14 @@ const submissionSchema = z.object({
 type SubmissionFormInputs = z.infer<typeof submissionSchema>;
 
 interface AdahiSubmissionFormProps {
-  onFormSubmit?: () => void; // Callback to refresh table or other actions
-  defaultValues?: Partial<AdahiSubmission>; // For editing
+  onFormSubmit?: () => void; 
+  defaultValues?: Partial<AdahiSubmission>; 
   isEditing?: boolean;
 }
 
 export default function AdahiSubmissionForm({ onFormSubmit, defaultValues, isEditing = false }: AdahiSubmissionFormProps) {
-  const { addSubmission, updateSubmission, user } = useAuth();
+  // user from useAuth will be null. AuthContext handles adding submissions without user specifics.
+  const { addSubmission, updateSubmission } = useAuth(); 
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -103,6 +104,7 @@ export default function AdahiSubmissionForm({ onFormSubmit, defaultValues, isEdi
 
   const processSubmit: SubmitHandler<SubmissionFormInputs> = async (data) => {
     setIsSubmitting(true);
+    // userId and userEmail are no longer attached here; AuthContext handles submission creation.
     const submissionData = {
       ...data,
       wantsToAttend: data.wantsToAttend === "yes",
@@ -114,6 +116,7 @@ export default function AdahiSubmissionForm({ onFormSubmit, defaultValues, isEdi
 
     let success = false;
     if (isEditing && defaultValues?.id) {
+        // Ensure data passed to updateSubmission matches its expected type (Omit id, userId, userEmail)
         const result = await updateSubmission(defaultValues.id, submissionData);
         success = !!result;
     } else {
@@ -125,7 +128,7 @@ export default function AdahiSubmissionForm({ onFormSubmit, defaultValues, isEdi
 
     if (success) {
       toast({ title: isEditing ? "تم تحديث البيانات بنجاح!" : "تم حفظ البيانات بنجاح!", description: "شكراً لمساهمتك." });
-      form.reset({ // Reset with default values or empty for new submission
+      form.reset({ 
         donorName: "",
         sacrificeFor: "",
         phoneNumber: "",
@@ -145,7 +148,7 @@ export default function AdahiSubmissionForm({ onFormSubmit, defaultValues, isEdi
     }
   };
   
-  if (!user) return null; // Should be handled by layout, but as a safeguard
+  // if (!user) return null; // Removed this check as form should always be available.
 
   return (
     <Card className="w-full shadow-lg">
@@ -208,7 +211,7 @@ export default function AdahiSubmissionForm({ onFormSubmit, defaultValues, isEdi
                       <RadioGroup
                         onValueChange={field.onChange}
                         defaultValue={field.value}
-                        className="flex space-x-4 space-x-reverse" // For RTL
+                        className="flex space-x-4 space-x-reverse" 
                       >
                         <FormItem className="flex items-center space-x-2 space-x-reverse">
                           <FormControl><RadioGroupItem value="yes" /></FormControl>
@@ -404,4 +407,3 @@ export default function AdahiSubmissionForm({ onFormSubmit, defaultValues, isEdi
     </Card>
   );
 }
-

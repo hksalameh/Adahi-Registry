@@ -25,17 +25,17 @@ interface AdminSubmissionsTableProps {
 }
 
 export default function AdminSubmissionsTable({ submissions, onDataChange }: AdminSubmissionsTableProps) {
-  const { updateSubmissionStatus, deleteSubmission } = useAuth();
+  // User checks in these functions (isAdmin) are removed in AuthContext
+  const { updateSubmissionStatus, deleteSubmission, updateSubmission } = useAuth();
   const { toast } = useToast();
   const [editingSubmission, setEditingSubmission] = useState<AdahiSubmission | null>(null);
-  // const [viewingSubmission, setViewingSubmission] = useState<AdahiSubmission | null>(null); // Not strictly needed if view is inline in Dialog
 
 
   const handleStatusUpdate = async (id: string, newStatus: 'pending' | 'entered') => {
     const success = await updateSubmissionStatus(id, newStatus);
     if (success) {
       toast({ title: "تم تحديث الحالة بنجاح." });
-      // onDataChange might not be needed if onSnapshot handles updates
+      onDataChange(); // Notify parent of change
     } else {
       toast({ variant: "destructive", title: "خطأ", description: "لم يتم تحديث الحالة." });
     }
@@ -45,7 +45,7 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
     const success = await deleteSubmission(id);
     if (success) {
       toast({ title: "تم حذف السجل بنجاح." });
-      // onDataChange might not be needed if onSnapshot handles updates
+      onDataChange(); // Notify parent of change
     } else {
       toast({ variant: "destructive", title: "خطأ", description: "لم يتم حذف السجل." });
     }
@@ -61,7 +61,7 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
   
   const closeEditDialog = () => {
     setEditingSubmission(null);
-    // onDataChange might not be needed if onSnapshot handles updates
+    onDataChange(); // Notify parent of change after edit
   }
 
   return (
@@ -82,12 +82,11 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
         <TableBody>
           {submissions.map((sub) => (
             <TableRow key={sub.id}>
-              <TableCell>{sub.userEmail || sub.userId}</TableCell>
+              <TableCell>{sub.userEmail || sub.userId || "غير متوفر"}</TableCell>
               <TableCell className="font-medium">{sub.donorName}</TableCell>
               <TableCell>{sub.sacrificeFor}</TableCell>
               <TableCell>{sub.phoneNumber}</TableCell>
               <TableCell>
-                {/* Ensure submissionDate is a valid Date object or string for `new Date()` */}
                 {sub.submissionDate ? format(new Date(sub.submissionDate), "dd/MM/yyyy", { locale: arSA }) : 'N/A'}
               </TableCell>
               <TableCell>
@@ -103,7 +102,7 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
                             <Edit3 className="h-4 w-4" />
                         </Button>
                     </DialogTrigger>
-                    {editingSubmission && editingSubmission.id === sub.id && ( // Redundant check if Dialog `open` is used correctly
+                    {editingSubmission && editingSubmission.id === sub.id && (
                          <DialogContent className="sm:max-w-[600px] md:max-w-[800px]">
                             <DialogHeader>
                             <DialogTitle>تعديل بيانات الأضحية لـ: {editingSubmission.donorName}</DialogTitle>
@@ -135,7 +134,7 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
                             <ScrollArea className="max-h-[60vh] p-1">
                             <div className="grid gap-3 py-4 text-sm">
                                 <div className="grid grid-cols-2 gap-2"><strong><UserCircle className="inline-block mr-1 h-4 w-4"/>اسم المتبرع:</strong> <p>{sub.donorName}</p></div>
-                                <div className="grid grid-cols-2 gap-2"><strong><UserCircle className="inline-block mr-1 h-4 w-4"/>مدخل البيانات:</strong> <p>{sub.userEmail || sub.userId}</p></div>
+                                <div className="grid grid-cols-2 gap-2"><strong><UserCircle className="inline-block mr-1 h-4 w-4"/>مدخل البيانات:</strong> <p>{sub.userEmail || sub.userId || "غير متوفر"}</p></div>
                                 <div className="grid grid-cols-2 gap-2"><strong><Heart className="inline-block mr-1 h-4 w-4"/>الأضحية عن:</strong> <p>{sub.sacrificeFor}</p></div>
                                 <div className="grid grid-cols-2 gap-2"><strong><Phone className="inline-block mr-1 h-4 w-4"/>رقم الهاتف:</strong> <p>{sub.phoneNumber}</p></div>
                                 <div className="grid grid-cols-2 gap-2"><strong><CalendarCheck2 className="inline-block mr-1 h-4 w-4"/>يريد الحضور:</strong> <p>{sub.wantsToAttend ? "نعم" : "لا"}</p></div>
