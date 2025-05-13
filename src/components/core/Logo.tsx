@@ -6,7 +6,7 @@ export function Logo() {
   return (
     <Link href="/" className="flex items-center gap-2 text-primary hover:opacity-80 transition-opacity">
       <HandHeart className="h-8 w-8" />
-      <h1 className="text-2xl font-bold">مدير الأضاحي</h1>
+      <h1 className="text-2xl font-bold">تسجيل الأضاحي</h1>
     </Link>
   );
 }

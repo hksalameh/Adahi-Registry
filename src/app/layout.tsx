@@ -8,7 +8,7 @@ import { Toaster } from "@/components/ui/toaster";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "Adahi Manager | مدير الأضاحي",
+  title: "تسجيل الأضاحي | Adahi Registration",
   description: "Manage Adahi submissions efficiently.",
 };
 
