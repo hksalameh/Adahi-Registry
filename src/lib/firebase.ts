@@ -1,6 +1,6 @@
 
 // src/lib/firebase.ts
-import { initializeApp, getApps, getApp, FirebaseOptions } from "firebase/app";
+import { initializeApp, getApps, getApp, type FirebaseOptions } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
@@ -59,7 +59,8 @@ if (!getApps().length && firebaseConfig) {
 
 // Export firebase services
 // It's safer to export them conditionally or handle cases where 'app' might be undefined
-export const auth = app ? getAuth(app) : null; // Return null if app couldn't be initialized
-export const db = app ? getFirestore(app) : null; // Return null if app couldn't be initialized
+// Ensure auth and db are only initialized if app exists
+export const auth = app ? getAuth(app) : null;
+export const db = app ? getFirestore(app) : null;
 
 export default app; // app could be undefined here
