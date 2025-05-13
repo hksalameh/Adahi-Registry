@@ -30,9 +30,8 @@ const exportToXlsx = (data: AdahiSubmission[], filename: string) => {
         "رقم التلفون",
         "يريد الحضور",
         "يريد من الأضحية",
-        "اسم المستخدم",
         "تم الدفع",
-        "عن طريق", // Renamed from "الاضحية عن طريق"
+        "عن طريق", 
         "لمن ستوزع الاضحية"
       ];
 
@@ -45,11 +44,10 @@ const exportToXlsx = (data: AdahiSubmission[], filename: string) => {
         "يريد من الأضحية": sub.wantsFromSacrifice 
           ? `نعم${sub.sacrificeWishes ? ` (${sub.sacrificeWishes})` : ''}` 
           : "لا",
-        "اسم المستخدم": sub.submitterUsername || sub.userEmail || sub.userId || "غير متوفر",
         "تم الدفع": sub.paymentConfirmed ? "نعم" : "لا",
         "عن طريق": sub.throughIntermediary 
-          ? `نعم${sub.intermediaryName ? ` (${sub.intermediaryName})` : ''}` 
-          : "لا",
+          ? `${sub.intermediaryName ? `${sub.intermediaryName}` : 'المستخدم نفسه'}` 
+          : "المستخدم نفسه",
         "لمن ستوزع الاضحية": distributionOptions.find(opt => opt.value === sub.distributionPreference)?.label || sub.distributionPreference || "غير محدد",
       }));
       
@@ -59,6 +57,35 @@ const exportToXlsx = (data: AdahiSubmission[], filename: string) => {
       // Set sheet to RTL
       if (worksheet) {
         worksheet['!RTL'] = true;
+      }
+
+      // Define border style
+      const borderStyle = {
+        style: "thin",
+        color: { rgb: "000000" } // Black color
+      };
+      const cellBorderStyle = {
+        top: borderStyle,
+        bottom: borderStyle,
+        left: borderStyle,
+        right: borderStyle
+      };
+
+      // Apply borders to cells with data
+      if (worksheet['!ref']) {
+        const range = XLSX.utils.decode_range(worksheet['!ref']);
+        for (let R = range.s.r; R <= range.e.r; ++R) {
+          for (let C = range.s.c; C <= range.e.c; ++C) {
+            const cell_address = XLSX.utils.encode_cell({ r: R, c: C });
+            if (!worksheet[cell_address]) continue; // Skip empty cells
+
+            // Ensure the cell object has an 's' property
+            if (!worksheet[cell_address].s) {
+              worksheet[cell_address].s = {};
+            }
+            worksheet[cell_address].s.border = cellBorderStyle;
+          }
+        }
       }
       
       const workbook = XLSX.utils.book_new();
