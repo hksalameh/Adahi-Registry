@@ -10,22 +10,32 @@ import { useState, useEffect } from "react";
 import type { AdahiSubmission } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
-// Mock export function (replace with actual Excel export logic if library is added)
-const exportToJson = (data: AdahiSubmission[], filename: string) => {
-  console.log(`Exporting data to ${filename}.json:`, data);
+// Function to export data to CSV (Excel can open CSV files)
+const exportToCsv = (data: AdahiSubmission[], filename: string) => {
+  console.log(`Exporting data to ${filename}.csv:`, data);
   return new Promise<void>((resolve) => {
     setTimeout(() => { // Simulate async operation
-        const jsonData = JSON.stringify(data, null, 2);
-        const blob = new Blob([jsonData], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${filename}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+      if (data.length === 0) {
         resolve();
+        return;
+      }
+
+      const replacer = (key: any, value: any) => value === null || value === undefined ? '' : String(value).replace(/"/g, '""'); // Handle null/undefined and escape double quotes
+      const header = Object.keys(data[0]);
+      let csv = data.map(row => header.map(fieldName => JSON.stringify((row as any)[fieldName], replacer)).join(','));
+      csv.unshift(header.join(','));
+      const csvString = csv.join('\r\n');
+      
+      const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${filename}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      resolve();
     }, 500);
   });
 };
@@ -49,7 +59,6 @@ export default function AdminDashboardPage() {
   });
 
   useEffect(() => {
-    // Filter out submissions where essential data might be missing, or handle them as needed
     const validSubmissions = allSubmissionsForAdmin.filter(sub => sub && sub.distributionPreference);
     setSubmissions(validSubmissions);
 
@@ -77,12 +86,8 @@ export default function AdminDashboardPage() {
   }, [allSubmissionsForAdmin]);
   
   const handleDataChange = () => {
-     // This function is called by AdminSubmissionsTable, data is already updated by AuthContext listener
-     // We can re-filter and re-calculate counts if necessary, but useEffect on allSubmissionsForAdmin should handle it.
-     // Forcing a re-evaluation if allSubmissionsForAdmin reference doesn't change but content does:
      const validSubmissions = allSubmissionsForAdmin.filter(sub => sub && sub.distributionPreference);
      setSubmissions(validSubmissions); 
-     // Recalculate distribution counts as well
       if (validSubmissions.length > 0) {
         const counts = validSubmissions.reduce(
           (acc, sub) => {
@@ -111,9 +116,9 @@ export default function AdminDashboardPage() {
         toast({ title: "لا توجد بيانات لتصديرها.", variant: "destructive" });
         return;
     }
-    toast({ title: "جاري تصدير جميع البيانات...", description: "سيتم تحميل ملف JSON." });
-    await exportToJson(submissions, "all_adahi_submissions");
-    toast({ title: "تم تصدير جميع البيانات بنجاح (JSON).", description: "تحقق من مجلد التنزيلات." });
+    toast({ title: "جاري تصدير جميع البيانات...", description: "سيتم تحميل ملف CSV (يمكن فتحه بواسطة Excel)." });
+    await exportToCsv(submissions, "all_adahi_submissions");
+    toast({ title: "تم تصدير جميع البيانات بنجاح (CSV).", description: "تحقق من مجلد التنزيلات." });
   };
 
   const handleExportByUser = async () => {
@@ -121,7 +126,7 @@ export default function AdminDashboardPage() {
         toast({ title: "لا توجد بيانات لتصديرها.", variant: "destructive"});
         return;
     }
-    toast({ title: "جاري تصدير البيانات حسب المستخدم...", description: "سيتم تحميل عدة ملفات JSON." });
+    toast({ title: "جاري تصدير البيانات حسب المستخدم...", description: "سيتم تحميل عدة ملفات CSV (يمكن فتحها بواسطة Excel)." });
     const submissionsByUser: { [key: string]: AdahiSubmission[] } = {};
     submissions.forEach(sub => {
       const userKey = sub.userEmail || sub.userId || "unknown_user"; 
@@ -132,9 +137,9 @@ export default function AdminDashboardPage() {
     });
 
     for (const userKey in submissionsByUser) {
-      await exportToJson(submissionsByUser[userKey], `adahi_submissions_${userKey.replace(/[^a-zA-Z0-9]/g, '_')}`);
+      await exportToCsv(submissionsByUser[userKey], `adahi_submissions_${userKey.replace(/[^a-zA-Z0-9]/g, '_')}`);
     }
-    toast({ title: "تم تصدير البيانات حسب المستخدم بنجاح (JSON).", description: "تحقق من مجلد التنزيلات." });
+    toast({ title: "تم تصدير البيانات حسب المستخدم بنجاح (CSV).", description: "تحقق من مجلد التنزيلات." });
   };
   
   return (
@@ -154,20 +159,20 @@ export default function AdminDashboardPage() {
               إجراءات التصدير
             </CardTitle>
             <CardDescription>
-              تصدير بيانات الأضاحي المسجلة كملفات JSON.
+              تصدير بيانات الأضاحي المسجلة كملفات CSV (يمكن فتحها بواسطة Excel).
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-col sm:flex-row gap-4">
               <Button onClick={handleExportAll} variant="outline" className="bg-accent text-accent-foreground hover:bg-accent/90 shadow-md flex-1 sm:flex-initial">
-                <FileDown className="ml-2 h-5 w-5" /> تصدير البيانات كاملة (JSON)
+                <FileDown className="ml-2 h-5 w-5" /> تصدير البيانات كاملة (Excel - CSV)
               </Button>
               <Button onClick={handleExportByUser} variant="outline" className="bg-accent text-accent-foreground hover:bg-accent/90 shadow-md flex-1 sm:flex-initial">
-                <FileDown className="ml-2 h-5 w-5" /> تصدير البيانات حسب المستخدم (JSON)
+                <FileDown className="ml-2 h-5 w-5" /> تصدير البيانات حسب المستخدم (Excel - CSV)
               </Button>
             </div>
             <p className="text-sm text-muted-foreground pt-2">
-              ملاحظة: يتم التصدير حاليًا كملفات JSON لأغراض تجريبية. لتصدير Excel، قد تحتاج إلى مكتبة إضافية.
+              ملاحظة: يتم تصدير البيانات كملفات CSV، والتي يمكن فتحها وتعديلها بسهولة باستخدام Microsoft Excel أو برامج جداول البيانات الأخرى. للحصول على ملفات .xlsx أصلية، قد تكون هناك حاجة إلى مكتبة متخصصة.
             </p>
           </CardContent>
         </Card>
@@ -193,7 +198,7 @@ export default function AdminDashboardPage() {
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
             <div className="p-4 border rounded-lg shadow-sm bg-secondary/30">
-              <Archive className="h-8 w-8 mx-auto text-primary mb-2" data-ai-hint="sheep livestock" />
+              <Archive className="h-8 w-8 mx-auto text-primary mb-2" data-ai-hint="livestock archive" />
               <p className="text-md font-semibold">أضاحي (الرمثا والمتبرع)</p>
               <p className="text-2xl font-bold text-primary">{distributionCounts.adahiRamthaDonor}</p>
             </div>
