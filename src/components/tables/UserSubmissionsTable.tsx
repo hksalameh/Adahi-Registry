@@ -4,7 +4,7 @@
 import type { AdahiSubmission } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { format }_ from "date-fns"; // Correct import for named export
+import { format } from "date-fns"; // Correct import for named export
 import { arSA } from "date-fns/locale"; // For Arabic date formatting
 
 interface UserSubmissionsTableProps {
@@ -53,3 +53,4 @@ export default function UserSubmissionsTable({ submissions }: UserSubmissionsTab
     </div>
   );
 }
+
