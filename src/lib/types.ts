@@ -14,6 +14,7 @@ export interface AdahiSubmission {
   id: string; // Firestore document ID
   userId?: string; // Firebase UID of the user who submitted - now optional
   userEmail?: string; // For admin display convenience - now optional
+  submitterUsername?: string; // Added for displaying username in admin table
   donorName: string;
   sacrificeFor: string;
   phoneNumber: string;
@@ -28,6 +29,9 @@ export interface AdahiSubmission {
   distributionPreference: DistributionPreference;
   submissionDate: string; // Stored as ISO string. Firestore Timestamps will be converted.
   status: 'pending' | 'entered';
+  lastUpdated: string; // Stored as ISO string
+  lastUpdatedBy?: string; // Firebase UID of the user who last updated
+  lastUpdatedByEmail?: string; // Email of the user who last updated
 }
 
 export const distributionOptions: { value: DistributionPreference; label: string }[] = [
@@ -36,3 +40,4 @@ export const distributionOptions: { value: DistributionPreference; label: string
   { value: 'donor', label: 'لنفس المتبرع' },
   { value: 'fund', label: 'لصندوق التكافل والتضامن' },
 ];
+

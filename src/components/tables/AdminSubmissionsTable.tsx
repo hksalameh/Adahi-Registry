@@ -6,12 +6,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCap
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { CheckCircle, Edit3, Trash2, MoreHorizontal, Eye, Phone, Users, CalendarDays, DollarSign, UserCircle, ListTree, Heart, MessageSquare, Receipt, FileText, CalendarCheck2 } from "lucide-react";
+import { CheckCircle, Edit3, Trash2, MoreHorizontal, Eye, Phone, Users, CalendarDays, DollarSign, UserCircle, ListTree, Heart, MessageSquare, Receipt, FileText, CalendarCheck2, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { arSA } from "date-fns/locale";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import AdahiSubmissionForm from "@/components/forms/AdahiSubmissionForm";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -21,7 +21,7 @@ import { distributionOptions } from "@/lib/types";
 
 interface AdminSubmissionsTableProps {
   submissions: AdahiSubmission[];
-  onDataChange: () => void; 
+  onDataChange: () => void;
 }
 
 const formatDate = (dateString: string | undefined | null): string => {
@@ -31,12 +31,10 @@ const formatDate = (dateString: string | undefined | null): string => {
   try {
     const dateObj = new Date(dateString);
     if (isNaN(dateObj.getTime())) {
-      // console.warn("Invalid date string encountered in AdminSubmissionsTable (formatDate):", dateString);
       return 'تاريخ غير صالح';
     }
     return format(dateObj, "dd/MM/yyyy", { locale: arSA });
   } catch (error) {
-    // console.error("Error formatting date in AdminSubmissionsTable (formatDate):", dateString, error);
     return 'خطأ في التاريخ';
   }
 };
@@ -48,41 +46,45 @@ const formatDateTime = (dateString: string | undefined | null): string => {
   try {
     const dateObj = new Date(dateString);
     if (isNaN(dateObj.getTime())) {
-      // console.warn("Invalid date string encountered in AdminSubmissionsTable (formatDateTime):", dateString);
       return 'تاريخ غير صالح';
     }
     return format(dateObj, "dd/MM/yyyy HH:mm", { locale: arSA });
   } catch (error) {
-    // console.error("Error formatting date/time in AdminSubmissionsTable (formatDateTime):", dateString, error);
     return 'خطأ في التاريخ';
   }
 };
 
 
 export default function AdminSubmissionsTable({ submissions, onDataChange }: AdminSubmissionsTableProps) {
-  const { updateSubmissionStatus, deleteSubmission } = useAuth();
+  const { updateSubmissionStatus, deleteSubmission, refreshData } = useAuth(); // Added refreshData
   const { toast } = useToast();
   const [editingSubmission, setEditingSubmission] = useState<AdahiSubmission | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState<string | null>(null); // For specific row status update
+  const [isDeleting, setIsDeleting] = useState<string | null>(null); // For specific row deletion
 
 
   const handleStatusUpdate = async (id: string, newStatus: 'pending' | 'entered') => {
+    setIsUpdatingStatus(id);
     const success = await updateSubmissionStatus(id, newStatus);
     if (success) {
       toast({ title: "تم تحديث الحالة بنجاح." });
-      onDataChange(); 
+      // onDataChange(); // onSnapshot should handle this
+      await refreshData(); // Explicitly refresh to ensure UI consistency after action
     }
-    // No 'else' toast here; AuthContext will show a more detailed one on failure.
+    setIsUpdatingStatus(null);
   };
 
   const handleDelete = async (id: string) => {
+    setIsDeleting(id);
     const success = await deleteSubmission(id);
     if (success) {
       toast({ title: "تم حذف السجل بنجاح." });
-      onDataChange(); 
+      // onDataChange(); // onSnapshot should handle this
+      await refreshData(); // Explicitly refresh
     }
-    // AuthContext's deleteSubmission handles its own error toasts.
+    setIsDeleting(null);
   };
-  
+
   const getDistributionLabel = (value: string) => {
     return distributionOptions.find(opt => opt.value === value)?.label || value;
   };
@@ -90,10 +92,11 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
   if (!submissions || submissions.length === 0) {
     return <p className="text-center text-muted-foreground mt-8">لا توجد أضاحي مسجلة حالياً.</p>;
   }
-  
-  const closeEditDialog = () => {
+
+  const closeEditDialog = async () => {
     setEditingSubmission(null);
-    onDataChange(); 
+    // onDataChange(); // onSnapshot should handle this
+    await refreshData(); // Explicitly refresh after edit dialog closes
   }
 
   return (
@@ -114,7 +117,7 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
         <TableBody>
           {submissions.map((sub) => (
             <TableRow key={sub.id}>
-              <TableCell>{sub.userEmail || sub.userId || "غير متوفر"}</TableCell>
+              <TableCell>{sub.submitterUsername || sub.userEmail || sub.userId || "غير متوفر"}</TableCell>
               <TableCell className="font-medium">{sub.donorName}</TableCell>
               <TableCell>{sub.sacrificeFor}</TableCell>
               <TableCell>{sub.phoneNumber}</TableCell>
@@ -153,7 +156,7 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuLabel>إجراءات</DropdownMenuLabel>
-                    <Dialog> 
+                    <Dialog>
                         <DialogTrigger asChild>
                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-pointer">
                                 <Eye className="mr-2 h-4 w-4" /> عرض التفاصيل
@@ -165,8 +168,8 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
                             </DialogHeader>
                             <ScrollArea className="max-h-[60vh] p-1">
                             <div className="grid gap-3 py-4 text-sm">
+                                <div className="grid grid-cols-2 gap-2"><strong><UserCircle className="inline-block mr-1 h-4 w-4"/>مدخل البيانات:</strong> <p>{sub.submitterUsername || sub.userEmail || sub.userId || "غير متوفر"}</p></div>
                                 <div className="grid grid-cols-2 gap-2"><strong><UserCircle className="inline-block mr-1 h-4 w-4"/>اسم المتبرع:</strong> <p>{sub.donorName}</p></div>
-                                <div className="grid grid-cols-2 gap-2"><strong><UserCircle className="inline-block mr-1 h-4 w-4"/>مدخل البيانات:</strong> <p>{sub.userEmail || sub.userId || "غير متوفر"}</p></div>
                                 <div className="grid grid-cols-2 gap-2"><strong><Heart className="inline-block mr-1 h-4 w-4"/>الأضحية عن:</strong> <p>{sub.sacrificeFor}</p></div>
                                 <div className="grid grid-cols-2 gap-2"><strong><Phone className="inline-block mr-1 h-4 w-4"/>رقم الهاتف:</strong> <p>{sub.phoneNumber}</p></div>
                                 <div className="grid grid-cols-2 gap-2"><strong><CalendarCheck2 className="inline-block mr-1 h-4 w-4"/>يريد الحضور:</strong> <p>{sub.wantsToAttend ? "نعم" : "لا"}</p></div>
@@ -183,6 +186,8 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
                                 {sub.throughIntermediary && <div className="grid grid-cols-2 gap-2"><strong>اسم الوسيط:</strong> <p>{sub.intermediaryName || "-"}</p></div>}
                                 <div className="grid grid-cols-2 gap-2"><strong><ListTree className="inline-block mr-1 h-4 w-4"/>توزع لـ:</strong> <p>{getDistributionLabel(sub.distributionPreference)}</p></div>
                                 <div className="grid grid-cols-2 gap-2"><strong><CalendarDays className="inline-block mr-1 h-4 w-4"/>تاريخ التسجيل:</strong> <p>{formatDateTime(sub.submissionDate)}</p></div>
+                                <div className="grid grid-cols-2 gap-2"><strong><CalendarDays className="inline-block mr-1 h-4 w-4"/>آخر تحديث:</strong> <p>{formatDateTime(sub.lastUpdated)}</p></div>
+                                <div className="grid grid-cols-2 gap-2"><strong><UserCircle className="inline-block mr-1 h-4 w-4"/>آخر تحديث بواسطة:</strong> <p>{sub.lastUpdatedByEmail || sub.lastUpdatedBy || "غير معروف"}</p></div>
                                 <div className="grid grid-cols-2 gap-2"><strong>الحالة:</strong> <Badge variant={sub.status === "entered" ? "default" : "secondary"} className={sub.status === "entered" ? "bg-green-500 text-white" : "bg-yellow-400 text-black"}>{sub.status === "entered" ? "مدخلة" : "غير مدخلة"}</Badge></div>
                             </div>
                             </ScrollArea>
@@ -190,20 +195,28 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
                     </Dialog>
 
                     <DropdownMenuSeparator />
-                    {sub.status === "pending" && (
-                      <DropdownMenuItem onClick={() => handleStatusUpdate(sub.id, "entered")} className="text-green-600 cursor-pointer">
-                        <CheckCircle className="mr-2 h-4 w-4" /> تأكيد الإدخال
-                      </DropdownMenuItem>
-                    )}
-                    {sub.status === "entered" && (
-                      <DropdownMenuItem onClick={() => handleStatusUpdate(sub.id, "pending")} className="text-yellow-600 cursor-pointer">
-                        <CheckCircle className="mr-2 h-4 w-4" /> إرجاع لـ (غير مدخلة)
-                      </DropdownMenuItem>
-                    )}
+                    <DropdownMenuItem
+                      onClick={() => handleStatusUpdate(sub.id, sub.status === "pending" ? "entered" : "pending")}
+                      className={sub.status === "pending" ? "text-green-600 cursor-pointer" : "text-yellow-600 cursor-pointer"}
+                      disabled={isUpdatingStatus === sub.id}
+                    >
+                      {isUpdatingStatus === sub.id ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                      )}
+                      {sub.status === "pending" ? "تأكيد الإدخال" : "إرجاع لـ (غير مدخلة)"}
+                    </DropdownMenuItem>
+
                     <AlertDialog>
                         <AlertDialogTrigger asChild>
-                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive cursor-pointer">
-                                <Trash2 className="mr-2 h-4 w-4" /> حذف
+                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive cursor-pointer" disabled={isDeleting === sub.id}>
+                                {isDeleting === sub.id ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                 <Trash2 className="mr-2 h-4 w-4" />
+                                )}
+                                حذف
                             </DropdownMenuItem>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
