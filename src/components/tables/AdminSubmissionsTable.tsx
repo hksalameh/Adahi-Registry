@@ -6,12 +6,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCap
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { CheckCircle, Edit3, Trash2, MoreHorizontal, Eye, Phone, Users, CalendarDays, DollarSign, UserCircle, ListTree, Heart, MessageSquare, Receipt, FileText, CalendarCheck2, Loader2, Fingerprint, Mail, UserCog, User, NotebookText, Handshake } from "lucide-react";
+import { CheckCircle, Edit3, Trash2, MoreHorizontal, Eye, Phone, Users, CalendarDays, DollarSign, UserCircle, ListTree, Heart, MessageSquare, Receipt, FileText, CalendarCheck2, Loader2, Fingerprint, Mail, UserCog, User, NotebookText, Handshake, Building, Landmark, ShieldQuestion } from "lucide-react";
 import { format } from "date-fns";
 import { arSA } from "date-fns/locale";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import AdahiSubmissionForm from "@/components/forms/AdahiSubmissionForm";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -68,7 +68,8 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
     const success = await updateSubmissionStatus(id, newStatus);
     if (success) {
       toast({ title: "تم تحديث الحالة بنجاح." });
-      await refreshData(); 
+      // refreshData(); // This will be called by onDataChange from parent if needed
+      onDataChange();
     } else {
       toast({ title: "فشل تحديث الحالة.", variant: "destructive" });
     }
@@ -80,7 +81,8 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
     const success = await deleteSubmission(id);
     if (success) {
       toast({ title: "تم حذف السجل بنجاح." });
-      await refreshData();
+      // refreshData(); // This will be called by onDataChange from parent
+      onDataChange();
     } else {
       toast({ title: "فشل حذف السجل.", variant: "destructive" });
     }
@@ -96,43 +98,61 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
     return <p className="text-center text-muted-foreground mt-8">لا توجد أضاحي مسجلة حالياً.</p>;
   }
 
-  const closeEditDialog = async () => {
+  const closeEditDialog = () => {
     setEditingSubmission(null);
-    await refreshData();
+    onDataChange();
   }
 
   return (
-    <div className="mt-8 rounded-lg border shadow-md bg-card">
-      <Table>
+    <div className="mt-8 rounded-lg border shadow-md bg-card overflow-x-auto">
+      <Table className="min-w-full">
         <TableCaption>عرض جميع الأضاحي المسجلة. مجموع الأضاحي الكلي: {submissions.length}</TableCaption>
         <TableHeader>
           <TableRow>
-            <TableHead>مدخل البيانات</TableHead>
-            <TableHead>اسم المتبرع</TableHead>
-            <TableHead>الأضحية عن</TableHead>
-            <TableHead>رقم التلفون</TableHead>
-            <TableHead>التاريخ</TableHead>
-            <TableHead>الحالة</TableHead>
-            <TableHead className="text-center">الإجراءات</TableHead>
+            <TableHead className="whitespace-nowrap">مدخل البيانات</TableHead>
+            <TableHead className="whitespace-nowrap">اسم المتبرع</TableHead>
+            <TableHead className="whitespace-nowrap">الأضحية عن</TableHead>
+            <TableHead className="whitespace-nowrap">رقم التلفون</TableHead>
+            <TableHead className="whitespace-nowrap">يريد الحضور</TableHead>
+            <TableHead className="whitespace-nowrap">يريد من الأضحية</TableHead>
+            <TableHead className="whitespace-nowrap">ماذا يريد</TableHead>
+            <TableHead className="whitespace-nowrap">تم الدفع</TableHead>
+            <TableHead className="whitespace-nowrap">رقم الدفتر</TableHead>
+            <TableHead className="whitespace-nowrap">رقم السند</TableHead>
+            <TableHead className="whitespace-nowrap">عن طريق وسيط</TableHead>
+            <TableHead className="whitespace-nowrap">اسم الوسيط</TableHead>
+            <TableHead className="whitespace-nowrap">توزع لـ</TableHead>
+            <TableHead className="whitespace-nowrap">التاريخ</TableHead>
+            <TableHead className="whitespace-nowrap">الحالة</TableHead>
+            <TableHead className="text-center whitespace-nowrap">الإجراءات</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {submissions.map((sub) => (
             <TableRow key={sub.id}>
-              <TableCell>{sub.submitterUsername || sub.userEmail || sub.userId || "غير متوفر"}</TableCell>
-              <TableCell className="font-medium">{sub.donorName}</TableCell>
-              <TableCell>{sub.sacrificeFor}</TableCell>
-              <TableCell>{sub.phoneNumber}</TableCell>
-              <TableCell>
+              <TableCell className="whitespace-nowrap">{sub.submitterUsername || sub.userEmail || sub.userId || "غير متوفر"}</TableCell>
+              <TableCell className="font-medium whitespace-nowrap">{sub.donorName}</TableCell>
+              <TableCell className="whitespace-nowrap">{sub.sacrificeFor}</TableCell>
+              <TableCell className="whitespace-nowrap">{sub.phoneNumber}</TableCell>
+              <TableCell className="whitespace-nowrap">{sub.wantsToAttend ? "نعم" : "لا"}</TableCell>
+              <TableCell className="whitespace-nowrap">{sub.wantsFromSacrifice ? "نعم" : "لا"}</TableCell>
+              <TableCell className="whitespace-nowrap">{sub.wantsFromSacrifice ? (sub.sacrificeWishes || "-") : "-"}</TableCell>
+              <TableCell className="whitespace-nowrap">{sub.paymentConfirmed ? "نعم" : "لا"}</TableCell>
+              <TableCell className="whitespace-nowrap">{sub.paymentConfirmed ? (sub.receiptBookNumber || "-") : "-"}</TableCell>
+              <TableCell className="whitespace-nowrap">{sub.paymentConfirmed ? (sub.voucherNumber || "-") : "-"}</TableCell>
+              <TableCell className="whitespace-nowrap">{sub.throughIntermediary ? "نعم" : "لا"}</TableCell>
+              <TableCell className="whitespace-nowrap">{sub.throughIntermediary ? (sub.intermediaryName || (sub.submitterUsername === sub.intermediaryName ? "المستخدم نفسه" : (sub.intermediaryName || "-") )) : "-"}</TableCell>
+              <TableCell className="whitespace-nowrap">{getDistributionLabel(sub.distributionPreference)}</TableCell>
+              <TableCell className="whitespace-nowrap">
                 {formatDate(sub.submissionDate)}
               </TableCell>
-              <TableCell>
+              <TableCell className="whitespace-nowrap">
                 <Badge variant={sub.status === "entered" ? "default" : "secondary"}
                        className={sub.status === "entered" ? "bg-green-500 hover:bg-green-600 text-white" : "bg-yellow-400 hover:bg-yellow-500 text-black"}>
                   {sub.status === "entered" ? "مدخلة" : "غير مدخلة"}
                 </Badge>
               </TableCell>
-              <TableCell className="text-center">
+              <TableCell className="text-center whitespace-nowrap">
                 <Dialog open={editingSubmission?.id === sub.id} onOpenChange={(isOpen) => !isOpen && setEditingSubmission(null)}>
                     <DialogTrigger asChild>
                         <Button variant="ghost" size="icon" className="text-blue-600 hover:text-blue-800" onClick={() => setEditingSubmission(sub)}>
@@ -192,7 +212,7 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
                                 )}
                                 <hr className="my-2 col-span-2"/>
                                 <div className="grid grid-cols-2 gap-2 items-center"><strong><Users className="inline-block ml-1 h-4 w-4"/>عن طريق وسيط:</strong> <p>{sub.throughIntermediary ? "نعم" : "لا"}</p></div>
-                                {sub.throughIntermediary && <div className="grid grid-cols-2 gap-2 items-center"><strong><Handshake className="inline-block ml-1 h-4 w-4" />اسم الوسيط:</strong> <p>{sub.intermediaryName || "-"}</p></div>}
+                                {sub.throughIntermediary && <div className="grid grid-cols-2 gap-2 items-center"><strong><Handshake className="inline-block ml-1 h-4 w-4" />اسم الوسيط:</strong> <p>{sub.intermediaryName || (sub.submitterUsername === sub.intermediaryName ? "المستخدم نفسه" : (sub.intermediaryName || "-")) }</p></div>}
                                 <div className="grid grid-cols-2 gap-2 items-center"><strong><ListTree className="inline-block ml-1 h-4 w-4"/>توزع لـ:</strong> <p>{getDistributionLabel(sub.distributionPreference)}</p></div>
                                 <hr className="my-2 col-span-2"/>
                                 <div className="grid grid-cols-2 gap-2 items-center"><strong><CalendarDays className="inline-block ml-1 h-4 w-4"/>تاريخ التسجيل:</strong> <p>{formatDateTime(sub.submissionDate)}</p></div>
