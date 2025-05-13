@@ -41,15 +41,23 @@ export default function LoginForm() {
   const onSubmit: SubmitHandler<LoginFormInputs> = async (data) => {
     setIsLoading(true);
     setError(null);
-    const success = await login(data.email, data.password);
+    const loggedInUser = await login(data.email, data.password);
     setIsLoading(false);
-    if (success) {
+
+    if (loggedInUser) {
       toast({ title: "تم تسجيل الدخول بنجاح!", description: "مرحباً بك." });
-      const redirectUrl = searchParams.get('redirect') || '/dashboard';
-      router.push(redirectUrl);
+      const redirectUrlFromParams = searchParams.get('redirect');
+      
+      if (redirectUrlFromParams) {
+        router.push(redirectUrlFromParams);
+      } else if (loggedInUser.isAdmin) {
+        router.push("/admin");
+      } else {
+        router.push("/dashboard");
+      }
     } else {
       setError("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
-      toast({ variant: "destructive", title: "خطأ في تسجيل الدخول", description: "البيانات المدخلة غير صحيحة." });
+      toast({ variant: "destructive", title: "خطأ في تسجيل الدخول", description: "البيانات المدخلة غير صحيحة أو حدث خطأ." });
     }
   };
 

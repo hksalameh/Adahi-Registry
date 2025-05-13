@@ -41,14 +41,17 @@ export default function RegisterForm() {
   const onSubmit: SubmitHandler<RegisterFormInputs> = async (data) => {
     setIsLoading(true);
     setError(null);
-    const success = await authRegister(data.username, data.email, data.password);
+    const registeredUser = await authRegister(data.username, data.email, data.password);
     setIsLoading(false);
-    if (success) {
+    if (registeredUser) {
       toast({ title: "تم إنشاء الحساب بنجاح!", description: "يمكنك الآن تسجيل الدخول." });
+      // New users are never admins, so always redirect to dashboard.
+      // If there's a specific redirect from query params, it might be handled,
+      // but for registration, dashboard is a safe default.
       router.push("/dashboard");
     } else {
-      setError("اسم المستخدم أو البريد الإلكتروني موجود بالفعل.");
-      toast({ variant: "destructive", title: "خطأ في التسجيل", description: "البيانات المدخلة مستخدمة من قبل." });
+      setError("اسم المستخدم أو البريد الإلكتروني موجود بالفعل، أو حدث خطأ آخر.");
+      toast({ variant: "destructive", title: "خطأ في التسجيل", description: "البيانات المدخلة مستخدمة من قبل أو حدث خطأ." });
     }
   };
 

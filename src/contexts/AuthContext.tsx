@@ -32,8 +32,8 @@ import {
 interface AuthContextType {
   user: AppUser | null;
   loading: boolean;
-  login: (email: string, pass: string) => Promise<boolean>; // Changed identifier to email
-  register: (username: string, email: string, pass: string) => Promise<boolean>;
+  login: (email: string, pass: string) => Promise<AppUser | null>; // Changed return type
+  register: (username: string, email: string, pass: string) => Promise<AppUser | null>; // Changed return type
   logout: () => void;
   submissions: AdahiSubmission[];
   addSubmission: (submission: Omit<AdahiSubmission, "id" | "submissionDate" | "status" | "userId" | "userEmail">) => Promise<AdahiSubmission | null>;
@@ -57,17 +57,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       setLoading(true);
-      if (firebaseUser) {
+      if (firebaseUser && auth) { // Ensure auth is not null
         const userDocRef = doc(db, "users", firebaseUser.uid);
         const userDocSnap = await getDoc(userDocRef);
         if (userDocSnap.exists()) {
           const appUserData = userDocSnap.data() as Omit<AppUser, "id">;
           setUser({ id: firebaseUser.uid, ...appUserData });
         } else {
-          // This case should ideally not happen if registration is correct
-          // Or handle creating a user doc if it's missing (e.g. for imported users)
           console.error("User document not found in Firestore for UID:", firebaseUser.uid);
-          setUser(null); // Or a minimal user object
+          // If user is authenticated but doc doesn't exist, sign out to prevent inconsistent state
+          await signOut(auth);
+          setUser(null);
         }
       } else {
         setUser(null);
@@ -87,14 +87,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         unsubscribeAdminSubmissions = onSnapshot(q, (querySnapshot) => {
           const adminSubs = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AdahiSubmission));
           setAllSubmissions(adminSubs);
-          // Admin also sees their own submissions filtered in their personal view if needed, or just uses allSubmissions.
-          // For this app, admin page uses allSubmissions, user dashboard uses filtered.
           setSubmissions(adminSubs.filter(s => s.userId === user.id)); 
         }, (error) => {
           console.error("Error fetching admin submissions:", error);
         });
       } else {
-        // Regular user submissions
         const q = query(collection(db, "submissions"), where("userId", "==", user.id), orderBy("submissionDate", "desc"));
         unsubscribeUserSubmissions = onSnapshot(q, (querySnapshot) => {
           const userSubs = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AdahiSubmission));
@@ -115,46 +112,86 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [user, loading]);
 
 
-  const login = async (email: string, pass: string): Promise<boolean> => {
+  const login = async (email: string, pass: string): Promise<AppUser | null> => {
     setLoading(true);
+    if (!auth || !db) {
+        console.error("Firebase auth or db not initialized");
+        setLoading(false);
+        return null;
+    }
     try {
-      await signInWithEmailAndPassword(auth, email, pass);
-      // onAuthStateChanged will handle setting user and loading to false
-      return true;
+      const userCredential = await signInWithEmailAndPassword(auth, email, pass);
+      const firebaseUser = userCredential.user;
+      if (firebaseUser) {
+        const userDocRef = doc(db, "users", firebaseUser.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+          const appUserData = userDocSnap.data() as Omit<AppUser, "id">;
+          const loggedInUser: AppUser = { id: firebaseUser.uid, ...appUserData };
+          setUser(loggedInUser); // Update context immediately
+          setLoading(false);
+          return loggedInUser;
+        } else {
+          // User signed in but no Firestore doc, this is an error state. Sign them out.
+          console.error("User document not found for UID after login:", firebaseUser.uid);
+          await signOut(auth);
+          setUser(null);
+          setLoading(false);
+          return null;
+        }
+      }
+      // This part should ideally not be reached if signInWithEmailAndPassword succeeds
+      setUser(null); 
+      setLoading(false);
+      return null;
     } catch (error) {
       console.error("Login error:", error);
       setUser(null);
       setLoading(false);
-      return false;
+      return null;
     }
   };
 
-  const register = async (username: string, email: string, pass: string): Promise<boolean> => {
+  const register = async (username: string, email: string, pass: string): Promise<AppUser | null> => {
     setLoading(true);
+    if (!auth || !db) {
+        console.error("Firebase auth or db not initialized");
+        setLoading(false);
+        return null;
+    }
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
       const firebaseUser = userCredential.user;
-      // Store additional user info in Firestore
-      const userDocRef = doc(db, "users", firebaseUser.uid);
-      await setDoc(userDocRef, {
+      const newUser: AppUser = {
+        id: firebaseUser.uid,
         username,
         email,
         isAdmin: false, // New users are not admins by default
+      };
+      const userDocRef = doc(db, "users", firebaseUser.uid);
+      await setDoc(userDocRef, { // Store only relevant fields, not the whole AppUser object
+        username: newUser.username,
+        email: newUser.email,
+        isAdmin: newUser.isAdmin,
       });
-      // onAuthStateChanged will handle setting user and loading to false
-      return true;
+      setUser(newUser); // Update context immediately
+      setLoading(false);
+      return newUser;
     } catch (error) {
       console.error("Registration error:", error);
       setUser(null);
       setLoading(false);
-      return false;
+      return null;
     }
   };
 
   const logout = async () => {
+    if (!auth) {
+        console.error("Firebase auth not initialized for logout");
+        return;
+    }
     try {
       await signOut(auth);
-      // onAuthStateChanged will set user to null
       setUser(null);
       setSubmissions([]);
       setAllSubmissions([]);
@@ -167,26 +204,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addSubmission = async (submissionData: Omit<AdahiSubmission, "id" | "submissionDate" | "status" | "userId" | "userEmail">): Promise<AdahiSubmission | null> => {
-    if (!user) return null;
+    if (!user || !db) return null;
     try {
       const newSubmissionData = {
         ...submissionData,
         userId: user.id,
-        userEmail: user.email, // Store for admin display convenience
-        submissionDate: serverTimestamp(), // Firestore server timestamp
+        userEmail: user.email, 
+        submissionDate: serverTimestamp(), 
         status: "pending" as const,
       };
       const docRef = await addDoc(collection(db, "submissions"), newSubmissionData);
       
-      // For immediate client-side update, we can construct the object.
-      // Firestore listener will eventually update it with actual server timestamp.
       return { 
         ...submissionData, 
         id: docRef.id, 
         userId: user.id, 
         userEmail: user.email, 
         status: "pending",
-        submissionDate: new Date().toISOString() // Approximate for immediate UI, will be replaced by listener
+        submissionDate: new Date().toISOString() 
       };
     } catch (error) {
       console.error("Error adding submission:", error);
@@ -195,7 +230,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const updateSubmissionStatus = async (submissionId: string, status: 'pending' | 'entered'): Promise<boolean> => {
-    if (!user || !user.isAdmin) return false;
+    if (!user || !user.isAdmin || !db) return false;
     try {
       const submissionDocRef = doc(db, "submissions", submissionId);
       await updateDoc(submissionDocRef, { status });
@@ -207,17 +242,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updateSubmission = async (submissionId: string, data: Partial<AdahiSubmission>): Promise<AdahiSubmission | null> => {
-    if (!user || !user.isAdmin) return null; // Ensure only admin can update general submissions
+    if (!user || !user.isAdmin || !db) return null; 
     
     try {
       const submissionDocRef = doc(db, "submissions", submissionId);
-      // Ensure submissionDate is not accidentally overwritten if not provided
       const updateData = { ...data };
-      delete updateData.submissionDate; // submissionDate should generally not be updated this way by admin
+      delete updateData.submissionDate; 
       delete updateData.id;
       delete updateData.userId;
       delete updateData.userEmail;
-
 
       await updateDoc(submissionDocRef, updateData);
       
@@ -233,7 +266,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const deleteSubmission = async (submissionId: string): Promise<boolean> => {
-    if (!user || !user.isAdmin) return false; 
+    if (!user || !user.isAdmin || !db) return false; 
     try {
       const submissionDocRef = doc(db, "submissions", submissionId);
       await deleteDoc(submissionDocRef);
@@ -250,3 +283,4 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     </AuthContext.Provider>
   );
 };
+
