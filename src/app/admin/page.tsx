@@ -46,8 +46,8 @@ const exportToXlsx = (data: AdahiSubmission[], filename: string) => {
           : "لا",
         "تم الدفع": sub.paymentConfirmed ? "نعم" : "لا",
         "عن طريق": sub.throughIntermediary 
-          ? `${sub.intermediaryName ? `${sub.intermediaryName}` : 'المستخدم نفسه'}` 
-          : "المستخدم نفسه",
+          ? `${sub.intermediaryName ? `${sub.intermediaryName}` : (sub.submitterUsername || sub.userEmail || 'المستخدم نفسه')}` 
+          : (sub.submitterUsername || sub.userEmail || 'المستخدم نفسه'),
         "لمن ستوزع الاضحية": distributionOptions.find(opt => opt.value === sub.distributionPreference)?.label || sub.distributionPreference || "غير محدد",
       }));
       
@@ -56,12 +56,12 @@ const exportToXlsx = (data: AdahiSubmission[], filename: string) => {
 
       // Set sheet to RTL
       if (worksheet) {
-        worksheet['!RTL'] = true;
+        worksheet['!rtl'] = true; // Changed from !RTL to !rtl
       }
 
       // Define border style
       const borderStyle = {
-        style: "thin",
+        style: "thin", // thin, medium, thick, dotted, hair, dashed, etc.
         color: { rgb: "000000" } // Black color
       };
       const cellBorderStyle = {
@@ -71,15 +71,18 @@ const exportToXlsx = (data: AdahiSubmission[], filename: string) => {
         right: borderStyle
       };
 
-      // Apply borders to cells with data
+      // Apply borders to cells with data (including headers)
       if (worksheet['!ref']) {
         const range = XLSX.utils.decode_range(worksheet['!ref']);
         for (let R = range.s.r; R <= range.e.r; ++R) {
           for (let C = range.s.c; C <= range.e.c; ++C) {
             const cell_address = XLSX.utils.encode_cell({ r: R, c: C });
-            if (!worksheet[cell_address]) continue; // Skip empty cells
+            if (!worksheet[cell_address]) { // If cell doesn't exist (e.g. sparse data), create it
+                 // XLSX.utils.sheet_add_aoa(worksheet, [[]], {origin: cell_address}); // Not needed if json_to_sheet creates all cells
+                 continue; // Or handle as needed - for now, skip if truly empty/undefined
+            }
 
-            // Ensure the cell object has an 's' property
+            // Ensure the cell object has an 's' (style) property
             if (!worksheet[cell_address].s) {
               worksheet[cell_address].s = {};
             }
