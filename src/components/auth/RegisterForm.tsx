@@ -61,7 +61,7 @@ export default function RegisterForm() {
             <FormItem>
               <FormLabel>اسم المستخدم</FormLabel>
               <FormControl>
-                <Input placeholder="اسمك" {...field} />
+                <Input placeholder="اسمك (يمكن أن يكون بالعربية)" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -114,3 +114,4 @@ export default function RegisterForm() {
     </Form>
   );
 }
+

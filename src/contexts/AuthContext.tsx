@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { User as AppUser, AdahiSubmission } from "@/lib/types";
@@ -16,7 +17,7 @@ import {
   doc,
   addDoc,
   getDoc, 
-  getDocs, // Import getDocs for querying
+  getDocs, 
   setDoc, 
   updateDoc,
   deleteDoc,
@@ -25,13 +26,16 @@ import {
   onSnapshot,
   orderBy,
   serverTimestamp,
+  enableNetwork,
+  disableNetwork,
+  terminate,
 } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 
 interface AuthContextType {
   user: AppUser | null;
   loading: boolean;
-  login: (email: string, pass: string) => Promise<AppUser | null>;
+  login: (emailOrUsername: string, pass: string) => Promise<AppUser | null>;
   register: (username: string, email: string, pass: string) => Promise<AppUser | null>;
   logout: () => void;
   submissions: AdahiSubmission[];
@@ -41,7 +45,7 @@ interface AuthContextType {
   deleteSubmission: (submissionId: string) => Promise<boolean>;
   allSubmissionsForAdmin: AdahiSubmission[];
   fetchUserById: (userId: string) => Promise<AppUser | null>;
-  fetchUserByUsername: (username: string) => Promise<AppUser | null>; // Added this
+  fetchUserByUsername: (username: string) => Promise<AppUser | null>;
 }
 
 const ADMIN_UID = "vqhrldpAdeWGcCgcMpWWRGdslOS2"; 
@@ -79,7 +83,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 isAdmin: true,
             };
         }
-        console.log(`No user document for ID: ${userId}, and UID is not ADMIN_UID.`);
+        // console.log(`No user document for ID: ${userId}, and UID is not ADMIN_UID.`);
         return null;
       }
     } catch (error) {
@@ -97,14 +101,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const usersRef = collection(db, "users");
       const q = query(usersRef, where("username", "==", username));
-      const querySnapshot = await getDocs(q); // Use getDocs for one-time fetch
+      const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
-        console.log(`No user found with username: ${username}`);
+        // console.log(`No user found with username: ${username}`);
         return null;
       }
-
-      // Assuming username is unique, there should be only one doc
       const userDoc = querySnapshot.docs[0];
       const userData = userDoc.data();
       const isAdmin = userDoc.id === ADMIN_UID || userData.isAdmin === true;
@@ -119,18 +121,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
   useEffect(() => {
-    if (!auth) {
-      console.warn("Auth service not available for onAuthStateChanged.");
+    if (!auth || !db) {
+      console.warn("Auth or DB service not available for onAuthStateChanged or Firestore listeners.");
       setLoading(false);
       setUser(null);
+      setSubmissions([]);
+      setAllSubmissions([]);
       return;
     }
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+
+    enableNetwork(db).catch(err => console.error("Error enabling network for Firestore:", err));
+
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
         const appUser = await fetchUserById(firebaseUser.uid);
         if (appUser) {
             setUser({...appUser, email: firebaseUser.email || appUser.email, username: appUser.username || firebaseUser.displayName || firebaseUser.email || "مستخدم"}); 
         } else {
+             // Fallback for admin or if user doc doesn't exist yet (e.g. during registration)
             setUser({ 
                 id: firebaseUser.uid,
                 email: firebaseUser.email || "",
@@ -143,96 +152,123 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       setLoading(false);
     });
-    return () => unsubscribe();
-  }, []); 
 
-  useEffect(() => {
-    if (!db || !user) { 
-        setSubmissions([]);
-        if (!user || !user.isAdmin) {
-            setAllSubmissions([]);
-        }
-        return;
-    }
-    
-    let q;
-    if (user.isAdmin) {
-      q = query(collection(db, "submissions"), orderBy("submissionDate", "desc"));
-    } else { 
-      q = query(collection(db, "submissions"), where("userId", "==", user.id), orderBy("submissionDate", "desc"));
-    } 
-    
-    const unsubscribeSubmissions = onSnapshot(q, (querySnapshot) => {
-      const subs = querySnapshot.docs.map(docSnapshot => {
-        const data = docSnapshot.data();
-        let submissionDateStr: string;
-
-        if (data.submissionDate && typeof data.submissionDate.toDate === 'function') {
-          submissionDateStr = data.submissionDate.toDate().toISOString();
-        } else if (typeof data.submissionDate === 'string') {
-          submissionDateStr = data.submissionDate;
-        } else if (data.submissionDate instanceof Date) {
-          submissionDateStr = data.submissionDate.toISOString();
-        } else {
-          submissionDateStr = new Date().toISOString(); 
-          console.warn("Submission has invalid or missing submissionDate:", docSnapshot.id, data.submissionDate);
-        }
-
-        let lastUpdatedStr = data.lastUpdated;
-         if (data.lastUpdated && typeof data.lastUpdated.toDate === 'function') {
-            lastUpdatedStr = data.lastUpdated.toDate().toISOString();
-        } else if (typeof data.lastUpdated === 'string') {
-            lastUpdatedStr = data.lastUpdated;
-        } else if (data.lastUpdated instanceof Date) {
-            lastUpdatedStr = data.lastUpdated.toISOString();
-        }
+    let unsubscribeSubmissions: () => void = () => {};
+    if (user) { // Only set up listener if user is determined
+        let q;
+        if (user.isAdmin) {
+          q = query(collection(db, "submissions"), orderBy("submissionDate", "desc"));
+        } else { 
+          q = query(collection(db, "submissions"), where("userId", "==", user.id), orderBy("submissionDate", "desc"));
+        } 
         
-        return { 
-          id: docSnapshot.id, 
-          ...data, 
-          submissionDate: submissionDateStr,
-          lastUpdated: lastUpdatedStr,
-        } as AdahiSubmission;
-      });
+        unsubscribeSubmissions = onSnapshot(q, (querySnapshot) => {
+          const subs = querySnapshot.docs.map(docSnapshot => {
+            const data = docSnapshot.data();
+            let submissionDateStr: string;
+            if (data.submissionDate && typeof data.submissionDate.toDate === 'function') {
+              submissionDateStr = data.submissionDate.toDate().toISOString();
+            } else if (typeof data.submissionDate === 'string') {
+              submissionDateStr = data.submissionDate;
+            } else if (data.submissionDate instanceof Date) {
+              submissionDateStr = data.submissionDate.toISOString();
+            } else {
+              submissionDateStr = new Date().toISOString(); 
+            }
 
-      if (user.isAdmin) {
-        setAllSubmissions(subs);
-      } else {
-        setSubmissions(subs);
-      }
-    }, (error) => {
-      console.error("Error fetching submissions:", error);
-      toast({ variant: "destructive", title: "خطأ في جلب البيانات", description: `فشل في جلب الأضاحي: ${error.message}` });
-    });
+            let lastUpdatedStr = data.lastUpdated;
+             if (data.lastUpdated && typeof data.lastUpdated.toDate === 'function') {
+                lastUpdatedStr = data.lastUpdated.toDate().toISOString();
+            } else if (typeof data.lastUpdated === 'string') {
+                lastUpdatedStr = data.lastUpdated;
+            } else if (data.lastUpdated instanceof Date) {
+                lastUpdatedStr = data.lastUpdated.toISOString();
+            }
+            
+            return { 
+              id: docSnapshot.id, 
+              ...data, 
+              submissionDate: submissionDateStr,
+              lastUpdated: lastUpdatedStr,
+            } as AdahiSubmission;
+          });
 
-    return () => unsubscribeSubmissions();
-  }, [user, toast]); 
+          if (user.isAdmin) {
+            setAllSubmissions(subs);
+          } else {
+            setSubmissions(subs);
+          }
+        }, (error) => {
+          console.error("Error fetching submissions:", error);
+          if (error.code === 'failed-precondition' && error.message.includes('requires an index')) {
+             toast({ variant: "destructive", title: "خطأ في قاعدة البيانات", description: "يتطلب الاستعلام فهرسًا. يرجى مراجعة Firebase Console لإنشاء الفهرس المطلوب." });
+          } else if (error.message.includes("offline")) {
+             toast({ variant: "destructive", title: "غير متصل", description: "لا يمكن جلب البيانات لأنك غير متصل بالإنترنت." });
+          } else {
+            toast({ variant: "destructive", title: "خطأ في جلب البيانات", description: `فشل في جلب الأضاحي: ${error.message}` });
+          }
+        });
+    } else if (!loading) { // If no user and not loading, clear submissions
+        setSubmissions([]);
+        setAllSubmissions([]);
+    }
 
 
-  const login = async (email: string, pass: string): Promise<AppUser | null> => {
+    return () => {
+        unsubscribeAuth();
+        if (unsubscribeSubmissions) unsubscribeSubmissions();
+        // Consider if terminate(db) is needed on component unmount or app close,
+        // but typically not for context persisting through app lifecycle.
+        // disableNetwork(db).catch(err => console.error("Error disabling network for Firestore:", err));
+    };
+  }, [user, loading, toast]); // Added user and loading to dependency array for submissions listener
+
+
+  const login = async (identifier: string, pass: string): Promise<AppUser | null> => {
     if (!auth || !db) {
         toast({variant: "destructive", title: "خطأ في التهيئة", description: "نظام المصادقة غير جاهز."});
         return null;
     }
     setLoading(true);
+    let emailToLogin = identifier;
+    const isPotentiallyEmail = identifier.includes('@') && identifier.includes('.');
+
+    if (!isPotentiallyEmail) {
+        const userProfile = await fetchUserByUsername(identifier);
+        if (userProfile && userProfile.email) {
+            emailToLogin = userProfile.email;
+        } else {
+            toast({
+              variant: "destructive",
+              title: "خطأ في تسجيل الدخول",
+              description: "اسم المستخدم غير موجود أو لم يتم العثور على بريد إلكتروني مطابق.",
+            });
+            setLoading(false);
+            return null;
+        }
+    }
+
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, pass);
+      const userCredential = await signInWithEmailAndPassword(auth, emailToLogin, pass);
       const firebaseUser = userCredential.user;
-      const appUser = await fetchUserById(firebaseUser.uid);
+      
+      const appUser = await fetchUserById(firebaseUser.uid); // fetchUserById will determine isAdmin
       
       if (appUser) {
-        toast({title: "تم تسجيل الدخول بنجاح"});
+        // toast({title: "تم تسجيل الدخول بنجاح"}); // Toast moved to LoginForm
         setLoading(false);
+        // setUser is handled by onAuthStateChanged, but we return the user for immediate use
         return {...appUser, email: firebaseUser.email || appUser.email, username: appUser.username || firebaseUser.displayName || firebaseUser.email || "مستخدم" };
       }
       
+      // Fallback if appUser isn't immediately found (should be rare if onAuthStateChanged is quick)
       const minimalUser: AppUser = {
         id: firebaseUser.uid, 
         email: firebaseUser.email || "", 
         username: firebaseUser.displayName || firebaseUser.email || "مستخدم", 
         isAdmin: firebaseUser.uid === ADMIN_UID 
       };
-      toast({title: "تم تسجيل الدخول, جاري جلب بيانات المستخدم..."});
+      // toast({title: "تم تسجيل الدخول, جاري جلب بيانات المستخدم..."}); // Toast moved to LoginForm
       setLoading(false);
       return minimalUser;
 
@@ -257,7 +293,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         toast({variant: "destructive", title: "خطأ في التهيئة", description: "نظام التسجيل غير جاهز."});
         return null;
     }
-    // Check if username already exists
+    
     const existingUserByUsername = await fetchUserByUsername(username);
     if (existingUserByUsername) {
         toast({variant: "destructive", title: "خطأ في التسجيل", description: "اسم المستخدم هذا موجود بالفعل. الرجاء اختيار اسم آخر."});
@@ -284,6 +320,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       setLoading(false);
       toast({title: "تم التسجيل بنجاح! يمكنك الآن تسجيل الدخول."});
+      // onAuthStateChanged will eventually set the user state
       return appUser;
     } catch (error: any) {
       console.error("Registration error:", error);
@@ -295,7 +332,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         errorMessage += "كلمة المرور ضعيفة جداً.";
       } else if (error.code === 'auth/invalid-email') {
         errorMessage += "البريد الإلكتروني غير صالح.";
-      } else {
+      } else if (error.code === 'auth/network-request-failed') {
+        errorMessage += "مشكلة في الاتصال بالشبكة.";
+      }
+       else {
         errorMessage += error.message || "حدث خطأ ما.";
       }
       toast({variant: "destructive", title: "خطأ في التسجيل", description: errorMessage});
@@ -310,6 +350,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     try {
         await signOut(auth);
+        setUser(null); // Clear user state immediately
+        setSubmissions([]);
+        setAllSubmissions([]);
         toast({title: "تم تسجيل الخروج بنجاح"});
         router.push("/auth/login"); 
     } catch (error: any) {
@@ -332,7 +375,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const newSubmissionData = {
         ...submissionData,
         userId: user.id,
-        userEmail: user.email, // Storing email for admin convenience
+        userEmail: user.email, 
         submissionDate: serverTimestamp(),
         status: "pending" as const,
         lastUpdated: serverTimestamp(),
@@ -345,7 +388,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         userId: newSubmissionData.userId,
         userEmail: newSubmissionData.userEmail,
         status: "pending",
-        submissionDate: new Date().toISOString(),
+        submissionDate: new Date().toISOString(), 
         lastUpdated: new Date().toISOString(),
       };
       return clientSideRepresentation;
@@ -374,6 +417,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const submissionDocRef = doc(db, "submissions", submissionId);
       await updateDoc(submissionDocRef, { status, lastUpdated: serverTimestamp() });
+      // onDataChange in AdminSubmissionsTable will be triggered by onSnapshot
       return true;
     } catch (error: any) {
       console.error("Error updating submission status:", error);
@@ -402,50 +446,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const submissionDocRef = doc(db, "submissions", submissionId);
       const updateData = { ...data, lastUpdated: serverTimestamp() };
       await updateDoc(submissionDocRef, updateData);
-      
+      // Data will be updated via onSnapshot, no need to manually fetch here
+      // For an immediate return value (if needed, though onSnapshot is preferred for UI updates):
       const updatedDocSnap = await getDoc(submissionDocRef);
-      if (updatedDocSnap && updatedDocSnap.exists()) {
+      if (updatedDocSnap.exists()) {
         const updatedData = updatedDocSnap.data();
-        let submissionDateStr = updatedData.submissionDate;
-         if (updatedData.submissionDate && typeof updatedData.submissionDate.toDate === 'function') {
-          submissionDateStr = updatedData.submissionDate.toDate().toISOString();
-        } else if (typeof updatedData.submissionDate === 'string') {
-            submissionDateStr = updatedData.submissionDate;
-        } else if (updatedData.submissionDate instanceof Date) {
-            submissionDateStr = updatedData.submissionDate.toISOString();
-        } else {
-            submissionDateStr = new Date().toISOString(); 
-        }
-
-        let lastUpdatedStr = updatedData.lastUpdated;
-        if (updatedData.lastUpdated && typeof updatedData.lastUpdated.toDate === 'function') {
-            lastUpdatedStr = updatedData.lastUpdated.toDate().toISOString();
-        } else if (typeof updatedData.lastUpdated === 'string') {
-            lastUpdatedStr = updatedData.lastUpdated;
-        } else if (updatedData.lastUpdated instanceof Date) {
-            lastUpdatedStr = updatedData.lastUpdated.toISOString();
-        }
-
-
+        let submissionDateStr = updatedData.submissionDate?.toDate ? updatedData.submissionDate.toDate().toISOString() : new Date(updatedData.submissionDate).toISOString();
+        let lastUpdatedStr = updatedData.lastUpdated?.toDate ? updatedData.lastUpdated.toDate().toISOString() : new Date(updatedData.lastUpdated).toISOString();
+        
         return { 
-            id: updatedDocSnap.id, 
-            donorName: updatedData.donorName || "",
-            sacrificeFor: updatedData.sacrificeFor || "",
-            phoneNumber: updatedData.phoneNumber || "",
-            wantsToAttend: updatedData.wantsToAttend === true,
-            wantsFromSacrifice: updatedData.wantsFromSacrifice === true,
-            sacrificeWishes: updatedData.sacrificeWishes || "",
-            paymentConfirmed: updatedData.paymentConfirmed === true,
-            receiptBookNumber: updatedData.receiptBookNumber || "",
-            voucherNumber: updatedData.voucherNumber || "",
-            throughIntermediary: updatedData.throughIntermediary === true,
-            intermediaryName: updatedData.intermediaryName || "",
-            distributionPreference: updatedData.distributionPreference || "ramtha",
-            status: updatedData.status || "pending",
-            userId: updatedData.userId || "",
-            userEmail: updatedData.userEmail || "",
-            submissionDate: submissionDateStr,
-            lastUpdated: lastUpdatedStr, 
+          id: updatedDocSnap.id, 
+          ...(updatedData as Omit<AdahiSubmission, 'id' | 'submissionDate' | 'lastUpdated'>),
+          submissionDate: submissionDateStr,
+          lastUpdated: lastUpdatedStr, 
          } as AdahiSubmission;
       }
       return null; 
@@ -474,6 +487,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const submissionDocRef = doc(db, "submissions", submissionId);
       await deleteDoc(submissionDocRef);
+      // Data will be updated via onSnapshot
       return true;
     } catch (error: any) {
       console.error("Error deleting submission:", error);
@@ -489,7 +503,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, submissions, addSubmission, updateSubmissionStatus, updateSubmission, deleteSubmission, allSubmissionsForAdmin: allSubmissions, fetchUserById, fetchUserByUsername }}>
+    <AuthContext.Provider value={{ 
+        user, 
+        loading, 
+        login, 
+        register, 
+        logout, 
+        submissions, 
+        addSubmission, 
+        updateSubmissionStatus, 
+        updateSubmission, 
+        deleteSubmission, 
+        allSubmissionsForAdmin: allSubmissions, 
+        fetchUserById, 
+        fetchUserByUsername 
+    }}>
       {children}
     </AuthContext.Provider>
   );
