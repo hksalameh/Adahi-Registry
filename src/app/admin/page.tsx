@@ -29,10 +29,11 @@ const exportToXlsx = (data: AdahiSubmission[], filename: string) => {
         "الاضحية عن",
         "رقم التلفون",
         "يريد الحضور",
+        "يريد من الأضحية",
+        "اسم المستخدم",
         "تم الدفع",
-        "الاضحية عن طريق",
-        "لمن ستوزع الاضحية",
-        "اسم المستخدم"
+        "عن طريق", // Renamed from "الاضحية عن طريق"
+        "لمن ستوزع الاضحية"
       ];
 
       const mappedData = data.map((sub, index) => ({
@@ -41,12 +42,15 @@ const exportToXlsx = (data: AdahiSubmission[], filename: string) => {
         "الاضحية عن": sub.sacrificeFor,
         "رقم التلفون": sub.phoneNumber,
         "يريد الحضور": sub.wantsToAttend ? "نعم" : "لا",
+        "يريد من الأضحية": sub.wantsFromSacrifice 
+          ? `نعم${sub.sacrificeWishes ? ` (${sub.sacrificeWishes})` : ''}` 
+          : "لا",
+        "اسم المستخدم": sub.submitterUsername || sub.userEmail || sub.userId || "غير متوفر",
         "تم الدفع": sub.paymentConfirmed ? "نعم" : "لا",
-        "الاضحية عن طريق": sub.throughIntermediary 
+        "عن طريق": sub.throughIntermediary 
           ? `نعم${sub.intermediaryName ? ` (${sub.intermediaryName})` : ''}` 
           : "لا",
         "لمن ستوزع الاضحية": distributionOptions.find(opt => opt.value === sub.distributionPreference)?.label || sub.distributionPreference || "غير محدد",
-        "اسم المستخدم": sub.submitterUsername || sub.userEmail || sub.userId || "غير متوفر",
       }));
       
       // Create worksheet with specified header order
