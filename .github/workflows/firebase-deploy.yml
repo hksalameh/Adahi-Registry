@@ -6,7 +6,7 @@ on:
       - master # تأكد أن هذا هو اسم فرعك الرئيسي الصحيح
 
 jobs:
-  build_and_deploy: # تم تغيير اسم المهمة ليعكس البناء والنشر
+  build_and_deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -15,7 +15,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18' # يمكنك تغيير هذا لإصدار Node.js الذي يستخدمه مشروعك إذا لزم الأمر
+          node-version: '20' # <--- هذا هو التعديل الرئيسي
 
       - name: Install dependencies
         run: npm install # أو yarn install إذا كنت تستخدم Yarn
