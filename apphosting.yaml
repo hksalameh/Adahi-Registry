@@ -4,16 +4,21 @@ version: 2
 # Environment variables available to your build and runtime
 env:
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: "AIzaSyBPFrkU8kjySO0_sGWkFQdopY_xPCz1YyA" # <--- استبدل هذه بقيمة apiKey الفعلية
+    value: "AIzaSyBPFrkU8kjySO0_sGWkFQdopY_xPCz1YyA"
   - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: "YOUR_AUTH_DOMAIN_HERE" # <--- استبدل وأضف أي متغيرات أخرى
+    value: "adahi-manager.firebaseapp.com"
   - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    value: "YOUR_PROJECT_ID_HERE" # <--- استبدل وأضف أي متغيرات أخرى
-  # أضف أي متغيرات بيئة أخرى يحتاجها مشروعك هنا
-  # - variable: ANOTHER_ENV_VARIABLE
-  #   value: "its_value"
+    value: "adahi-manager"
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: "adahi-manager.appspot.com" # انتبه: عادة ما يكون .appspot.com هنا
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "793566133167"
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: "1:793566133167:web:da43b75ebaf60ab49acd5a"
+  - variable: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+    value: "G-H4GYXE8T59"
 
 # Optional settings for the build process
 # build:
-#   buildCommand: npm run build # يمكنك تحديد أمر البناء هنا إذا أردت
-#   outputDirectory: .next     # ومجلد المخرجات
+#   buildCommand: npm install && npm run build
+#   outputDirectory: .next
