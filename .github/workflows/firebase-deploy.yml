@@ -3,19 +3,32 @@ name: Deploy to Firebase Hosting
 on:
   push:
     branches:
-      - master  # تم التغيير هنا إلى master
+      - master # تأكد أن هذا هو اسم فرعك الرئيسي الصحيح
 
 jobs:
-  deploy_to_firebase:
+  build_and_deploy: # تم تغيير اسم المهمة ليعكس البناء والنشر
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18' # يمكنك تغيير هذا لإصدار Node.js الذي يستخدمه مشروعك إذا لزم الأمر
+
+      - name: Install dependencies
+        run: npm install # أو yarn install إذا كنت تستخدم Yarn
+
+      - name: Build Next.js project for static export
+        run: npm run build # هذا يفترض أن لديك سكربت "build" في package.json يقوم بـ next build && next export
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
-          projectId: 'adahi-manager' # هذا هو معرف مشروعك الذي أكدناه
+          projectId: 'adahi-manager'
           channelId: live
+          # target: your_hosting_target # إذا كان لديك أكثر من موقع hosting في نفس المشروع
+          # entryPoint: "./out" # عادةً ما يكون هذا هو الافتراضي إذا كان public هو "out" في firebase.json
