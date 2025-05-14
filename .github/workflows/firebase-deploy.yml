@@ -15,13 +15,22 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20' # <--- هذا هو التعديل الرئيسي
+          node-version: '20'
 
       - name: Install dependencies
-        run: npm install # أو yarn install إذا كنت تستخدم Yarn
+        run: npm install
 
       - name: Build Next.js project for static export
-        run: npm run build # هذا يفترض أن لديك سكربت "build" في package.json يقوم بـ next build && next export
+        run: npm run build
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
+          NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID }}
+          CI: "" # يمنع التعامل مع التحذيرات كأخطاء في بعض بيئات CI
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
@@ -30,5 +39,3 @@ jobs:
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
           projectId: 'adahi-manager'
           channelId: live
-          # target: your_hosting_target # إذا كان لديك أكثر من موقع hosting في نفس المشروع
-          # entryPoint: "./out" # عادةً ما يكون هذا هو الافتراضي إذا كان public هو "out" في firebase.json
