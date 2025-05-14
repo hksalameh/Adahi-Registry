@@ -7,7 +7,7 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Checkbox } from "@/components/ui/checkbox"; // استيراد Checkbox
+import { Checkbox } from "@/components/ui/checkbox"; 
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -55,49 +55,45 @@ export default function LoginForm() {
 
   const onSubmit = async (data: LoginFormInputs) => {
     setIsLoading(true);
-    let emailToLogin = data.identifier;
+    console.log(`[LoginForm onSubmit] Called with identifier: ${data.identifier}, rememberMe: ${data.rememberMe}`);
     
-    // التحقق مما إذا كان المعرف هو اسم المستخدم أو البريد الإلكتروني للمدير
-    const isAdminLoginAttempt = data.identifier === process.env.NEXT_PUBLIC_ADMIN_USERNAME || data.identifier === process.env.NEXT_PUBLIC_ADMIN_EMAIL;
-
-    if (!isAdminLoginAttempt && !(data.identifier.includes('@') && data.identifier.includes('.'))) {
-      // إذا لم يكن بريدًا إلكترونيًا وليس محاولة تسجيل دخول للمدير، افترض أنه اسم مستخدم عادي
-      const userProfile = await fetchUserByUsername(data.identifier);
-      if (userProfile && userProfile.email) {
-        emailToLogin = userProfile.email;
-      } else {
-        toast({
-          variant: "destructive",
-          title: "خطأ في تسجيل الدخول",
-          description: "اسم المستخدم غير موجود أو لم يتم العثور على بريد إلكتروني مطابق. يرجى مراعاة حالة الأحرف.",
-        });
-        setIsLoading(false);
-        return;
-      }
-    } else if (isAdminLoginAttempt && data.identifier === process.env.NEXT_PUBLIC_ADMIN_USERNAME && process.env.NEXT_PUBLIC_ADMIN_EMAIL) {
-      // إذا كان محاولة تسجيل دخول المدير باسم المستخدم الخاص بالمدير، استخدم البريد الإلكتروني للمدير
-      emailToLogin = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
-    }
-    // إذا كان المعرف بريدًا إلكترونيًا بالفعل (بما في ذلك بريد المدير)، سيبقى emailToLogin كما هو
-
-    const loggedInUser = await login(emailToLogin, data.password);
+    const loggedInUser = await login(data.identifier, data.password);
     setIsLoading(false);
 
     if (loggedInUser) {
+      console.log("[LoginForm onSubmit] Login successful. User object from AuthContext.login():", JSON.stringify(loggedInUser));
+      console.log("[LoginForm onSubmit] User isAdmin status:", loggedInUser.isAdmin);
+
       if (typeof window !== 'undefined') {
         if (data.rememberMe) {
-          localStorage.setItem(LOCAL_STORAGE_IDENTIFIER_KEY, data.identifier);
+          localStorage.setItem(LOCAL_STORAGE_IDENTIFIER_KEY, data.identifier); // Store the original identifier used
           localStorage.setItem(LOCAL_STORAGE_REMEMBER_ME_KEY, 'true');
+          console.log(`[LoginForm onSubmit] "Remember me" is true. Stored identifier: ${data.identifier}`);
         } else {
           localStorage.removeItem(LOCAL_STORAGE_IDENTIFIER_KEY);
           localStorage.setItem(LOCAL_STORAGE_REMEMBER_ME_KEY, 'false');
+          console.log(`[LoginForm onSubmit] "Remember me" is false. Cleared remembered identifier.`);
         }
       }
       toast({ title: "تم تسجيل الدخول بنجاح" });
-      const redirectUrl = searchParams.get("redirect") || (loggedInUser.isAdmin ? "/admin" : "/dashboard");
+      
+      const redirectUrlFromParams = searchParams.get("redirect");
+      const defaultAdminRedirect = "/admin";
+      const defaultUserRedirect = "/dashboard";
+      
+      let redirectUrl = loggedInUser.isAdmin ? defaultAdminRedirect : defaultUserRedirect;
+      if (redirectUrlFromParams) {
+        redirectUrl = redirectUrlFromParams;
+         // Ensure admin isn't redirected to a non-admin page if ?redirect is set, unless it's intended.
+         // For simplicity, if user is admin and redirect is present, we'll honor it.
+         // Otherwise, a more complex logic might be needed if admin should always go to /admin regardless of ?redirect
+      }
+      
+      console.log(`[LoginForm onSubmit] Redirecting to: ${redirectUrl}. Based on isAdmin: ${loggedInUser.isAdmin}, redirectParam: ${redirectUrlFromParams}`);
       router.push(redirectUrl);
+      // router.refresh(); // Removed this line as router.push should be sufficient
     } else {
-        // رسالة الخطأ من دالة login في AuthContext
+        console.log("[LoginForm onSubmit] Login failed. loggedInUser is null or undefined (toast handled in AuthContext).");
     }
   };
 
