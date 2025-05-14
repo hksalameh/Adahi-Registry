@@ -1,0 +1,19 @@
+# Required value, should be "2"
+version: 2
+
+# Environment variables available to your build and runtime
+env:
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: "AIzaSyBPFrkU8kjySO0_sGWkFQdopY_xPCz1YyA" # <--- استبدل هذه بقيمة apiKey الفعلية
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: "YOUR_AUTH_DOMAIN_HERE" # <--- استبدل وأضف أي متغيرات أخرى
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: "YOUR_PROJECT_ID_HERE" # <--- استبدل وأضف أي متغيرات أخرى
+  # أضف أي متغيرات بيئة أخرى يحتاجها مشروعك هنا
+  # - variable: ANOTHER_ENV_VARIABLE
+  #   value: "its_value"
+
+# Optional settings for the build process
+# build:
+#   buildCommand: npm run build # يمكنك تحديد أمر البناء هنا إذا أردت
+#   outputDirectory: .next     # ومجلد المخرجات
