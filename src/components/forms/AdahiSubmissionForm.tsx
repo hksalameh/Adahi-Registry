@@ -101,7 +101,7 @@ export default function AdahiSubmissionForm({ onFormSubmit, defaultValues, isEdi
   });
 
   useEffect(() => {
-    if (!authLoading && !user && !isEditing) { // Only redirect if not editing and not authenticated
+    if (!authLoading && !user && !isEditing) { 
       toast({
         title: "مطلوب تسجيل الدخول",
         description: "يجب تسجيل الدخول أولاً لإضافة أضحية.",
@@ -145,7 +145,7 @@ export default function AdahiSubmissionForm({ onFormSubmit, defaultValues, isEdi
 
     if (success) {
       toast({ title: isEditing ? "تم تحديث البيانات بنجاح!" : "تم حفظ البيانات بنجاح!", description: "شكراً لمساهمتك." });
-      if (!isEditing) { // Only reset form if it was a new submission
+      if (!isEditing) { 
         form.reset({ 
           donorName: "",
           sacrificeFor: "",
@@ -171,7 +171,7 @@ export default function AdahiSubmissionForm({ onFormSubmit, defaultValues, isEdi
     return (
       <Card className="w-full shadow-lg">
         <CardHeader>
-          <CardTitle className="text-2xl flex items-center gap-2 text-primary">
+          <CardTitle className="text-xl sm:text-2xl flex items-center gap-2 text-primary">
             <Loader2 className="animate-spin" /> {isEditing ? "تحميل بيانات التعديل..." : "تحميل نموذج الإضافة..."}
           </CardTitle>
         </CardHeader>
@@ -182,19 +182,15 @@ export default function AdahiSubmissionForm({ onFormSubmit, defaultValues, isEdi
     );
   }
   
-  // Do not render the form if user is not logged in (except for edit mode, which is handled by layout)
-  // The useEffect above will redirect for new submissions.
-  // For editing, the AdminLayout or DashboardLayout should handle auth.
-  // However, an extra check here for non-editing mode is fine.
   if (!user && !isEditing) {
-    return null; // Or a message, but redirect is preferred
+    return null; 
   }
 
 
   return (
     <Card className="w-full shadow-lg">
       <CardHeader>
-        <CardTitle className="text-2xl flex items-center gap-2 text-primary">
+        <CardTitle className="text-xl sm:text-2xl flex items-center gap-2 text-primary">
           <ListTree /> {isEditing ? "تعديل بيانات الأضحية" : "إضافة أضحية جديدة"}
         </CardTitle>
         <CardDescription>الرجاء ملء جميع الحقول المطلوبة بعناية.</CardDescription>

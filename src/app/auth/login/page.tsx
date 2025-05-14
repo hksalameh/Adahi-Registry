@@ -12,7 +12,7 @@ export default function LoginPage() {
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground">
             <LockKeyhole size={32} />
           </div>
-          <CardTitle className="text-3xl font-bold tracking-tight text-primary">تسجيل الدخول</CardTitle>
+          <CardTitle className="text-2xl sm:text-3xl font-bold tracking-tight text-primary">تسجيل الدخول</CardTitle>
           <CardDescription className="text-muted-foreground">
             أدخل بريدك الإلكتروني وكلمة المرور للوصول إلى حسابك.
           </CardDescription>

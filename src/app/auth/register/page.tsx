@@ -12,7 +12,7 @@ export default function RegisterPage() {
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground">
             <UserPlus size={32} />
           </div>
-          <CardTitle className="text-3xl font-bold tracking-tight text-primary">إنشاء حساب جديد</CardTitle>
+          <CardTitle className="text-2xl sm:text-3xl font-bold tracking-tight text-primary">إنشاء حساب جديد</CardTitle>
           <CardDescription className="text-muted-foreground">
             املأ النموذج أدناه لإنشاء حسابك.
           </CardDescription>

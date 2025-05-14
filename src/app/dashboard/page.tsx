@@ -1,3 +1,4 @@
+
 "use client";
 
 import AdahiSubmissionForm from "@/components/forms/AdahiSubmissionForm";
@@ -9,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { ListTree, Eye } from "lucide-react";
 
 export default function DashboardPage() {
-  const { submissions: initialSubmissions } = useAuth(); 
+  const { user, submissions: initialSubmissions, loading } = useAuth(); 
   const [currentSubmissions, setCurrentSubmissions] = useState<AdahiSubmission[]>(initialSubmissions);
 
   useEffect(() => {
@@ -23,22 +24,19 @@ export default function DashboardPage() {
   return (
     <div className="space-y-10">
       <header className="space-y-2 pb-6 border-b">
-        <h1 className="text-4xl font-bold tracking-tight">سجل أضحية</h1>
+        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">سجل أضحية</h1>
         <p className="text-lg text-muted-foreground">
           أضف أضحية جديدة أو اطلع على الأضاحي المسجلة.
         </p>
       </header>
 
       <section aria-labelledby="new-submission-heading">
-        {/* AdahiSubmissionForm is already a Card, no need to double wrap if CardHeader is used directly. */}
-        {/* However, to give it a distinct section, wrapping or using a Card component is good. */}
-        {/* The AdahiSubmissionForm component already uses a Card internally. */}
         <AdahiSubmissionForm onFormSubmit={handleFormSubmit} />
       </section>
 
       <section aria-labelledby="view-submissions-heading" className="space-y-6">
         <div className="space-y-1">
-          <h2 id="view-submissions-heading" className="text-3xl font-semibold tracking-tight flex items-center gap-2">
+          <h2 id="view-submissions-heading" className="text-2xl sm:text-3xl font-semibold tracking-tight flex items-center gap-2">
             <Eye className="h-7 w-7 text-primary" />
             الأضاحي المسجلة
           </h2>
@@ -46,7 +44,6 @@ export default function DashboardPage() {
             قائمة بجميع الأضاحي التي قمت بإدخالها.
           </p>
         </div>
-        {/* UserSubmissionsTable has its own card-like styling */}
         <UserSubmissionsTable submissions={currentSubmissions} />
       </section>
     </div>
