@@ -52,6 +52,14 @@ if (pdfMake.fonts) {
 
 const PDF_MARGIN = 40;
 
+// Helper function to reverse Arabic text for PDFMake (word order)
+const reverseTextForPdfMake = (text: string | undefined | null): string => {
+  if (!text) return '';
+  // This simple reversal might not be perfect for all complex Arabic text but can help with word order.
+  return text.split(' ').reverse().join('  '); // Using double space to ensure some separation
+};
+
+
 const AdminPage = () => {
   const { allSubmissionsForAdmin, loading: authLoading, refreshData, user, fetchUserById } = useAuth();
   const { toast } = useToast();
@@ -63,7 +71,7 @@ const AdminPage = () => {
   const isAmiriFontConfigured = !!(pdfMake.fonts && pdfMake.fonts.Amiri && pdfMake.fonts.Amiri.normal && pdfMake.vfs && Object.keys(pdfMake.vfs).length > 0);
 
   useEffect(() => {
-    if (!isAmiriFontConfigured) {
+    if (!isAmiriFontConfigured && (exportingType?.includes('Pdf'))) { // Show only if PDF export is attempted
       toast({
         title: "تنبيه بخصوص خط PDF",
         description: "لم يتم تكوين خط Amiri بشكل كامل لـ pdfMake (قد يكون VFS غير محمل بشكل صحيح أو الخط غير مسجل في vfs_fonts.js). قد لا تظهر النصوص العربية بشكل صحيح في ملفات PDF.",
@@ -71,7 +79,7 @@ const AdminPage = () => {
         duration: 10000,
       });
     }
-  }, [isAmiriFontConfigured, toast]);
+  }, [isAmiriFontConfigured, toast, exportingType]);
 
   const getDistributionLabel = useCallback((value?: DistributionPreference | string) => {
     if (!value) return "غير محدد";
@@ -149,8 +157,9 @@ const AdminPage = () => {
 
     if (wb.Sheets[sheetName]) {
         const sheet = wb.Sheets[sheetName];
-        const headerRowIndex = 0;
+        const headerRowIndex = 0; // Assuming headers are in the first row
 
+        // Style header row
         columns.forEach((_col, C_idx) => {
             const cell_ref = XLSX.utils.encode_cell({ r: headerRowIndex, c: C_idx });
             if (sheet[cell_ref]) {
@@ -167,12 +176,13 @@ const AdminPage = () => {
             }
         });
         
+        // Style data rows
         worksheetData.forEach((_rowData, R_idx) => {
             columns.forEach((_col, C_idx) => {
-                const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx });
+                const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx }); // R_idx + 1 because data starts after header
                 if (sheet[cell_ref] && sheet[cell_ref].v !== undefined && sheet[cell_ref].v !== null && sheet[cell_ref].v !== "") {
                     sheet[cell_ref].s = {
-                        ...(sheet[cell_ref].s || {}),
+                        ...(sheet[cell_ref].s || {}), // Preserve existing styles if any
                         border: {
                             top: { style: "thin", color: { auto: 1 } },
                             bottom: { style: "thin", color: { auto: 1 } },
@@ -181,7 +191,7 @@ const AdminPage = () => {
                         },
                         alignment: { ...(sheet[cell_ref].s?.alignment || {}), horizontal: "right", vertical: "center", wrapText: true }
                     };
-                } else if (sheet[cell_ref]) {
+                } else if (sheet[cell_ref]) { // Apply border even to empty cells if they exist in the sheet object
                      sheet[cell_ref].s = {
                         ...(sheet[cell_ref].s || {}),
                          border: {
@@ -198,8 +208,8 @@ const AdminPage = () => {
 
         const colWidths = columns.map(column => ({ wch: Math.max(15, String(column.header).length + 5) }));
         sheet['!cols'] = colWidths;
-        sheet['!props'] = { rtl: true };
-        sheet['!autofilter'] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(sheet['!ref']!)) };
+        sheet['!props'] = { rtl: true }; // Set sheet direction to RTL
+        sheet['!autofilter'] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(sheet['!ref']!)) }; // Enable autofilter for the entire sheet
     }
     XLSX.writeFile(wb, `${fileName}.xlsx`);
   };
@@ -215,23 +225,25 @@ const AdminPage = () => {
       return;
     }
     
-    // For PDF, we reverse the columns to achieve RTL layout visually.
+    // For PDF, reverse columns for visual RTL, and reverse header text
     const pdfColumns = [...columns].reverse(); 
     
-    const tableHeaders = pdfColumns.map(col => ({ text: col.header, style: 'tableHeader', alignment: 'right' as const }));
+    const tableHeaders = pdfColumns.map(col => ({ text: reverseTextForPdfMake(col.header), style: 'tableHeader', alignment: 'right' as const }));
     const tableBody = data.map(item =>
         pdfColumns.map(col => ({ text: (item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : ''), alignment: 'right' as const }))
     );
     
+    const reversedTitle = reverseTextForPdfMake(title);
     const exportDateText = `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`;
+    const reversedExportDateText = reverseTextForPdfMake(exportDateText);
 
     const docDefinition: any = {
       pageSize: 'A4',
       pageOrientation: 'landscape',
       pageMargins: [PDF_MARGIN, PDF_MARGIN + 20, PDF_MARGIN, PDF_MARGIN + 20], 
       content: [
-        { text: title, style: 'header', alignment: 'right' as const, margin: [0, 0, 0, 10] },
-        { text: exportDateText, style: 'subheader', alignment: 'right' as const, margin: [0, 0, 0, 20] },
+        { text: reversedTitle, style: 'header', alignment: 'right' as const, margin: [0, 0, 0, 10] },
+        { text: reversedExportDateText, style: 'subheader', alignment: 'right' as const, margin: [0, 0, 0, 20] },
         {
           table: {
             headerRows: 1,
@@ -257,7 +269,7 @@ const AdminPage = () => {
       styles: {
         header: {
           fontSize: 18,
-          bold: false, //  تمت إزالة الخط العريض من هنا
+          // bold: false, // Keep bold if Amiri-Bold is properly loaded in VFS
           alignment: 'right' as const
         },
         subheader: {
@@ -265,7 +277,7 @@ const AdminPage = () => {
           alignment: 'right' as const
         },
         tableHeader: {
-          bold: false, // تمت إزالة الخط العريض من هنا
+          // bold: false, // Keep bold if Amiri-Bold is properly loaded in VFS
           fontSize: 8, 
           color: 'black',
           alignment: 'right' as const 
@@ -273,10 +285,11 @@ const AdminPage = () => {
       },
       footer: function(currentPage: number, pageCount: number) {
         const pageNumText = `صفحة ${currentPage.toString()} من ${pageCount.toString()}`;
+        const reversedPageNumText = reverseTextForPdfMake(pageNumText);
         return {
-          text: pageNumText,
+          text: reversedPageNumText,
           alignment: 'center' as const,
-          style: { font: 'Amiri', fontSize: 8 }, // التأكد من استخدام الخط هنا أيضاً
+          style: { font: 'Amiri', fontSize: 8 },
           margin: [0, 10, 0, 0]
         };
       }
