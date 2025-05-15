@@ -35,7 +35,7 @@ const AdminPage = () => {
   const [amiriFontBase64, setAmiriFontBase64] = useState<string | null>(null);
   const [fontLoadedSuccessfully, setFontLoadedSuccessfully] = useState<boolean>(false);
 
-  const PDF_MARGIN = 40; // Define margin at component scope
+  const PDF_MARGIN = 40; 
 
   const getDistributionLabel = useCallback((value?: DistributionPreference | string) => {
     if (!value) return "غير محدد";
@@ -59,18 +59,19 @@ const AdminPage = () => {
         };
         reader.onerror = (error) => {
           console.error("Error reading font blob:", error);
+          setFontLoadedSuccessfully(false);
           throw new Error("Failed to read font blob.");
         };
         reader.readAsDataURL(fontBlob);
       } catch (error: any) {
         console.error("Error loading Amiri font:", error.message);
+        setFontLoadedSuccessfully(false);
         toast({
           title: "خطأ في تحميل الخط لملفات PDF",
-          description: `لم يتم تحميل خط Amiri بنجاح. قد لا تظهر النصوص العربية بشكل صحيح في PDF. الخطأ: ${error.message}`,
+          description: `لم يتم تحميل خط Amiri بنجاح. قد لا تظهر النصوص العربية بشكل صحيح في PDF. تأكد من وجود ملف Amiri-Regular.ttf في public/fonts/. الخطأ: ${error.message}`,
           variant: "destructive",
           duration: 7000,
         });
-        setFontLoadedSuccessfully(false);
       }
     };
     loadFont();
@@ -131,8 +132,8 @@ const AdminPage = () => {
       distributionPreferenceText: getDistributionLabel(sub.distributionPreference),
       submissionDateFormatted: sub.submissionDate ? format(new Date(sub.submissionDate), "dd/MM/yyyy HH:mm", { locale: ar }) : 'N/A',
       statusText: sub.status === "entered" ? "مدخلة" : "غير مدخلة",
-      userId: sub.userId, // Kept for potential internal use during export logic
-      distributionPreference: sub.distributionPreference, // Kept for filtering
+      userId: sub.userId, 
+      distributionPreference: sub.distributionPreference, 
     }));
   }, [getDistributionLabel]);
 
@@ -223,19 +224,20 @@ const AdminPage = () => {
       } catch (e) {
         console.error("Error adding Amiri font to PDF (VFS or font registration):", e);
         toast({ title: "خطأ في خط PDF", description: "لم يتم تطبيق الخط العربي بشكل كامل للعناوين.", variant: "destructive"});
-        pdfDoc.setFont('Helvetica');
+        pdfDoc.setFont('Helvetica'); // Fallback font
       }
     } else {
-        pdfDoc.setFont('Helvetica');
+        pdfDoc.setFont('Helvetica'); // Fallback font if Amiri not loaded
     }
     
     const pageWidth = pdfDoc.internal.pageSize.getWidth();
-    const pageHeight = pdfDoc.internal.pageSize.getHeight();
-    // PDF_MARGIN is now accessible from component scope
-
+    
+    // Setting font again before rendering text, explicitly
+    if (fontLoadedSuccessfully) pdfDoc.setFont('Amiri'); else pdfDoc.setFont('Helvetica');
     pdfDoc.setFontSize(18);
     pdfDoc.text(title, pageWidth / 2, PDF_MARGIN, { align: 'center' });
 
+    if (fontLoadedSuccessfully) pdfDoc.setFont('Amiri'); else pdfDoc.setFont('Helvetica');
     pdfDoc.setFontSize(10);
     const exportDateText = `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`;
     pdfDoc.text(exportDateText, pageWidth / 2, PDF_MARGIN + 25, { align: 'center' });
@@ -256,15 +258,15 @@ const AdminPage = () => {
       body: tableBody,
       theme: 'grid',
       styles: {
-        font: fontLoadedSuccessfully ? 'Amiri' : 'Helvetica',
+        font: fontLoadedSuccessfully ? 'Amiri' : 'Helvetica', // Use Amiri for table body
         halign: 'right', 
         cellPadding: 5,
         fontSize: 8,
         overflow: 'linebreak'
       },
       headStyles: {
-        font: fontLoadedSuccessfully ? 'Amiri' : 'Helvetica',
-        fontStyle: 'bold',
+        font: fontLoadedSuccessfully ? 'Amiri' : 'Helvetica', // Use Amiri for table header
+        // fontStyle: 'bold', // Removed bold to see if it helps with char rendering
         fillColor: [220, 220, 220], 
         textColor: [0, 0, 0],
         halign: 'center', 
