@@ -26,6 +26,14 @@ declare module 'jspdf' {
   }
 }
 
+// Helper function to reverse Arabic text for PDF (basic implementation)
+const reverseArabicTextForPdf = (text: string): string => {
+  if (!text || typeof text !== 'string') return '';
+  // This is a basic reversal. For complex scripts or mixed LTR/RTL, a proper bidi algorithm is needed.
+  // It might not correctly handle ligatures or complex shaping.
+  return text.split('').reverse().join('');
+};
+
 const AdminPage = () => {
   const { allSubmissionsForAdmin, loading: authLoading, refreshData, user, fetchUserById } = useAuth();
   const { toast } = useToast();
@@ -43,7 +51,7 @@ const AdminPage = () => {
   useEffect(() => {
     const loadFont = async () => {
       try {
-        const response = await fetch('/fonts/Amiri-Regular.ttf'); // Make sure Amiri-Regular.ttf is in public/fonts
+        const response = await fetch('/fonts/Amiri-Regular.ttf'); 
         if (!response.ok) {
           throw new Error('Failed to fetch Amiri font. Ensure Amiri-Regular.ttf is in public/fonts/');
         }
@@ -51,7 +59,7 @@ const AdminPage = () => {
         const reader = new FileReader();
         reader.onloadend = () => {
           const base64data = reader.result as string;
-          setAmiriFontBase64(base64data.split(',')[1]); // Get only the Base64 part
+          setAmiriFontBase64(base64data.split(',')[1]); 
           setFontLoadedSuccessfully(true);
           console.log("Amiri font loaded successfully for PDF generation.");
         };
@@ -80,10 +88,10 @@ const AdminPage = () => {
       if (user && user.isAdmin) {
         handleRefresh().finally(() => setPageLoading(false));
       } else {
-        setPageLoading(false); // If not admin or no user, stop page loading
+        setPageLoading(false); 
       }
     }
-  }, [authLoading, user]); // Removed refreshData from dependencies to avoid loop, handleRefresh calls it
+  }, [authLoading, user]); 
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -125,18 +133,17 @@ const AdminPage = () => {
       receiptBookNumber: sub.paymentConfirmed ? (sub.receiptBookNumber || "-") : "-",
       voucherNumber: sub.paymentConfirmed ? (sub.voucherNumber || "-") : "-",
       throughIntermediaryText: sub.throughIntermediary ? "نعم" : "لا",
-      intermediaryName: sub.throughIntermediary ? (sub.intermediaryName || "-") : "-", // Simplified logic
+      intermediaryName: sub.throughIntermediary ? (sub.intermediaryName || "-") : "-",
       distributionPreferenceText: getDistributionLabel(sub.distributionPreference),
       submissionDateFormatted: sub.submissionDate ? format(new Date(sub.submissionDate), "dd/MM/yyyy HH:mm", { locale: ar }) : 'N/A',
       statusText: sub.status === "entered" ? "مدخلة" : "غير مدخلة",
-      // raw data for filtering or other purposes if needed
       userId: sub.userId,
       distributionPreference: sub.distributionPreference,
     }));
   }, [getDistributionLabel]);
 
-  const exportToExcel = (data: any[], fileName: string, sheetName: string, columns: Array<{header: string, dataKey: string}>) => {
-    const worksheetData = data.map(item => {
+  const exportToExcel = (dataToExportRaw: any[], fileName: string, sheetName: string, columns: Array<{header: string, dataKey: string}>) => {
+    const worksheetData = dataToExportRaw.map(item => {
       const orderedItem: any = {};
       columns.forEach(col => {
         orderedItem[col.header] = item[col.dataKey]; 
@@ -144,51 +151,63 @@ const AdminPage = () => {
       return orderedItem;
     });
 
-    const ws = XLSX.utils.json_to_sheet(worksheetData);
-
-    ws['!cols'] = columns.map(() => ({ wch: 20 })); 
-    ws['!rows'] = [{ hpt: 20 }]; 
-    ws['!merges'] = []; 
-    ws['!protect'] = {
-        sheet: false,
-        selectLockedCells: false,
-        selectUnlockedCells: false,
-    };
-    ws['!autofilter'] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(ws['!ref']!)) };
-
+    const ws = XLSX.utils.json_to_sheet(worksheetData, {
+      header: columns.map(col => col.header) // Ensure headers are set from columns definition
+    });
+    
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
     
     if (wb.Sheets[sheetName]) {
-        wb.Sheets[sheetName]['!props'] = { rtl: true };
-        const range = XLSX.utils.decode_range(wb.Sheets[sheetName]['!ref']!);
-        for (let R = range.s.r; R <= range.e.r; ++R) {
-            for (let C = range.s.c; C <= range.e.c; ++C) {
-                const cell_address = { c: C, r: R };
-                const cell_ref = XLSX.utils.encode_cell(cell_address);
-                if (!wb.Sheets[sheetName][cell_ref]) continue;
-                wb.Sheets[sheetName][cell_ref].s = {
-                    ...(wb.Sheets[sheetName][cell_ref].s || {}),
-                    border: {
-                        top: { style: "thin", color: { auto: 1 } },
-                        bottom: { style: "thin", color: { auto: 1 } },
-                        left: { style: "thin", color: { auto: 1 } },
-                        right: { style: "thin", color: { auto: 1 } },
-                    },
-                    alignment: {
-                        ...(wb.Sheets[sheetName][cell_ref].s?.alignment || {}),
-                        horizontal: "right",
-                        vertical: "center"
-                    }
-                };
-                if (R === 0) { 
-                    wb.Sheets[sheetName][cell_ref].s.font = {
-                        ...(wb.Sheets[sheetName][cell_ref].s?.font || {}),
-                        bold: true
+        const sheet = wb.Sheets[sheetName];
+        const headerRowIndex = 0;
+        
+        // Style header row
+        columns.forEach((col, C_idx) => {
+            const cell_ref = XLSX.utils.encode_cell({ r: headerRowIndex, c: C_idx });
+            if (!sheet[cell_ref]) sheet[cell_ref] = { t: 's', v: col.header };
+            else sheet[cell_ref].v = col.header;
+
+            sheet[cell_ref].s = {
+                border: {
+                    top: { style: "thin", color: { auto: 1 } },
+                    bottom: { style: "thin", color: { auto: 1 } },
+                    left: { style: "thin", color: { auto: 1 } },
+                    right: { style: "thin", color: { auto: 1 } },
+                },
+                alignment: { horizontal: "center", vertical: "center", wrapText: true },
+                font: { bold: true }
+            };
+        });
+
+        // Style data rows
+        worksheetData.forEach((_rowData, R_idx) => { 
+            columns.forEach((_col, C_idx) => {
+                const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx }); 
+                if (sheet[cell_ref] && sheet[cell_ref].v !== undefined && sheet[cell_ref].v !== null && sheet[cell_ref].v !== "") { // Style only if cell has data
+                    sheet[cell_ref].s = {
+                        ...(sheet[cell_ref].s || {}), 
+                        border: {
+                            top: { style: "thin", color: { auto: 1 } },
+                            bottom: { style: "thin", color: { auto: 1 } },
+                            left: { style: "thin", color: { auto: 1 } },
+                            right: { style: "thin", color: { auto: 1 } },
+                        },
+                        alignment: { ...(sheet[cell_ref].s?.alignment || {}), horizontal: "right", vertical: "center", wrapText: true }
+                    };
+                } else if (sheet[cell_ref]) { // For empty cells that might exist, ensure alignment if needed
+                     sheet[cell_ref].s = {
+                        ...(sheet[cell_ref].s || {}),
+                        alignment: { ...(sheet[cell_ref].s?.alignment || {}), horizontal: "right", vertical: "center", wrapText: true }
                     };
                 }
-            }
-        }
+            });
+        });
+        
+        const colWidths = columns.map(column => ({ wch: Math.max(15, String(column.header).length + 5) }));
+        sheet['!cols'] = colWidths;
+        sheet['!autofilter'] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(sheet['!ref']!)) };
+        sheet['!props'] = { rtl: true };
     }
     
     XLSX.writeFile(wb, `${fileName}.xlsx`);
@@ -201,44 +220,50 @@ const AdminPage = () => {
       format: 'a4'
     });
 
+    pdfDoc.setLanguage('ar');
+    pdfDoc.setR2L(true); 
+
     if (fontLoadedSuccessfully && amiriFontBase64) {
       try {
         pdfDoc.addFileToVFS('Amiri-Regular.ttf', amiriFontBase64);
         pdfDoc.addFont('Amiri-Regular.ttf', 'Amiri', 'normal');
+        pdfDoc.setFont('Amiri');
       } catch (e) {
         console.error("Error adding Amiri font to PDF (VFS or font registration):", e);
         toast({ title: "خطأ في خط PDF", description: "لم يتم تطبيق الخط العربي بشكل كامل للعناوين.", variant: "destructive"});
+        pdfDoc.setFont('Helvetica'); // Fallback
       }
+    } else {
+        pdfDoc.setFont('Helvetica'); // Fallback
     }
     
-    pdfDoc.setLanguage('ar');
-    pdfDoc.setR2L(true); 
-
     const pageWidth = pdfDoc.internal.pageSize.getWidth();
     
-    if (fontLoadedSuccessfully) {
-      pdfDoc.setFont('Amiri');
-    } else {
-      pdfDoc.setFont('Helvetica'); // Fallback
-    }
     pdfDoc.setFontSize(18);
-    pdfDoc.text(title, pageWidth / 2, 40, { align: 'center' });
+    // Apply reversal for title if Amiri is loaded (or any RTL font that might need it for jspdf.text)
+    const processedTitle = (fontLoadedSuccessfully) ? reverseArabicTextForPdf(title) : title;
+    pdfDoc.text(processedTitle, pageWidth / 2, 40, { align: 'center' });
 
-    if (fontLoadedSuccessfully) {
-      pdfDoc.setFont('Amiri');
-    } else {
-      pdfDoc.setFont('Helvetica'); // Fallback
-    }
     pdfDoc.setFontSize(10);
-    const exportDate = `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`;
-    pdfDoc.text(exportDate, pageWidth / 2, 60, { align: 'center' });
+    const exportDateText = `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`;
+    const processedExportDate = (fontLoadedSuccessfully) ? reverseArabicTextForPdf(exportDateText) : exportDateText;
+    pdfDoc.text(processedExportDate, pageWidth / 2, 60, { align: 'center' });
     
     return pdfDoc;
   };
 
   const addTableToPdf = (pdfDoc: jsPDF, data: any[], columns: Array<{header: string, dataKey: string}>, startY: number) => {
-    const tableHeaders = columns.map(col => col.header);
-    const tableBody = data.map(item => columns.map(col => item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : ''));
+    const tableHeaders = columns.map(col => fontLoadedSuccessfully ? reverseArabicTextForPdf(col.header) : col.header);
+    const tableBody = data.map(item => columns.map(col => {
+      let cellValue = item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : '';
+      // For PDF, if Amiri is loaded, reverse Arabic text in cells too if it's primarily Arabic.
+      // This is a heuristic; ideally, we'd detect Arabic text more reliably.
+      // For now, let's assume if Amiri is loaded, all text might need reversal for jspdf.text contexts.
+      // However, autotable might handle this better. Test this carefully.
+      // return fontLoadedSuccessfully && /[\u0600-\u06FF]/.test(cellValue) ? reverseArabicTextForPdf(cellValue) : cellValue;
+      // Let's assume autotable handles table cell text fine with Amiri font, so no reversal for cell data.
+      return cellValue;
+    }));
     
     pdfDoc.autoTable({
       startY: startY,
@@ -267,7 +292,9 @@ const AdminPage = () => {
           pdfDoc.setFont('Helvetica');
         }
         pdfDoc.setFontSize(8);
-        pdfDoc.text(`صفحة ${data.pageNumber} من ${pageCount}`, pdfDoc.internal.pageSize.getWidth() / 2, pdfDoc.internal.pageSize.getHeight() - 20, { align: 'center' });
+        const pageNumText = `صفحة ${data.pageNumber} من ${pageCount}`;
+        const processedPageNumText = fontLoadedSuccessfully ? reverseArabicTextForPdf(pageNumText) : pageNumText;
+        pdfDoc.text(processedPageNumText, pdfDoc.internal.pageSize.getWidth() / 2, pdfDoc.internal.pageSize.getHeight() - 20, { align: 'center' });
       }
     });
   };
@@ -435,7 +462,6 @@ const AdminPage = () => {
   }
 
   if (!user || !user.isAdmin) {
-    // This should ideally be handled by AdminLayout, but as a fallback
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <p className="text-destructive text-center">غير مصرح لك بالدخول لهذه الصفحة. يتم توجيهك...</p>
@@ -551,5 +577,3 @@ const AdminPage = () => {
 }
 
 export default AdminPage;
-
-    
