@@ -116,28 +116,41 @@ const AdminPage = () => {
     { header: "توزع لـ", dataKey: "distributionPreferenceText" },
   ];
 
-  const prepareDataForExport = useCallback((submissions: AdahiSubmission[]): any[] => {
-    return submissions.map((sub, index) => ({
-      serial: index + 1,
-      donorName: sub.donorName,
-      sacrificeFor: sub.sacrificeFor,
-      phoneNumber: sub.phoneNumber,
-      submitterUsername: sub.submitterUsername || sub.userEmail || "غير معروف",
-      wantsToAttendText: sub.wantsToAttend ? "نعم" : "لا",
-      wantsFromSacrificeText: sub.wantsFromSacrifice ? "نعم" : "لا",
-      sacrificeWishes: sub.wantsFromSacrifice ? (sub.sacrificeWishes || "-") : "-",
-      paymentConfirmedText: sub.paymentConfirmed ? "نعم" : "لا",
-      distributionPreferenceText: getDistributionLabel(sub.distributionPreference),
-      receiptBookNumber: sub.paymentConfirmed ? (sub.receiptBookNumber || "-") : "-",
-      voucherNumber: sub.paymentConfirmed ? (sub.voucherNumber || "-") : "-",
-      throughIntermediaryText: sub.throughIntermediary ? "نعم" : "لا",
-      intermediaryName: sub.throughIntermediary ? (sub.intermediaryName || "-") : "-",
-      submissionDateFormatted: sub.submissionDate ? format(new Date(sub.submissionDate), "dd/MM/yyyy HH:mm", { locale: ar }) : 'N/A',
-      statusText: sub.status === "entered" ? "مدخلة" : "غير مدخلة",
-      userId: sub.userId, 
-      distributionPreference: sub.distributionPreference,
-    }));
-  }, [getDistributionLabel]);
+  const prepareDataForExport = useCallback(async (submissions: AdahiSubmission[]): Promise<any[]> => {
+    const prepared = [];
+    for (let i = 0; i < submissions.length; i++) {
+      const sub = submissions[i];
+      let submitterUsername = sub.submitterUsername || sub.userEmail || "غير معروف";
+      if (!sub.submitterUsername && sub.userId) {
+        const submitterProfile = await fetchUserById(sub.userId);
+        if (submitterProfile && submitterProfile.username) {
+          submitterUsername = submitterProfile.username;
+        }
+      }
+      prepared.push({
+        serial: i + 1,
+        donorName: sub.donorName,
+        sacrificeFor: sub.sacrificeFor,
+        phoneNumber: sub.phoneNumber,
+        submitterUsername: submitterUsername,
+        wantsToAttendText: sub.wantsToAttend ? "نعم" : "لا",
+        wantsFromSacrificeText: sub.wantsFromSacrifice ? "نعم" : "لا",
+        sacrificeWishes: sub.wantsFromSacrifice ? (sub.sacrificeWishes || "-") : "-",
+        paymentConfirmedText: sub.paymentConfirmed ? "نعم" : "لا",
+        distributionPreferenceText: getDistributionLabel(sub.distributionPreference),
+        receiptBookNumber: sub.paymentConfirmed ? (sub.receiptBookNumber || "-") : "-",
+        voucherNumber: sub.paymentConfirmed ? (sub.voucherNumber || "-") : "-",
+        throughIntermediaryText: sub.throughIntermediary ? "نعم" : "لا",
+        intermediaryName: sub.throughIntermediary ? (sub.intermediaryName || "-") : "-",
+        submissionDateFormatted: sub.submissionDate ? format(new Date(sub.submissionDate), "dd/MM/yyyy HH:mm", { locale: ar }) : 'N/A',
+        statusText: sub.status === "entered" ? "مدخلة" : "غير مدخلة",
+        userId: sub.userId,
+        distributionPreference: sub.distributionPreference,
+      });
+    }
+    return prepared;
+  }, [getDistributionLabel, fetchUserById]);
+
 
   const exportToExcel = (dataToExportRaw: any[], fileName: string, sheetName: string, columns: Array<{header: string, dataKey: string}>) => {
     const worksheetData = dataToExportRaw.map(item => {
@@ -229,8 +242,9 @@ const AdminPage = () => {
     const pdfColumns = [...columns].reverse(); 
     
     const tableHeaders = pdfColumns.map(col => ({ text: reverseTextForPdfMake(col.header), style: 'tableHeader', alignment: 'right' as const }));
+    
     const tableBody = data.map(item =>
-        pdfColumns.map(col => ({ text: (item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : ''), alignment: 'right' as const }))
+        pdfColumns.map(col => ({ text: reverseTextForPdfMake(item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : ''), alignment: 'right' as const }))
     );
     
     const reversedTitle = reverseTextForPdfMake(title);
@@ -310,7 +324,7 @@ const AdminPage = () => {
     }
     setExportingType('allExcel');
     try {
-      const dataToExport = prepareDataForExport(allSubmissionsForAdmin);
+      const dataToExport = await prepareDataForExport(allSubmissionsForAdmin);
       exportToExcel(dataToExport, "جميع_الأضاحي", "الكل", commonExportColumns);
       toast({ title: "تم تصدير جميع الأضاحي (Excel) بنجاح" });
     } catch (error) {
@@ -328,7 +342,7 @@ const AdminPage = () => {
     }
     setExportingType('gazaExcel');
     try {
-      const dataToExport = prepareDataForExport(gazaSubmissions);
+      const dataToExport = await prepareDataForExport(gazaSubmissions);
       exportToExcel(dataToExport, "أضاحي_غزة", "أهل غزة", commonExportColumns);
       toast({ title: "تم تصدير أضاحي غزة (Excel) بنجاح" });
     } catch (error) {
@@ -346,29 +360,24 @@ const AdminPage = () => {
     setExportingType('userExcel');
     try {
       const submissionsByUser: { [key: string]: AdahiSubmission[] } = {};
-      for (const sub of allSubmissionsForAdmin) {
-          let userName = sub.submitterUsername || sub.userEmail || 'مستخدم_غير_معروف';
-
-          if (!sub.submitterUsername && sub.userId) { 
-              const userProfile = await fetchUserById(sub.userId);
-              if (userProfile && userProfile.username) {
-                  userName = userProfile.username;
-              }
-          }
+      const allDataPrepared = await prepareDataForExport(allSubmissionsForAdmin); // Prepare all data once
+      
+      allDataPrepared.forEach(subPrepared => {
+          const originalSub = allSubmissionsForAdmin.find(s => s.id === subPrepared.id); // Find original to get userId for username fetch
+          let userName = subPrepared.submitterUsername || 'مستخدم_غير_معروف'; // Use already prepared username
           
           const userKey = userName.replace(/[<>:"/\\|?* ]/g, '_'); 
 
           if (!submissionsByUser[userKey]) {
               submissionsByUser[userKey] = [];
           }
-          submissionsByUser[userKey].push(sub);
-      }
+          submissionsByUser[userKey].push(subPrepared); // Push the prepared submission
+      });
 
       for (const userNameKey in submissionsByUser) {
-        const userSubmissions = submissionsByUser[userNameKey];
-        if (userSubmissions.length > 0) {
-            const dataToExport = prepareDataForExport(userSubmissions);
-            exportToExcel(dataToExport, `أضاحي_المستخدم_${userNameKey}`, userNameKey, commonExportColumns);
+        const userSubmissionsData = submissionsByUser[userNameKey];
+        if (userSubmissionsData.length > 0) {
+            exportToExcel(userSubmissionsData, `أضاحي_المستخدم_${userNameKey}`, userNameKey, commonExportColumns);
         }
       }
       toast({ title: "تم تصدير الأضاحي حسب المستخدم (ملفات Excel منفصلة) بنجاح" });
@@ -390,7 +399,7 @@ const AdminPage = () => {
     }
     setExportingType('allPdf');
     try {
-      const dataToExport = prepareDataForExport(allSubmissionsForAdmin);
+      const dataToExport = await prepareDataForExport(allSubmissionsForAdmin);
       generatePdfMakeDocument("تقرير جميع الأضاحي", dataToExport, commonExportColumns, "جميع_الأضاحي");
       toast({ title: "تم تصدير جميع الأضاحي (PDF) بنجاح" });
     } catch (error) {
@@ -412,7 +421,7 @@ const AdminPage = () => {
     }
     setExportingType('gazaPdf');
     try {
-      const dataToExport = prepareDataForExport(gazaSubmissionsRaw);
+      const dataToExport = await prepareDataForExport(gazaSubmissionsRaw);
       generatePdfMakeDocument("تقرير أضاحي غزة", dataToExport, commonExportColumns, "أضاحي_غزة");
       toast({ title: "تم تصدير أضاحي غزة (PDF) بنجاح" });
     } catch (error) {
@@ -433,31 +442,23 @@ const AdminPage = () => {
     }
     setExportingType('userPdf');
     try {
-      const submissionsByUser: { [key: string]: AdahiSubmission[] } = {};
-      
-      for (const sub of allSubmissionsForAdmin) {
-          let userName = sub.submitterUsername || sub.userEmail || 'مستخدم_غير_معروف';
+      const submissionsByUser: { [key: string]: any[] } = {}; // Store prepared data
+      const allDataPrepared = await prepareDataForExport(allSubmissionsForAdmin);
 
-          if (!sub.submitterUsername && sub.userId) {
-              const userProfile = await fetchUserById(sub.userId);
-              if (userProfile && userProfile.username) {
-                  userName = userProfile.username;
-              }
-          }
-          
+      allDataPrepared.forEach(subPrepared => {
+          let userName = subPrepared.submitterUsername || 'مستخدم_غير_معروف';
           const userKey = userName.replace(/[<>:"/\\|?* ]/g, '_'); 
 
           if (!submissionsByUser[userKey]) {
               submissionsByUser[userKey] = [];
           }
-          submissionsByUser[userKey].push(sub);
-      }
+          submissionsByUser[userKey].push(subPrepared);
+      });
 
       for (const userNameKey in submissionsByUser) {
-        const userSubmissionsRaw = submissionsByUser[userNameKey];
-        if (userSubmissionsRaw.length > 0) {
-            const dataToExport = prepareDataForExport(userSubmissionsRaw);
-            generatePdfMakeDocument(`تقرير أضاحي المستخدم: ${userNameKey}`, dataToExport, commonExportColumns, `أضاحي_${userNameKey}`);
+        const userSubmissionsData = submissionsByUser[userNameKey];
+        if (userSubmissionsData.length > 0) {
+            generatePdfMakeDocument(`تقرير أضاحي المستخدم: ${userNameKey}`, userSubmissionsData, commonExportColumns, `أضاحي_${userNameKey}`);
         }
       }
       toast({ title: "تم تصدير الأضاحي حسب المستخدم (ملفات PDF منفصلة) بنجاح" });
@@ -497,7 +498,7 @@ const AdminPage = () => {
       <header className="space-y-2 pb-6 border-b">
         <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2">
           <Settings2 className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
-          إدارة الأضاحي
+          تسجيل الأضاحي
         </h1>
         <p className="text-md sm:text-lg text-muted-foreground">
           عرض وتعديل وحذف جميع الأضاحي المسجلة في النظام.
@@ -591,5 +592,3 @@ const AdminPage = () => {
 }
 
 export default AdminPage;
-
-    
