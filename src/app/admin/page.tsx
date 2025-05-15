@@ -75,6 +75,13 @@ const AdminPage = () => {
     return distributionOptions.find(opt => opt.value === value)?.label || String(value);
   }, []);
 
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    await refreshData();
+    setIsRefreshing(false);
+    toast({ title: "تم تحديث البيانات" });
+  }, [refreshData, toast]);
+
   useEffect(() => {
     if (!authLoading) {
       if (user && user.isAdmin) {
@@ -83,14 +90,8 @@ const AdminPage = () => {
         setPageLoading(false);
       }
     }
-  }, [authLoading, user, handleRefresh]); // Added handleRefresh to dependency array
+  }, [authLoading, user, handleRefresh]);
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await refreshData();
-    setIsRefreshing(false);
-    toast({ title: "تم تحديث البيانات" });
-  };
 
   // Define the columns for export based on user request
   const commonExportColumns = [
@@ -108,7 +109,6 @@ const AdminPage = () => {
   const prepareDataForExport = useCallback((submissions: AdahiSubmission[]): any[] => {
     return submissions.map((sub, index) => ({
       serial: index + 1,
-      submitterUsername: sub.submitterUsername || sub.userEmail || "غير معروف",
       donorName: sub.donorName,
       sacrificeFor: sub.sacrificeFor,
       phoneNumber: sub.phoneNumber,
@@ -116,15 +116,17 @@ const AdminPage = () => {
       wantsFromSacrificeText: sub.wantsFromSacrifice ? "نعم" : "لا",
       sacrificeWishes: sub.wantsFromSacrifice ? (sub.sacrificeWishes || "-") : "-",
       paymentConfirmedText: sub.paymentConfirmed ? "نعم" : "لا",
+      distributionPreferenceText: getDistributionLabel(sub.distributionPreference),
+      // Additional fields for potential future use or if needed by other export types
+      submitterUsername: sub.submitterUsername || sub.userEmail || "غير معروف",
       receiptBookNumber: sub.paymentConfirmed ? (sub.receiptBookNumber || "-") : "-",
       voucherNumber: sub.paymentConfirmed ? (sub.voucherNumber || "-") : "-",
       throughIntermediaryText: sub.throughIntermediary ? "نعم" : "لا",
       intermediaryName: sub.throughIntermediary ? (sub.intermediaryName || "-") : "-",
-      distributionPreferenceText: getDistributionLabel(sub.distributionPreference),
       submissionDateFormatted: sub.submissionDate ? format(new Date(sub.submissionDate), "dd/MM/yyyy HH:mm", { locale: ar }) : 'N/A',
       statusText: sub.status === "entered" ? "مدخلة" : "غير مدخلة",
-      userId: sub.userId, // Keep for grouping by user
-      distributionPreference: sub.distributionPreference, // Keep for filtering Gaza
+      userId: sub.userId, 
+      distributionPreference: sub.distributionPreference,
     }));
   }, [getDistributionLabel]);
 
@@ -222,18 +224,20 @@ const AdminPage = () => {
     const tableBody = data.map(item =>
       columns.map(col => ({ text: (item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : ''), alignment: 'right' as const }))
     );
+    
+    const exportDateText = `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`;
 
     const docDefinition: any = {
       pageSize: 'A4',
       pageOrientation: 'landscape',
-      pageMargins: [PDF_MARGIN, PDF_MARGIN, PDF_MARGIN, PDF_MARGIN + 20],
+      pageMargins: [PDF_MARGIN, PDF_MARGIN + 20, PDF_MARGIN, PDF_MARGIN + 20], // Increased top margin for title
       content: [
         { text: title, style: 'header', alignment: 'right' as const, margin: [0, 0, 0, 10] },
-        { text: `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`, style: 'subheader', alignment: 'right' as const, margin: [0, 0, 0, 20] },
+        { text: exportDateText, style: 'subheader', alignment: 'right' as const, margin: [0, 0, 0, 20] },
         {
           table: {
             headerRows: 1,
-            widths: columns.map(() => '*' as const), // Auto-fit columns
+            widths: columns.map(() => '*' as const), 
             body: [tableHeaders, ...tableBody],
           },
           layout: {
@@ -248,7 +252,7 @@ const AdminPage = () => {
         }
       ],
       defaultStyle: {
-        font: isAmiriFontConfigured ? 'Amiri' : 'Roboto',
+        font: isAmiriFontConfigured ? 'Amiri' : 'Roboto', // Use Amiri if configured
         fontSize: 10,
         alignment: 'right' as const
       },
@@ -270,10 +274,11 @@ const AdminPage = () => {
         }
       },
       footer: function(currentPage: number, pageCount: number) {
+        const pageNumText = `صفحة ${currentPage.toString()} من ${pageCount.toString()}`;
         return {
-          text: `صفحة ${currentPage.toString()} من ${pageCount.toString()}`,
+          text: pageNumText,
           alignment: 'center' as const,
-          style: 'footer',
+          style: { font: isAmiriFontConfigured ? 'Amiri' : 'Roboto', fontSize: 8 },
           margin: [0, 10, 0, 0]
         };
       }
@@ -333,14 +338,14 @@ const AdminPage = () => {
       for (const sub of allSubmissionsForAdmin) {
           let userName = sub.submitterUsername || sub.userEmail || 'مستخدم_غير_معروف';
 
-          if (!sub.submitterUsername && sub.userId) { // Fetch username if only userId is present
+          if (!sub.submitterUsername && sub.userId) { 
               const userProfile = await fetchUserById(sub.userId);
               if (userProfile && userProfile.username) {
                   userName = userProfile.username;
               }
           }
           
-          const userKey = userName.replace(/[<>:"/\\|?* ]/g, '_'); // Make username safe for file names
+          const userKey = userName.replace(/[<>:"/\\|?* ]/g, '_'); 
 
           if (!submissionsByUser[userKey]) {
               submissionsByUser[userKey] = [];
