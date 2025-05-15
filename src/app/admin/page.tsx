@@ -3,7 +3,7 @@
 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { FileDown, Settings2, TableIcon, BarChart3, HandHelping, Coins, RefreshCw, Loader2, Users, FileText } from "lucide-react"; 
+import { FileDown, Settings2, TableIcon, BarChart3, HandHelping, Coins, RefreshCw, Loader2, Users, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useCallback } from "react";
 import type { AdahiSubmission, DistributionPreference } from "@/lib/types";
@@ -35,17 +35,17 @@ const AdminPage = () => {
   const [amiriFontBase64, setAmiriFontBase64] = useState<string | null>(null);
   const [fontLoadedSuccessfully, setFontLoadedSuccessfully] = useState<boolean>(false);
 
-  const PDF_MARGIN = 40; 
+  const PDF_MARGIN = 40;
 
   const getDistributionLabel = useCallback((value?: DistributionPreference | string) => {
     if (!value) return "غير محدد";
     return distributionOptions.find(opt => opt.value === value)?.label || String(value);
   }, []);
-  
+
   useEffect(() => {
     const loadFont = async () => {
       try {
-        const response = await fetch('/fonts/Amiri-Regular.ttf'); 
+        const response = await fetch('/fonts/Amiri-Regular.ttf');
         if (!response.ok) {
           throw new Error('Failed to fetch Amiri font. Ensure Amiri-Regular.ttf is in public/fonts/');
         }
@@ -53,7 +53,7 @@ const AdminPage = () => {
         const reader = new FileReader();
         reader.onloadend = () => {
           const base64data = reader.result as string;
-          setAmiriFontBase64(base64data.split(',')[1]); 
+          setAmiriFontBase64(base64data.split(',')[1]);
           setFontLoadedSuccessfully(true);
           console.log("Amiri font loaded successfully for PDF generation.");
         };
@@ -83,10 +83,10 @@ const AdminPage = () => {
       if (user && user.isAdmin) {
         handleRefresh().finally(() => setPageLoading(false));
       } else {
-        setPageLoading(false); 
+        setPageLoading(false);
       }
     }
-  }, [authLoading, user]); 
+  }, [authLoading, user]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -94,7 +94,7 @@ const AdminPage = () => {
     setIsRefreshing(false);
     toast({ title: "تم تحديث البيانات" });
   };
-  
+
   const commonExportColumns = [
     { header: "م", dataKey: "serial" },
     { header: "مدخل البيانات", dataKey: "submitterUsername" },
@@ -113,7 +113,7 @@ const AdminPage = () => {
     { header: "تاريخ التسجيل", dataKey: "submissionDateFormatted" },
     { header: "الحالة", dataKey: "statusText" },
   ];
-  
+
   const prepareDataForExport = useCallback((submissions: AdahiSubmission[]): any[] => {
     return submissions.map((sub, index) => ({
       serial: index + 1,
@@ -132,8 +132,8 @@ const AdminPage = () => {
       distributionPreferenceText: getDistributionLabel(sub.distributionPreference),
       submissionDateFormatted: sub.submissionDate ? format(new Date(sub.submissionDate), "dd/MM/yyyy HH:mm", { locale: ar }) : 'N/A',
       statusText: sub.status === "entered" ? "مدخلة" : "غير مدخلة",
-      userId: sub.userId, 
-      distributionPreference: sub.distributionPreference, 
+      userId: sub.userId,
+      distributionPreference: sub.distributionPreference,
     }));
   }, [getDistributionLabel]);
 
@@ -141,22 +141,22 @@ const AdminPage = () => {
     const worksheetData = dataToExportRaw.map(item => {
       const orderedItem: any = {};
       columns.forEach(col => {
-        orderedItem[col.header] = item[col.dataKey]; 
+        orderedItem[col.header] = item[col.dataKey];
       });
       return orderedItem;
     });
 
     const ws = XLSX.utils.json_to_sheet(worksheetData, {
-      header: columns.map(col => col.header) 
+      header: columns.map(col => col.header)
     });
-    
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
-    
+
     if (wb.Sheets[sheetName]) {
         const sheet = wb.Sheets[sheetName];
         const headerRowIndex = 0;
-        
+
         columns.forEach((col, C_idx) => {
             const cell_ref = XLSX.utils.encode_cell({ r: headerRowIndex, c: C_idx });
             if (!sheet[cell_ref]) sheet[cell_ref] = { t: 's', v: col.header };
@@ -174,12 +174,12 @@ const AdminPage = () => {
             };
         });
 
-        worksheetData.forEach((_rowData, R_idx) => { 
+        worksheetData.forEach((_rowData, R_idx) => {
             columns.forEach((_col, C_idx) => {
-                const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx }); 
+                const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx });
                 if (sheet[cell_ref] && sheet[cell_ref].v !== undefined && sheet[cell_ref].v !== null && sheet[cell_ref].v !== "") {
                     sheet[cell_ref].s = {
-                        ...(sheet[cell_ref].s || {}), 
+                        ...(sheet[cell_ref].s || {}),
                         border: {
                             top: { style: "thin", color: { auto: 1 } },
                             bottom: { style: "thin", color: { auto: 1 } },
@@ -196,19 +196,19 @@ const AdminPage = () => {
                 }
             });
         });
-        
+
         const colWidths = columns.map(column => ({ wch: Math.max(15, String(column.header).length + 5) }));
         sheet['!cols'] = colWidths;
         sheet['!autofilter'] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(sheet['!ref']!)) };
         sheet['!props'] = { rtl: true };
     }
-    
+
     XLSX.writeFile(wb, `${fileName}.xlsx`);
   };
 
   const generatePdfDoc = (title: string) => {
     const pdfDoc = new jsPDF({
-      orientation: 'l', 
+      orientation: 'l',
       unit: 'pt',
       format: 'a4'
     });
@@ -229,19 +229,19 @@ const AdminPage = () => {
     } else {
         pdfDoc.setFont('Helvetica'); // Fallback font if Amiri not loaded
     }
-    
+
     const pageWidth = pdfDoc.internal.pageSize.getWidth();
-    
+
     // Setting font again before rendering text, explicitly
     if (fontLoadedSuccessfully) pdfDoc.setFont('Amiri'); else pdfDoc.setFont('Helvetica');
     pdfDoc.setFontSize(18);
-    pdfDoc.text(title, pageWidth / 2, PDF_MARGIN, { align: 'center' });
+    pdfDoc.text(title, pageWidth - PDF_MARGIN, PDF_MARGIN, { align: 'right' }); // Align title to the right
 
     if (fontLoadedSuccessfully) pdfDoc.setFont('Amiri'); else pdfDoc.setFont('Helvetica');
     pdfDoc.setFontSize(10);
     const exportDateText = `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`;
-    pdfDoc.text(exportDateText, pageWidth / 2, PDF_MARGIN + 25, { align: 'center' });
-    
+    pdfDoc.text(exportDateText, pageWidth - PDF_MARGIN, PDF_MARGIN + 25, { align: 'right' }); // Align date to the right
+
     return pdfDoc;
   };
 
@@ -251,28 +251,27 @@ const AdminPage = () => {
       let cellValue = item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : '';
       return cellValue;
     }));
-    
+
     pdfDoc.autoTable({
       startY: startY,
       head: [tableHeaders],
       body: tableBody,
       theme: 'grid',
       styles: {
-        font: fontLoadedSuccessfully ? 'Amiri' : 'Helvetica', // Use Amiri for table body
-        halign: 'right', 
+        font: fontLoadedSuccessfully ? 'Amiri' : 'Helvetica',
+        halign: 'right',
         cellPadding: 5,
         fontSize: 8,
         overflow: 'linebreak'
       },
       headStyles: {
-        font: fontLoadedSuccessfully ? 'Amiri' : 'Helvetica', // Use Amiri for table header
-        // fontStyle: 'bold', // Removed bold to see if it helps with char rendering
-        fillColor: [220, 220, 220], 
+        font: fontLoadedSuccessfully ? 'Amiri' : 'Helvetica',
+        fillColor: [220, 220, 220],
         textColor: [0, 0, 0],
-        halign: 'center', 
+        halign: 'right', // Align table headers to the right
       },
       didDrawPage: (data) => {
-        const pageCount = pdfDoc.internal.pages.length -1; 
+        const pageCount = pdfDoc.internal.pages.length -1;
         if (fontLoadedSuccessfully) {
           pdfDoc.setFont('Amiri');
         } else {
@@ -411,7 +410,7 @@ const AdminPage = () => {
     }
     setExportingType(null);
   };
-  
+
   const handleExportByUserPdf = async () => {
     if (!fontLoadedSuccessfully && !amiriFontBase64) {
         toast({
@@ -493,9 +492,9 @@ const AdminPage = () => {
           عرض وتعديل وحذف جميع الأضاحي المسجلة في النظام.
         </p>
         <p className="text-sm text-muted-foreground pt-1">
-          إجمالي الأضاحي: {stats.total} | 
-          أضاحي للرمثا والمتبرعين: {stats.ramthaAndDonor} | 
-          لأهل غزة: {stats.gaza} | 
+          إجمالي الأضاحي: {stats.total} |
+          أضاحي للرمثا والمتبرعين: {stats.ramthaAndDonor} |
+          لأهل غزة: {stats.gaza} |
           لصندوق التضامن: {stats.fund}
         </p>
       </header>
@@ -538,7 +537,7 @@ const AdminPage = () => {
           </CardContent>
         </Card>
       </section>
-      
+
       <div className="space-y-4">
         <h2 className="text-lg sm:text-xl font-semibold">خيارات التصدير وجدول الإدخالات</h2>
         <div className="flex flex-wrap items-center justify-start gap-2 p-3 border rounded-md bg-card shadow-sm">
@@ -576,7 +575,7 @@ const AdminPage = () => {
           </Button>
         </div>
       </div>
-      
+
       <AdminSubmissionsTable submissions={allSubmissionsForAdmin} onDataChange={handleRefresh} />
     </div>
   );
@@ -584,3 +583,4 @@ const AdminPage = () => {
 
 export default AdminPage;
 
+    
