@@ -12,19 +12,31 @@ import AdminSubmissionsTable from "@/components/tables/AdminSubmissionsTable";
 import { distributionOptions } from "@/lib/types";
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
 
-// Extend jsPDF interface for jspdf-autotable
-declare module 'jspdf' {
-  interface jsPDF {
-    autoTable: (options: any) => jsPDF;
-    addFileToVFS: (fileName: string, data: string) => jsPDF;
-    addFont: (postScriptName: string, fontName: string, fontStyle: string, fontWeight?: string | number, encoding?: string) => jsPDF;
+// Import pdfMake and vfs_fonts
+import pdfMake from 'pdfmake/build/pdfmake';
+import pdfFonts from 'pdfmake/build/vfs_fonts'; // This is the default VFS, may not include Amiri
+
+// Initialize pdfMake's virtual file system
+pdfMake.vfs = pdfFonts.pdfMake.vfs;
+
+// Configure Amiri font for pdfMake
+// IMPORTANT: For Amiri (or any custom font) to work correctly,
+// the font data (e.g., Amiri-Regular.ttf) must be included in the
+// pdfMake.vfs (virtual file system). This usually means creating a custom
+// vfs_fonts.js file that includes the Base64 encoded font data and importing that.
+// The configuration below tells pdfMake *about* the font, but it still needs the data.
+pdfMake.fonts = {
+  ...pdfMake.fonts, // Preserve any default fonts
+  Amiri: {
+    normal: 'Amiri-Regular.ttf', // This filename must match the font file name *within* your VFS
+    // bold: 'Amiri-Bold.ttf',    // Uncomment and provide if you have bold variant in VFS
+    // italics: 'Amiri-Italic.ttf', // Uncomment and provide if you have italic variant in VFS
+    // bolditalics: 'Amiri-BoldItalic.ttf' // Uncomment and provide if you have bold-italic in VFS
   }
-}
+};
 
 const AdminPage = () => {
   const { allSubmissionsForAdmin, loading: authLoading, refreshData, user, fetchUserById } = useAuth();
@@ -32,51 +44,29 @@ const AdminPage = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
   const [exportingType, setExportingType] = useState<string | null>(null);
-  const [amiriFontBase64, setAmiriFontBase64] = useState<string | null>(null);
-  const [fontLoadedSuccessfully, setFontLoadedSuccessfully] = useState<boolean>(false);
+
+  // Check if Amiri font is configured in pdfMake.fonts
+  // This checks the configuration, not if the VFS data is actually present.
+  const isAmiriFontConfigured = !!(pdfMake.fonts && pdfMake.fonts.Amiri && pdfMake.fonts.Amiri.normal);
 
   const PDF_MARGIN = 40;
+
+  useEffect(() => {
+    if (!isAmiriFontConfigured) {
+      toast({
+        title: "تنبيه بخصوص خط PDF",
+        description: "لم يتم تكوين خط Amiri بشكل كامل لـ pdfMake. قد لا تظهر النصوص العربية بشكل صحيح في ملفات PDF. يرجى مراجعة إعدادات الخط (vfs_fonts.js).",
+        variant: "destructive",
+        duration: 10000,
+      });
+    }
+  }, [isAmiriFontConfigured, toast]);
+
 
   const getDistributionLabel = useCallback((value?: DistributionPreference | string) => {
     if (!value) return "غير محدد";
     return distributionOptions.find(opt => opt.value === value)?.label || String(value);
   }, []);
-
-  useEffect(() => {
-    const loadFont = async () => {
-      try {
-        const response = await fetch('/fonts/Amiri-Regular.ttf');
-        if (!response.ok) {
-          throw new Error('Failed to fetch Amiri font. Ensure Amiri-Regular.ttf is in public/fonts/');
-        }
-        const fontBlob = await response.blob();
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const base64data = reader.result as string;
-          setAmiriFontBase64(base64data.split(',')[1]);
-          setFontLoadedSuccessfully(true);
-          console.log("Amiri font loaded successfully for PDF generation.");
-        };
-        reader.onerror = (error) => {
-          console.error("Error reading font blob:", error);
-          setFontLoadedSuccessfully(false);
-          throw new Error("Failed to read font blob.");
-        };
-        reader.readAsDataURL(fontBlob);
-      } catch (error: any) {
-        console.error("Error loading Amiri font:", error.message);
-        setFontLoadedSuccessfully(false);
-        toast({
-          title: "خطأ في تحميل الخط لملفات PDF",
-          description: `لم يتم تحميل خط Amiri بنجاح. قد لا تظهر النصوص العربية بشكل صحيح في PDF. تأكد من وجود ملف Amiri-Regular.ttf في public/fonts/. الخطأ: ${error.message}`,
-          variant: "destructive",
-          duration: 7000,
-        });
-      }
-    };
-    loadFont();
-  }, [toast]);
-
 
   useEffect(() => {
     if (!authLoading) {
@@ -205,91 +195,86 @@ const AdminPage = () => {
     XLSX.writeFile(wb, `${fileName}.xlsx`);
   };
 
-
-  const generatePdfDoc = (title: string) => {
-    const pdfDoc = new jsPDF({
-      orientation: 'l', 
-      unit: 'pt',
-      format: 'a4'
-    });
-
-    if (fontLoadedSuccessfully && amiriFontBase64) {
-      try {
-        pdfDoc.addFileToVFS('Amiri-Regular.ttf', amiriFontBase64);
-        pdfDoc.addFont('Amiri-Regular.ttf', 'Amiri', 'normal');
-        pdfDoc.setFont('Amiri');
-        console.log("Amiri font set for PDF (generatePdfDoc).")
-      } catch (e) {
-        console.error("Error adding Amiri font to PDF (VFS or font registration):", e);
-        toast({ title: "خطأ في خط PDF", description: "لم يتم تطبيق الخط العربي بشكل كامل للعناوين.", variant: "destructive"});
-        pdfDoc.setFont('Helvetica'); 
-      }
-    } else {
-        pdfDoc.setFont('Helvetica'); 
-        console.warn("Amiri font not loaded, using Helvetica for PDF (generatePdfDoc).")
-    }
-    
-    pdfDoc.setLanguage('ar');
-    pdfDoc.setR2L(true);
-
-    const pageWidth = pdfDoc.internal.pageSize.getWidth();
-    
-    if (fontLoadedSuccessfully) pdfDoc.setFont('Amiri'); else pdfDoc.setFont('Helvetica');
-    pdfDoc.setFontSize(18);
-    pdfDoc.text(title, pageWidth - PDF_MARGIN, PDF_MARGIN, { align: 'right' }); 
-    
-    if (fontLoadedSuccessfully) pdfDoc.setFont('Amiri'); else pdfDoc.setFont('Helvetica');
-    pdfDoc.setFontSize(10);
-    const exportDateText = `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`;
-    pdfDoc.text(exportDateText, pageWidth - PDF_MARGIN, PDF_MARGIN + 25, { align: 'right' }); 
-
-    return pdfDoc;
-  };
-
-  const addTableToPdf = (pdfDoc: jsPDF, data: any[], columns: Array<{header: string, dataKey: string}>, startY: number) => {
-    const tableHeaders = columns.map(col => col.header);
-    const tableBody = data.map(item => columns.map(col => {
-      let cellValue = item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : '';
-      return cellValue;
-    }));
-
-    if (fontLoadedSuccessfully) {
-        pdfDoc.setFont('Amiri');
-    } else {
-        pdfDoc.setFont('Helvetica');
+  // Function to generate PDF using pdfMake
+  const generatePdfMakeDocument = (title: string, data: any[], columns: Array<{header: string, dataKey: string}>, fileName: string) => {
+    if (!isAmiriFontConfigured) {
+      toast({
+        title: "خطأ في إعداد الخط لـ PDF",
+        description: "لم يتم إعداد خط Amiri بشكل صحيح. لا يمكن إنشاء PDF. يرجى التأكد من إعداد vfs_fonts.js بشكل صحيح.",
+        variant: "destructive",
+        duration: 7000,
+      });
+      return;
     }
 
-    pdfDoc.autoTable({
-      startY: startY,
-      head: [tableHeaders],
-      body: tableBody,
-      theme: 'grid',
-      styles: {
-        font: fontLoadedSuccessfully ? 'Amiri' : 'Helvetica',
-        halign: 'right',
-        cellPadding: 5,
-        fontSize: 8,
-        overflow: 'linebreak'
-      },
-      headStyles: {
-        font: fontLoadedSuccessfully ? 'Amiri' : 'Helvetica',
-        fillColor: [220, 220, 220],
-        textColor: [0, 0, 0],
-        halign: 'right', 
-        fontSize: 8, 
-      },
-      didDrawPage: (data) => {
-        const pageCount = pdfDoc.internal.pages.length -1; 
-        if (fontLoadedSuccessfully) {
-          pdfDoc.setFont('Amiri');
-        } else {
-          pdfDoc.setFont('Helvetica');
+    const tableHeaders = columns.map(col => ({ text: col.header, style: 'tableHeader', alignment: 'right' }));
+    const tableBody = data.map(item => 
+      columns.map(col => ({ text: (item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : ''), alignment: 'right' }))
+    );
+
+    const docDefinition: any = {
+      pageSize: 'A4',
+      pageOrientation: 'landscape',
+      pageMargins: [PDF_MARGIN, PDF_MARGIN, PDF_MARGIN, PDF_MARGIN + 20], // left, top, right, bottom (extra bottom for footer)
+      
+      content: [
+        { text: title, style: 'header', alignment: 'center', margin: [0, 0, 0, 10] },
+        { text: `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`, style: 'subheader', alignment: 'center', margin: [0, 0, 0, 20] },
+        {
+          table: {
+            headerRows: 1,
+            widths: columns.map(() => '*'), // Distribute column widths equally, or define specific widths
+            body: [tableHeaders, ...tableBody],
+          },
+          layout: {
+            fillColor: function (rowIndex: number, node: any, columnIndex: number) {
+              return (rowIndex === 0) ? '#CCCCCC' : null;
+            },
+            hLineWidth: function (i: number, node: any) { return (i === 0 || i === node.table.body.length) ? 2 : 1; },
+            vLineWidth: function (i: number, node: any) { return (i === 0 || i === node.table.widths.length) ? 2 : 1; },
+            hLineColor: function (i: number, node: any) { return (i === 0 || i === node.table.body.length) ? 'black' : 'gray'; },
+            vLineColor: function (i: number, node: any) { return (i === 0 || i === node.table.widths.length) ? 'black' : 'gray'; },
+          }
         }
-        pdfDoc.setFontSize(8);
-        const pageNumText = `صفحة ${data.pageNumber} من ${pageCount}`;
-        pdfDoc.text(pageNumText, pdfDoc.internal.pageSize.getWidth() - PDF_MARGIN, pdfDoc.internal.pageSize.getHeight() - 20, { align: 'right' });
+      ],
+      defaultStyle: {
+        font: 'Amiri', // Use Amiri as the default font for the document
+        fontSize: 10,
+      },
+      styles: {
+        header: {
+          fontSize: 18,
+          bold: true,
+          alignment: 'center'
+        },
+        subheader: {
+          fontSize: 12,
+          alignment: 'center'
+        },
+        tableHeader: {
+          bold: true,
+          fontSize: 11,
+          color: 'black',
+          fillColor: '#eeeeee',
+          alignment: 'center'
+        }
+      },
+      footer: function(currentPage: number, pageCount: number) {
+        return {
+          text: `صفحة ${currentPage.toString()} من ${pageCount.toString()}`,
+          alignment: 'center',
+          style: 'footer',
+          margin: [0, 10, 0, 0] // margin for footer: [left, top, right, bottom]
+        };
       }
-    });
+    };
+
+    try {
+      pdfMake.createPdf(docDefinition).download(`${fileName}.pdf`);
+    } catch (error) {
+      console.error("Error creating PDF with pdfMake:", error);
+      toast({ title: "خطأ في إنشاء PDF", description: "حدث خطأ أثناء محاولة إنشاء ملف PDF.", variant: "destructive" });
+    }
   };
 
 
@@ -350,10 +335,11 @@ const AdminPage = () => {
         const userSubmissions = submissionsByUser[userId];
         if (userSubmissions.length > 0) {
             const dataToExport = prepareDataForExport(userSubmissions);
+            // Create a separate Excel file for each user
             exportToExcel(dataToExport, `أضاحي_المستخدم_${userName.replace(/\s+/g, '_')}`, userName, commonExportColumns);
         }
       }
-      toast({ title: "تم تصدير الأضاحي حسب المستخدم (Excel) بنجاح" });
+      toast({ title: "تم تصدير الأضاحي حسب المستخدم (ملفات Excel منفصلة) بنجاح" });
     } catch (error) {
       console.error("Error exporting by user to Excel:", error);
       toast({ title: "خطأ في التصدير (Excel)", description: "حدث خطأ أثناء محاولة تصدير الأضاحي حسب المستخدم.", variant: "destructive" });
@@ -366,22 +352,14 @@ const AdminPage = () => {
       toast({ title: "لا توجد بيانات للتصدير" });
       return;
     }
-     if (!fontLoadedSuccessfully && !amiriFontBase64) {
-        toast({
-            title: "خطأ في الخط",
-            description: "لم يتم تحميل الخط العربي اللازم لإنشاء ملفات PDF. يرجى المحاولة مرة أخرى أو التأكد من اتصال جيد بالإنترنت.",
-            variant: "destructive",
-            duration: 7000
-        });
-        setExportingType(null);
-        return;
+    if (!isAmiriFontConfigured) {
+      toast({ title: "خطأ في إعداد الخط لـ PDF", description: "لا يمكن إنشاء PDF بدون إعداد خط Amiri.", variant: "destructive" });
+      return;
     }
     setExportingType('allPdf');
     try {
       const dataToExport = prepareDataForExport(allSubmissionsForAdmin);
-      const pdfDoc = generatePdfDoc("تقرير جميع الأضاحي");
-      addTableToPdf(pdfDoc, dataToExport, commonExportColumns, PDF_MARGIN + 60);
-      pdfDoc.save("جميع_الأضاحي.pdf");
+      generatePdfMakeDocument("تقرير جميع الأضاحي", dataToExport, commonExportColumns, "جميع_الأضاحي");
       toast({ title: "تم تصدير جميع الأضاحي (PDF) بنجاح" });
     } catch (error) {
       console.error("Error exporting all to PDF:", error);
@@ -396,22 +374,14 @@ const AdminPage = () => {
       toast({ title: "لا توجد أضاحي لغزة للتصدير" });
       return;
     }
-     if (!fontLoadedSuccessfully && !amiriFontBase64) {
-        toast({
-            title: "خطأ في الخط",
-            description: "لم يتم تحميل الخط العربي اللازم لإنشاء ملفات PDF. يرجى المحاولة مرة أخرى أو التأكد من اتصال جيد بالإنترنت.",
-            variant: "destructive",
-            duration: 7000
-        });
-        setExportingType(null);
-        return;
+    if (!isAmiriFontConfigured) {
+      toast({ title: "خطأ في إعداد الخط لـ PDF", description: "لا يمكن إنشاء PDF بدون إعداد خط Amiri.", variant: "destructive" });
+      return;
     }
     setExportingType('gazaPdf');
     try {
       const dataToExport = prepareDataForExport(gazaSubmissionsRaw);
-      const pdfDoc = generatePdfDoc("تقرير أضاحي غزة");
-      addTableToPdf(pdfDoc, dataToExport, commonExportColumns, PDF_MARGIN + 60);
-      pdfDoc.save("أضاحي_غزة.pdf");
+      generatePdfMakeDocument("تقرير أضاحي غزة", dataToExport, commonExportColumns, "أضاحي_غزة");
       toast({ title: "تم تصدير أضاحي غزة (PDF) بنجاح" });
     } catch (error) {
       console.error("Error exporting Gaza to PDF:", error);
@@ -421,18 +391,12 @@ const AdminPage = () => {
   };
 
   const handleExportByUserPdf = async () => {
-    if (!fontLoadedSuccessfully && !amiriFontBase64) {
-        toast({
-            title: "خطأ في الخط",
-            description: "لم يتم تحميل الخط العربي اللازم لإنشاء ملفات PDF. يرجى المحاولة مرة أخرى أو التأكد من اتصال جيد بالإنترنت.",
-            variant: "destructive",
-            duration: 7000
-        });
-        setExportingType(null);
-        return;
-    }
     if (allSubmissionsForAdmin.length === 0) {
       toast({ title: "لا توجد بيانات للتصدير" });
+      return;
+    }
+    if (!isAmiriFontConfigured) {
+      toast({ title: "خطأ في إعداد الخط لـ PDF", description: "لا يمكن إنشاء PDF بدون إعداد خط Amiri.", variant: "destructive" });
       return;
     }
     setExportingType('userPdf');
@@ -452,12 +416,10 @@ const AdminPage = () => {
         const userSubmissionsRaw = submissionsByUser[userId];
         if (userSubmissionsRaw.length > 0) {
             const dataToExport = prepareDataForExport(userSubmissionsRaw);
-            const pdfDoc = generatePdfDoc(`تقرير أضاحي المستخدم: ${userName}`);
-            addTableToPdf(pdfDoc, dataToExport, commonExportColumns, PDF_MARGIN + 60);
-            pdfDoc.save(`أضاحي_${userName.replace(/\s+/g, '_')}.pdf`);
+            generatePdfMakeDocument(`تقرير أضاحي المستخدم: ${userName}`, dataToExport, commonExportColumns, `أضاحي_${userName.replace(/\s+/g, '_')}`);
         }
       }
-      toast({ title: "تم تصدير الأضاحي حسب المستخدم (PDF) بنجاح" });
+      toast({ title: "تم تصدير الأضاحي حسب المستخدم (ملفات PDF منفصلة) بنجاح" });
     } catch (error) {
       console.error("Error exporting by user to PDF:", error);
       toast({ title: "خطأ في التصدير (PDF)", description: "حدث خطأ أثناء محاولة تصدير الأضاحي حسب المستخدم.", variant: "destructive" });
@@ -570,15 +532,15 @@ const AdminPage = () => {
           </Button>
 
           {/* PDF Exports */}
-          <Button onClick={handleExportAllPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0 || !fontLoadedSuccessfully} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700">
+          <Button onClick={handleExportAllPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0 || !isAmiriFontConfigured} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700">
             {exportingType === 'allPdf' ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <FileText className="ml-2 h-4 w-4" />}
             تصدير الكل (PDF)
           </Button>
-          <Button onClick={handleExportGazaPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.filter(s => s.distributionPreference === 'gaza').length === 0 || !fontLoadedSuccessfully} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700">
+          <Button onClick={handleExportGazaPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.filter(s => s.distributionPreference === 'gaza').length === 0 || !isAmiriFontConfigured} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700">
             {exportingType === 'gazaPdf' ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <FileText className="ml-2 h-4 w-4" />}
             أضاحي غزة (PDF)
           </Button>
-          <Button onClick={handleExportByUserPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0 || !fontLoadedSuccessfully} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700">
+          <Button onClick={handleExportByUserPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0 || !isAmiriFontConfigured} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700">
             {exportingType === 'userPdf' ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <FileText className="ml-2 h-4 w-4" />}
             حسب المستخدم (PDF)
           </Button>
@@ -591,3 +553,5 @@ const AdminPage = () => {
 }
 
 export default AdminPage;
+
+    
