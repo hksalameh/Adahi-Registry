@@ -5,8 +5,8 @@ import { HandHeart } from "lucide-react"; // Using an icon representing giving/c
 export function Logo() {
   return (
     <Link href="/" className="flex items-center gap-2 text-primary hover:opacity-80 transition-opacity">
-      <HandHeart className="h-8 w-8" />
-      <h1 className="text-xl sm:text-2xl font-bold">تسجيل الأضاحي</h1>
+      <HandHeart className="h-7 w-7 sm:h-8 sm:w-8" />
+      <h1 className="text-md sm:text-xl font-bold">مركز الرمثا للخدمات المجتمعية</h1>
     </Link>
   );
 }
