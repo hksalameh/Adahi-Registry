@@ -19,7 +19,7 @@ import { ar } from "date-fns/locale";
 import pdfMake from 'pdfmake/build/pdfmake';
 // تأكد من أن هذا المسار صحيح وأن الملف vfs_fonts.js موجود فيه
 // هذا الملف يجب أن يحتوي على بيانات خط Amiri (وغيره من الخطوط التي تريدها)
-import '@/lib/vfs_fonts.js'; //  <<<<---- تأكد من أن هذا الملف موجود في src/lib/
+import '@/lib/vfs_fonts.js'; //  <<<<----  تم تغيير هذا السطر
 
 // يفترض أن pdfMake.vfs قد تم تهيئته الآن بواسطة الاستيراد أعلاه لملف الخطوط المخصص.
 
@@ -33,10 +33,10 @@ if (pdfMake.fonts) {
     pdfMake.fonts = {
       ...pdfMake.fonts, // Preserve any default fonts
       Amiri: {
-        normal: 'Amiri-Regular.ttf', 
+        normal: 'Amiri-Regular.ttf',
         bold: 'Amiri-Bold.ttf',
-        italics: 'Amiri-Italic.ttf', //  يفضل أن يكون لديك ملف Amiri-Italic.ttf في VFS
-        bolditalics: 'Amiri-BoldItalic.ttf' // يفضل أن يكون لديك ملف Amiri-BoldItalic.ttf في VFS
+        italics: 'Amiri-Regular.ttf', //  يفضل أن يكون لديك ملف Amiri-Italic.ttf في VFS
+        bolditalics: 'Amiri-Regular.ttf' // يفضل أن يكون لديك ملف Amiri-BoldItalic.ttf في VFS
       }
     };
 } else {
@@ -44,8 +44,8 @@ if (pdfMake.fonts) {
       Amiri: {
         normal: 'Amiri-Regular.ttf',
         bold: 'Amiri-Bold.ttf',
-        italics: 'Amiri-Italic.ttf',
-        bolditalics: 'Amiri-BoldItalic.ttf'
+        italics: 'Amiri-Regular.ttf',
+        bolditalics: 'Amiri-Regular.ttf'
       }
     };
 }
@@ -53,10 +53,12 @@ if (pdfMake.fonts) {
 const PDF_MARGIN = 40;
 
 // Helper function to reverse Arabic text for PDFMake (word order)
+// This helps with word order display in PDFMake when RTL is not fully native.
 const reverseTextForPdfMake = (text: string | undefined | null): string => {
   if (!text) return '';
-  // This simple reversal might not be perfect for all complex Arabic text but can help with word order.
-  return text.split(' ').reverse().join('  '); // Using double space to ensure some separation
+  // Split by space, reverse array, then join with double space for visual separation.
+  // This might not be perfect for complex mixed LTR/RTL text but often improves simple RTL phrases.
+  return text.split(' ').reverse().join('  ');
 };
 
 
@@ -108,7 +110,7 @@ const AdminPage = () => {
     { header: "اسم المتبرع", dataKey: "donorName" },
     { header: "الاضحية باسم", dataKey: "sacrificeFor" },
     { header: "رقم التلفون", dataKey: "phoneNumber" },
-    { header: "اسم المستخدم", dataKey: "submitterUsername"},
+    { header: "اسم المستخدم", dataKey: "submitterUsername"}, // مدخل البيانات
     { header: "يريد الحضور", dataKey: "wantsToAttendText" },
     { header: "يريد من الأضحية", dataKey: "wantsFromSacrificeText" },
     { header: "ماذا يريد", dataKey: "sacrificeWishes" },
@@ -138,14 +140,15 @@ const AdminPage = () => {
         sacrificeWishes: sub.wantsFromSacrifice ? (sub.sacrificeWishes || "-") : "-",
         paymentConfirmedText: sub.paymentConfirmed ? "نعم" : "لا",
         distributionPreferenceText: getDistributionLabel(sub.distributionPreference),
+        // Keep other fields for potential future use or detailed PDF export if needed
         receiptBookNumber: sub.paymentConfirmed ? (sub.receiptBookNumber || "-") : "-",
         voucherNumber: sub.paymentConfirmed ? (sub.voucherNumber || "-") : "-",
         throughIntermediaryText: sub.throughIntermediary ? "نعم" : "لا",
         intermediaryName: sub.throughIntermediary ? (sub.intermediaryName || "-") : "-",
         submissionDateFormatted: sub.submissionDate ? format(new Date(sub.submissionDate), "dd/MM/yyyy HH:mm", { locale: ar }) : 'N/A',
         statusText: sub.status === "entered" ? "مدخلة" : "غير مدخلة",
-        userId: sub.userId,
-        distributionPreference: sub.distributionPreference,
+        userId: sub.userId, // For user-specific exports
+        id: sub.id // For linking prepared data back to original if needed
       });
     }
     return prepared;
@@ -156,13 +159,14 @@ const AdminPage = () => {
     const worksheetData = dataToExportRaw.map(item => {
       const orderedItem: any = {};
       columns.forEach(col => {
-        orderedItem[col.header] = item[col.dataKey];
+        // Ensure that the dataKey exists in the item, otherwise use an empty string or placeholder
+        orderedItem[col.header] = item.hasOwnProperty(col.dataKey) ? item[col.dataKey] : "";
       });
       return orderedItem;
     });
 
     const ws = XLSX.utils.json_to_sheet(worksheetData, {
-      header: columns.map(col => col.header)
+      header: columns.map(col => col.header) // This sets the column order
     });
 
     const wb = XLSX.utils.book_new();
@@ -170,13 +174,14 @@ const AdminPage = () => {
 
     if (wb.Sheets[sheetName]) {
         const sheet = wb.Sheets[sheetName];
-        const headerRowIndex = 0; // Assuming headers are in the first row
+        const headerRowIndex = 0;
 
-        // Style header row
+        // Style header row and data rows
         columns.forEach((_col, C_idx) => {
-            const cell_ref = XLSX.utils.encode_cell({ r: headerRowIndex, c: C_idx });
-            if (sheet[cell_ref]) {
-                sheet[cell_ref].s = {
+            // Header style
+            const header_cell_ref = XLSX.utils.encode_cell({ r: headerRowIndex, c: C_idx });
+            if (sheet[header_cell_ref]) {
+                sheet[header_cell_ref].s = {
                     border: {
                         top: { style: "thin", color: { auto: 1 } },
                         bottom: { style: "thin", color: { auto: 1 } },
@@ -187,16 +192,14 @@ const AdminPage = () => {
                     font: { bold: true }
                 };
             }
-        });
-        
-        // Style data rows
-        worksheetData.forEach((_rowData, R_idx) => {
-            columns.forEach((_col, C_idx) => {
-                const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx }); // R_idx + 1 because data starts after header
-                if (sheet[cell_ref] && sheet[cell_ref].v !== undefined && sheet[cell_ref].v !== null && sheet[cell_ref].v !== "") {
-                    sheet[cell_ref].s = {
-                        ...(sheet[cell_ref].s || {}), // Preserve existing styles if any
-                        border: {
+
+            // Data row style (applied to all potential data cells in this column)
+            for (let R_idx = 0; R_idx < worksheetData.length; R_idx++) {
+                const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx });
+                if (sheet[cell_ref] && sheet[cell_ref].v !== undefined && sheet[cell_ref].v !== null && String(sheet[cell_ref].v).trim() !== "") {
+                     sheet[cell_ref].s = {
+                        ...(sheet[cell_ref].s || {}),
+                         border: {
                             top: { style: "thin", color: { auto: 1 } },
                             bottom: { style: "thin", color: { auto: 1 } },
                             left: { style: "thin", color: { auto: 1 } },
@@ -216,18 +219,18 @@ const AdminPage = () => {
                         alignment: { ...(sheet[cell_ref].s?.alignment || {}), horizontal: "right", vertical: "center", wrapText: true }
                     };
                 }
-            });
+            }
         });
-
+        
         const colWidths = columns.map(column => ({ wch: Math.max(15, String(column.header).length + 5) }));
         sheet['!cols'] = colWidths;
         sheet['!props'] = { rtl: true }; // Set sheet direction to RTL
-        sheet['!autofilter'] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(sheet['!ref']!)) }; // Enable autofilter for the entire sheet
+        sheet['!autofilter'] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(sheet['!ref']!)) };
     }
     XLSX.writeFile(wb, `${fileName}.xlsx`);
   };
 
-  const generatePdfMakeDocument = (title: string, data: any[], columns: Array<{header: string, dataKey: string}>, fileName: string) => {
+  const generatePdfMakeDocument = (title: string, data: any[], columnsToUse: Array<{header: string, dataKey: string}>, fileName: string) => {
     if (!isAmiriFontConfigured) {
       toast({
         title: "خطأ في إعداد الخط لـ PDF",
@@ -238,26 +241,27 @@ const AdminPage = () => {
       return;
     }
     
-    // For PDF, reverse columns for visual RTL, and reverse header text
-    const pdfColumns = [...columns].reverse(); 
+    // For PDF, reverse columns for visual RTL
+    const pdfColumns = [...columnsToUse].reverse();
     
-    const tableHeaders = pdfColumns.map(col => ({ text: reverseTextForPdfMake(col.header), style: 'tableHeader', alignment: 'right' as const }));
+    const tableHeaders = pdfColumns.map(col => ({ text: col.header, style: 'tableHeader', alignment: 'right' as const }));
     
     const tableBody = data.map(item =>
-        pdfColumns.map(col => ({ text: reverseTextForPdfMake(item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : ''), alignment: 'right' as const }))
+      pdfColumns.map(col => {
+        const cellValue = item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : '';
+        return ({ text: cellValue, alignment: 'right' as const });
+      })
     );
     
-    const reversedTitle = reverseTextForPdfMake(title);
     const exportDateText = `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`;
-    const reversedExportDateText = reverseTextForPdfMake(exportDateText);
 
     const docDefinition: any = {
       pageSize: 'A4',
       pageOrientation: 'landscape',
       pageMargins: [PDF_MARGIN, PDF_MARGIN + 20, PDF_MARGIN, PDF_MARGIN + 20], 
       content: [
-        { text: reversedTitle, style: 'header', alignment: 'right' as const, margin: [0, 0, 0, 10] },
-        { text: reversedExportDateText, style: 'subheader', alignment: 'right' as const, margin: [0, 0, 0, 20] },
+        { text: title, style: 'header', alignment: 'right' as const, margin: [0, 0, 0, 10] },
+        { text: exportDateText, style: 'subheader', alignment: 'right' as const, margin: [0, 0, 0, 20] },
         {
           table: {
             headerRows: 1,
@@ -283,7 +287,6 @@ const AdminPage = () => {
       styles: {
         header: {
           fontSize: 18,
-          // bold: false, // Keep bold if Amiri-Bold is properly loaded in VFS
           alignment: 'right' as const
         },
         subheader: {
@@ -291,7 +294,6 @@ const AdminPage = () => {
           alignment: 'right' as const
         },
         tableHeader: {
-          // bold: false, // Keep bold if Amiri-Bold is properly loaded in VFS
           fontSize: 8, 
           color: 'black',
           alignment: 'right' as const 
@@ -299,9 +301,8 @@ const AdminPage = () => {
       },
       footer: function(currentPage: number, pageCount: number) {
         const pageNumText = `صفحة ${currentPage.toString()} من ${pageCount.toString()}`;
-        const reversedPageNumText = reverseTextForPdfMake(pageNumText);
         return {
-          text: reversedPageNumText,
+          text: pageNumText,
           alignment: 'center' as const,
           style: { font: 'Amiri', fontSize: 8 },
           margin: [0, 10, 0, 0]
@@ -359,25 +360,25 @@ const AdminPage = () => {
     }
     setExportingType('userExcel');
     try {
-      const submissionsByUser: { [key: string]: AdahiSubmission[] } = {};
-      const allDataPrepared = await prepareDataForExport(allSubmissionsForAdmin); // Prepare all data once
+      const submissionsByUser: { [key: string]: any[] } = {};
+      const allDataPrepared = await prepareDataForExport(allSubmissionsForAdmin);
       
       allDataPrepared.forEach(subPrepared => {
-          const originalSub = allSubmissionsForAdmin.find(s => s.id === subPrepared.id); // Find original to get userId for username fetch
-          let userName = subPrepared.submitterUsername || 'مستخدم_غير_معروف'; // Use already prepared username
-          
-          const userKey = userName.replace(/[<>:"/\\|?* ]/g, '_'); 
+          let userName = subPrepared.submitterUsername || 'مستخدم_غير_معروف';
+          const userKey = userName.replace(/[<>:"/\\|?* ]/g, '_'); // Sanitize username for sheet/file name
 
           if (!submissionsByUser[userKey]) {
               submissionsByUser[userKey] = [];
           }
-          submissionsByUser[userKey].push(subPrepared); // Push the prepared submission
+          submissionsByUser[userKey].push(subPrepared);
       });
 
       for (const userNameKey in submissionsByUser) {
         const userSubmissionsData = submissionsByUser[userNameKey];
         if (userSubmissionsData.length > 0) {
-            exportToExcel(userSubmissionsData, `أضاحي_المستخدم_${userNameKey}`, userNameKey, commonExportColumns);
+            // Use a sanitized version of the username for the filename and sheet name
+            const safeUserNameKey = userNameKey.substring(0, 30); // Excel sheet name limit
+            exportToExcel(userSubmissionsData, `أضاحي_المستخدم_${safeUserNameKey}`, safeUserNameKey, commonExportColumns);
         }
       }
       toast({ title: "تم تصدير الأضاحي حسب المستخدم (ملفات Excel منفصلة) بنجاح" });
@@ -401,7 +402,7 @@ const AdminPage = () => {
     try {
       const dataToExport = await prepareDataForExport(allSubmissionsForAdmin);
       generatePdfMakeDocument("تقرير جميع الأضاحي", dataToExport, commonExportColumns, "جميع_الأضاحي");
-      toast({ title: "تم تصدير جميع الأضاحي (PDF) بنجاح" });
+      // toast({ title: "تم تصدير جميع الأضاحي (PDF) بنجاح" }); // Toast is in generatePdfMakeDocument or on error
     } catch (error) {
       console.error("Error exporting all to PDF:", error);
       toast({ title: "خطأ في التصدير (PDF)", description: "حدث خطأ أثناء محاولة تصدير جميع الأضاحي.", variant: "destructive" });
@@ -423,7 +424,6 @@ const AdminPage = () => {
     try {
       const dataToExport = await prepareDataForExport(gazaSubmissionsRaw);
       generatePdfMakeDocument("تقرير أضاحي غزة", dataToExport, commonExportColumns, "أضاحي_غزة");
-      toast({ title: "تم تصدير أضاحي غزة (PDF) بنجاح" });
     } catch (error) {
       console.error("Error exporting Gaza to PDF:", error);
       toast({ title: "خطأ في التصدير (PDF)", description: "حدث خطأ أثناء محاولة تصدير أضاحي غزة.", variant: "destructive" });
@@ -442,12 +442,12 @@ const AdminPage = () => {
     }
     setExportingType('userPdf');
     try {
-      const submissionsByUser: { [key: string]: any[] } = {}; // Store prepared data
+      const submissionsByUser: { [key: string]: any[] } = {};
       const allDataPrepared = await prepareDataForExport(allSubmissionsForAdmin);
 
       allDataPrepared.forEach(subPrepared => {
           let userName = subPrepared.submitterUsername || 'مستخدم_غير_معروف';
-          const userKey = userName.replace(/[<>:"/\\|?* ]/g, '_'); 
+          const userKey = userName.replace(/[<>:"/\\|?* ]/g, '_'); // Sanitize
 
           if (!submissionsByUser[userKey]) {
               submissionsByUser[userKey] = [];
@@ -458,7 +458,8 @@ const AdminPage = () => {
       for (const userNameKey in submissionsByUser) {
         const userSubmissionsData = submissionsByUser[userNameKey];
         if (userSubmissionsData.length > 0) {
-            generatePdfMakeDocument(`تقرير أضاحي المستخدم: ${userNameKey}`, userSubmissionsData, commonExportColumns, `أضاحي_${userNameKey}`);
+            const safeUserNameKey = userNameKey.substring(0, 30); // Sanitize for filename
+            generatePdfMakeDocument(`تقرير أضاحي المستخدم: ${userNameKey}`, userSubmissionsData, commonExportColumns, `أضاحي_${safeUserNameKey}`);
         }
       }
       toast({ title: "تم تصدير الأضاحي حسب المستخدم (ملفات PDF منفصلة) بنجاح" });
@@ -592,3 +593,5 @@ const AdminPage = () => {
 }
 
 export default AdminPage;
+
+    
