@@ -43,9 +43,9 @@ const AdminPage = () => {
   useEffect(() => {
     const loadFont = async () => {
       try {
-        const response = await fetch('/fonts/Amiri-Regular.ttf');
+        const response = await fetch('/fonts/Amiri-Regular.ttf'); // Make sure Amiri-Regular.ttf is in public/fonts
         if (!response.ok) {
-          throw new Error('Failed to fetch Amiri font');
+          throw new Error('Failed to fetch Amiri font. Ensure Amiri-Regular.ttf is in public/fonts/');
         }
         const fontBlob = await response.blob();
         const reader = new FileReader();
@@ -53,18 +53,20 @@ const AdminPage = () => {
           const base64data = reader.result as string;
           setAmiriFontBase64(base64data.split(',')[1]); // Get only the Base64 part
           setFontLoadedSuccessfully(true);
-          console.log("Amiri font loaded successfully.");
+          console.log("Amiri font loaded successfully for PDF generation.");
         };
-        reader.onerror = () => {
+        reader.onerror = (error) => {
+          console.error("Error reading font blob:", error);
           throw new Error("Failed to read font blob.");
         };
         reader.readAsDataURL(fontBlob);
-      } catch (error) {
-        console.error("Error loading Amiri font:", error);
+      } catch (error: any) {
+        console.error("Error loading Amiri font:", error.message);
         toast({
-          title: "خطأ في تحميل الخط",
-          description: "لم يتم تحميل خط Amiri بنجاح. قد لا تظهر النصوص العربية بشكل صحيح في PDF.",
+          title: "خطأ في تحميل الخط لملفات PDF",
+          description: `لم يتم تحميل خط Amiri بنجاح. قد لا تظهر النصوص العربية بشكل صحيح في PDF. الخطأ: ${error.message}`,
           variant: "destructive",
+          duration: 7000,
         });
         setFontLoadedSuccessfully(false);
       }
@@ -78,10 +80,10 @@ const AdminPage = () => {
       if (user && user.isAdmin) {
         handleRefresh().finally(() => setPageLoading(false));
       } else {
-        setPageLoading(false);
+        setPageLoading(false); // If not admin or no user, stop page loading
       }
     }
-  }, [authLoading, user, refreshData]);
+  }, [authLoading, user]); // Removed refreshData from dependencies to avoid loop, handleRefresh calls it
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -89,7 +91,7 @@ const AdminPage = () => {
     setIsRefreshing(false);
     toast({ title: "تم تحديث البيانات" });
   };
-
+  
   const commonExportColumns = [
     { header: "م", dataKey: "serial" },
     { header: "مدخل البيانات", dataKey: "submitterUsername" },
@@ -123,11 +125,11 @@ const AdminPage = () => {
       receiptBookNumber: sub.paymentConfirmed ? (sub.receiptBookNumber || "-") : "-",
       voucherNumber: sub.paymentConfirmed ? (sub.voucherNumber || "-") : "-",
       throughIntermediaryText: sub.throughIntermediary ? "نعم" : "لا",
-      intermediaryName: sub.throughIntermediary ? (sub.intermediaryName || (sub.submitterUsername === sub.intermediaryName ? "المستخدم نفسه" : "-") ) : "-",
+      intermediaryName: sub.throughIntermediary ? (sub.intermediaryName || "-") : "-", // Simplified logic
       distributionPreferenceText: getDistributionLabel(sub.distributionPreference),
       submissionDateFormatted: sub.submissionDate ? format(new Date(sub.submissionDate), "dd/MM/yyyy HH:mm", { locale: ar }) : 'N/A',
       statusText: sub.status === "entered" ? "مدخلة" : "غير مدخلة",
-      // raw data for filtering
+      // raw data for filtering or other purposes if needed
       userId: sub.userId,
       distributionPreference: sub.distributionPreference,
     }));
@@ -157,7 +159,6 @@ const AdminPage = () => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
     
-    // Apply RTL and borders
     if (wb.Sheets[sheetName]) {
         wb.Sheets[sheetName]['!props'] = { rtl: true };
         const range = XLSX.utils.decode_range(wb.Sheets[sheetName]['!ref']!);
@@ -180,7 +181,7 @@ const AdminPage = () => {
                         vertical: "center"
                     }
                 };
-                if (R === 0) { // Header row
+                if (R === 0) { 
                     wb.Sheets[sheetName][cell_ref].s.font = {
                         ...(wb.Sheets[sheetName][cell_ref].s?.font || {}),
                         bold: true
@@ -195,7 +196,7 @@ const AdminPage = () => {
 
   const generatePdfDoc = (title: string) => {
     const pdfDoc = new jsPDF({
-      orientation: 'l', // landscape
+      orientation: 'l', 
       unit: 'pt',
       format: 'a4'
     });
@@ -204,26 +205,30 @@ const AdminPage = () => {
       try {
         pdfDoc.addFileToVFS('Amiri-Regular.ttf', amiriFontBase64);
         pdfDoc.addFont('Amiri-Regular.ttf', 'Amiri', 'normal');
-        pdfDoc.setFont('Amiri');
       } catch (e) {
-        console.error("Error adding Amiri font to PDF (likely VFS or font registration issue):", e);
-        toast({ title: "خطأ في خط PDF", description: "لم يتم تطبيق الخط العربي بشكل كامل.", variant: "destructive"});
-        pdfDoc.setFont('Helvetica'); // Fallback
+        console.error("Error adding Amiri font to PDF (VFS or font registration):", e);
+        toast({ title: "خطأ في خط PDF", description: "لم يتم تطبيق الخط العربي بشكل كامل للعناوين.", variant: "destructive"});
       }
-    } else {
-      pdfDoc.setFont('Helvetica'); // Fallback if font not loaded
     }
+    
     pdfDoc.setLanguage('ar');
-    pdfDoc.setR2L(true); // Enable Right-to-Left globally for the document
+    pdfDoc.setR2L(true); 
 
-    // Add title
     const pageWidth = pdfDoc.internal.pageSize.getWidth();
-    if (fontLoadedSuccessfully) pdfDoc.setFont('Amiri'); else pdfDoc.setFont('Helvetica');
+    
+    if (fontLoadedSuccessfully) {
+      pdfDoc.setFont('Amiri');
+    } else {
+      pdfDoc.setFont('Helvetica'); // Fallback
+    }
     pdfDoc.setFontSize(18);
     pdfDoc.text(title, pageWidth / 2, 40, { align: 'center' });
 
-    // Add export date
-    if (fontLoadedSuccessfully) pdfDoc.setFont('Amiri'); else pdfDoc.setFont('Helvetica');
+    if (fontLoadedSuccessfully) {
+      pdfDoc.setFont('Amiri');
+    } else {
+      pdfDoc.setFont('Helvetica'); // Fallback
+    }
     pdfDoc.setFontSize(10);
     const exportDate = `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`;
     pdfDoc.text(exportDate, pageWidth / 2, 60, { align: 'center' });
@@ -250,22 +255,23 @@ const AdminPage = () => {
       headStyles: {
         font: fontLoadedSuccessfully ? 'Amiri' : 'Helvetica',
         fontStyle: 'bold',
-        fillColor: [220, 220, 220], // Light gray for header
+        fillColor: [220, 220, 220], 
         textColor: [0, 0, 0],
         halign: 'center',
       },
       didDrawPage: (data) => {
-        // Footer with page number
-        const pageCount = pdfDoc.internal.pages.length -1; // Correct page count
-        if (fontLoadedSuccessfully) pdfDoc.setFont('Amiri'); else pdfDoc.setFont('Helvetica');
+        const pageCount = pdfDoc.internal.pages.length -1; 
+        if (fontLoadedSuccessfully) {
+          pdfDoc.setFont('Amiri');
+        } else {
+          pdfDoc.setFont('Helvetica');
+        }
         pdfDoc.setFontSize(8);
         pdfDoc.text(`صفحة ${data.pageNumber} من ${pageCount}`, pdfDoc.internal.pageSize.getWidth() / 2, pdfDoc.internal.pageSize.getHeight() - 20, { align: 'center' });
       }
     });
   };
 
-
-  // EXCEL EXPORT HANDLERS
   const handleExportAllExcel = async () => {
     if (allSubmissionsForAdmin.length === 0) {
       toast({ title: "لا توجد بيانات للتصدير" });
@@ -321,8 +327,10 @@ const AdminPage = () => {
         const userProfile = await fetchUserById(userId);
         const userName = userProfile?.username || userId;
         const userSubmissions = submissionsByUser[userId];
-        const dataToExport = prepareDataForExport(userSubmissions);
-        exportToExcel(dataToExport, `أضاحي_المستخدم_${userName.replace(/\s+/g, '_')}`, userName, commonExportColumns);
+        if (userSubmissions.length > 0) {
+            const dataToExport = prepareDataForExport(userSubmissions);
+            exportToExcel(dataToExport, `أضاحي_المستخدم_${userName.replace(/\s+/g, '_')}`, userName, commonExportColumns);
+        }
       }
       toast({ title: "تم تصدير الأضاحي حسب المستخدم (Excel) بنجاح" });
     } catch (error) {
@@ -332,7 +340,6 @@ const AdminPage = () => {
     setExportingType(null);
   };
 
-  // PDF EXPORT HANDLERS
   const handleExportAllPdf = async () => {
     if (allSubmissionsForAdmin.length === 0) {
       toast({ title: "لا توجد بيانات للتصدير" });
@@ -402,11 +409,12 @@ const AdminPage = () => {
         const userProfile = await fetchUserById(userId);
         const userName = userProfile?.username || userId;
         const userSubmissionsRaw = submissionsByUser[userId];
-        const dataToExport = prepareDataForExport(userSubmissionsRaw);
-        
-        const pdfDoc = generatePdfDoc(`تقرير أضاحي المستخدم: ${userName}`);
-        addTableToPdf(pdfDoc, dataToExport, commonExportColumns, 80);
-        pdfDoc.save(`أضاحي_${userName.replace(/\s+/g, '_')}.pdf`);
+        if (userSubmissionsRaw.length > 0) {
+            const dataToExport = prepareDataForExport(userSubmissionsRaw);
+            const pdfDoc = generatePdfDoc(`تقرير أضاحي المستخدم: ${userName}`);
+            addTableToPdf(pdfDoc, dataToExport, commonExportColumns, 80);
+            pdfDoc.save(`أضاحي_${userName.replace(/\s+/g, '_')}.pdf`);
+        }
       }
       toast({ title: "تم تصدير الأضاحي حسب المستخدم (PDF) بنجاح" });
     } catch (error) {
@@ -427,6 +435,7 @@ const AdminPage = () => {
   }
 
   if (!user || !user.isAdmin) {
+    // This should ideally be handled by AdminLayout, but as a fallback
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <p className="text-destructive text-center">غير مصرح لك بالدخول لهذه الصفحة. يتم توجيهك...</p>
@@ -501,7 +510,7 @@ const AdminPage = () => {
       <div className="space-y-4">
         <h2 className="text-lg sm:text-xl font-semibold">خيارات التصدير وجدول الإدخالات</h2>
         <div className="flex flex-wrap items-center justify-start gap-2 p-3 border rounded-md bg-card shadow-sm">
-          <Button onClick={handleRefresh} variant="outline" disabled={exportingType !== null || authLoading}>
+          <Button onClick={handleRefresh} variant="outline" disabled={exportingType !== null || authLoading || isRefreshing}>
             {isRefreshing ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <RefreshCw className="ml-2 h-4 w-4" />}
             تحديث البيانات
           </Button>
@@ -543,3 +552,4 @@ const AdminPage = () => {
 
 export default AdminPage;
 
+    
