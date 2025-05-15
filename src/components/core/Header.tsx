@@ -21,7 +21,7 @@ export default function Header() {
             <span className="text-sm text-muted-foreground">جاري التحميل...</span>
           ) : user ? (
             <>
-              <span className="text-base text-muted-foreground flex items-center gap-1"> {/* Changed from text-sm to text-base */}
+              <span className="text-lg text-muted-foreground flex items-center gap-1"> {/* Changed from text-base to text-lg */}
                 <UserCircle className="h-5 w-5" /> مرحبا, {user.username}
                 {user.isAdmin && <ShieldCheck className="h-5 w-5 text-primary" title="Admin" />}
               </span>
@@ -32,7 +32,7 @@ export default function Header() {
               )}
               {pathname !== "/dashboard" && (
                 <Button variant="ghost" asChild>
-                    <Link href="/dashboard">سجل أضحية</Link>
+                    <Link href="/dashboard">لوحة التحكم</Link>
                 </Button>
               )}
               <Button variant="outline" size="sm" onClick={logout}>
