@@ -19,24 +19,19 @@ import { ar } from "date-fns/locale";
 import pdfMake from 'pdfmake/build/pdfmake';
 // تأكد من أن هذا المسار صحيح وأن الملف vfs_fonts.js موجود فيه
 // هذا الملف يجب أن يحتوي على بيانات خط Amiri (وغيره من الخطوط التي تريدها)
-import '@/lib/vfs_fonts.js'; //  <<<<----  تم تغيير هذا السطر
+import '@/lib/vfs_fonts.js';
 
 // يفترض أن pdfMake.vfs قد تم تهيئته الآن بواسطة الاستيراد أعلاه لملف الخطوط المخصص.
 
 // Configure Amiri font for pdfMake
-// IMPORTANT: For Amiri (or any custom font) to work correctly,
-// you MUST have the font data (e.g., Amiri-Regular.ttf, Amiri-Bold.ttf)
-// properly compiled into the vfs_fonts.js file you are importing.
-// The names 'Amiri-Regular.ttf', 'Amiri-Bold.ttf' etc. in this config
-// MUST MATCH the font file names *within* your VFS.
 if (pdfMake.fonts) {
     pdfMake.fonts = {
-      ...pdfMake.fonts, // Preserve any default fonts
+      ...pdfMake.fonts,
       Amiri: {
         normal: 'Amiri-Regular.ttf',
         bold: 'Amiri-Bold.ttf',
-        italics: 'Amiri-Regular.ttf', //  يفضل أن يكون لديك ملف Amiri-Italic.ttf في VFS
-        bolditalics: 'Amiri-Regular.ttf' // يفضل أن يكون لديك ملف Amiri-BoldItalic.ttf في VFS
+        italics: 'Amiri-Regular.ttf',
+        bolditalics: 'Amiri-Bold.ttf'
       }
     };
 } else {
@@ -45,22 +40,17 @@ if (pdfMake.fonts) {
         normal: 'Amiri-Regular.ttf',
         bold: 'Amiri-Bold.ttf',
         italics: 'Amiri-Regular.ttf',
-        bolditalics: 'Amiri-Regular.ttf'
+        bolditalics: 'Amiri-Bold.ttf'
       }
     };
 }
 
 const PDF_MARGIN = 40;
 
-// Helper function to reverse Arabic text for PDFMake (word order)
-// This helps with word order display in PDFMake when RTL is not fully native.
-const reverseTextForPdfMake = (text: string | undefined | null): string => {
+const reverseArabicTextForPdfMake = (text: string | undefined | null): string => {
   if (!text) return '';
-  // Split by space, reverse array, then join with double space for visual separation.
-  // This might not be perfect for complex mixed LTR/RTL text but often improves simple RTL phrases.
   return text.split(' ').reverse().join('  ');
 };
-
 
 const AdminPage = () => {
   const { allSubmissionsForAdmin, loading: authLoading, refreshData, user, fetchUserById } = useAuth();
@@ -69,14 +59,13 @@ const AdminPage = () => {
   const [pageLoading, setPageLoading] = useState(true);
   const [exportingType, setExportingType] = useState<string | null>(null);
 
-  // Check if Amiri font is configured in pdfMake.fonts AND vfs is populated
   const isAmiriFontConfigured = !!(pdfMake.fonts && pdfMake.fonts.Amiri && pdfMake.fonts.Amiri.normal && pdfMake.vfs && Object.keys(pdfMake.vfs).length > 0);
 
   useEffect(() => {
-    if (!isAmiriFontConfigured && (exportingType?.includes('Pdf'))) { // Show only if PDF export is attempted
+    if (!isAmiriFontConfigured && (exportingType?.includes('Pdf'))) {
       toast({
         title: "تنبيه بخصوص خط PDF",
-        description: "لم يتم تكوين خط Amiri بشكل كامل لـ pdfMake (قد يكون VFS غير محمل بشكل صحيح أو الخط غير مسجل في vfs_fonts.js). قد لا تظهر النصوص العربية بشكل صحيح في ملفات PDF.",
+        description: "لم يتم تكوين خط Amiri بشكل كامل لـ pdfMake. قد لا تظهر النصوص العربية بشكل صحيح في ملفات PDF.",
         variant: "destructive",
         duration: 10000,
       });
@@ -110,7 +99,7 @@ const AdminPage = () => {
     { header: "اسم المتبرع", dataKey: "donorName" },
     { header: "الاضحية باسم", dataKey: "sacrificeFor" },
     { header: "رقم التلفون", dataKey: "phoneNumber" },
-    { header: "اسم المستخدم", dataKey: "submitterUsername"}, // مدخل البيانات
+    { header: "اسم المستخدم", dataKey: "submitterUsername"},
     { header: "يريد الحضور", dataKey: "wantsToAttendText" },
     { header: "يريد من الأضحية", dataKey: "wantsFromSacrificeText" },
     { header: "ماذا يريد", dataKey: "sacrificeWishes" },
@@ -140,15 +129,14 @@ const AdminPage = () => {
         sacrificeWishes: sub.wantsFromSacrifice ? (sub.sacrificeWishes || "-") : "-",
         paymentConfirmedText: sub.paymentConfirmed ? "نعم" : "لا",
         distributionPreferenceText: getDistributionLabel(sub.distributionPreference),
-        // Keep other fields for potential future use or detailed PDF export if needed
         receiptBookNumber: sub.paymentConfirmed ? (sub.receiptBookNumber || "-") : "-",
         voucherNumber: sub.paymentConfirmed ? (sub.voucherNumber || "-") : "-",
         throughIntermediaryText: sub.throughIntermediary ? "نعم" : "لا",
         intermediaryName: sub.throughIntermediary ? (sub.intermediaryName || "-") : "-",
         submissionDateFormatted: sub.submissionDate ? format(new Date(sub.submissionDate), "dd/MM/yyyy HH:mm", { locale: ar }) : 'N/A',
         statusText: sub.status === "entered" ? "مدخلة" : "غير مدخلة",
-        userId: sub.userId, // For user-specific exports
-        id: sub.id // For linking prepared data back to original if needed
+        userId: sub.userId,
+        id: sub.id
       });
     }
     return prepared;
@@ -159,14 +147,13 @@ const AdminPage = () => {
     const worksheetData = dataToExportRaw.map(item => {
       const orderedItem: any = {};
       columns.forEach(col => {
-        // Ensure that the dataKey exists in the item, otherwise use an empty string or placeholder
         orderedItem[col.header] = item.hasOwnProperty(col.dataKey) ? item[col.dataKey] : "";
       });
       return orderedItem;
     });
 
     const ws = XLSX.utils.json_to_sheet(worksheetData, {
-      header: columns.map(col => col.header) // This sets the column order
+      header: columns.map(col => col.header)
     });
 
     const wb = XLSX.utils.book_new();
@@ -176,9 +163,7 @@ const AdminPage = () => {
         const sheet = wb.Sheets[sheetName];
         const headerRowIndex = 0;
 
-        // Style header row and data rows
         columns.forEach((_col, C_idx) => {
-            // Header style
             const header_cell_ref = XLSX.utils.encode_cell({ r: headerRowIndex, c: C_idx });
             if (sheet[header_cell_ref]) {
                 sheet[header_cell_ref].s = {
@@ -193,10 +178,9 @@ const AdminPage = () => {
                 };
             }
 
-            // Data row style (applied to all potential data cells in this column)
             for (let R_idx = 0; R_idx < worksheetData.length; R_idx++) {
                 const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx });
-                if (sheet[cell_ref] && sheet[cell_ref].v !== undefined && sheet[cell_ref].v !== null && String(sheet[cell_ref].v).trim() !== "") {
+                 if (sheet[cell_ref] && (sheet[cell_ref].v !== undefined && sheet[cell_ref].v !== null && String(sheet[cell_ref].v).trim() !== "")) {
                      sheet[cell_ref].s = {
                         ...(sheet[cell_ref].s || {}),
                          border: {
@@ -207,7 +191,7 @@ const AdminPage = () => {
                         },
                         alignment: { ...(sheet[cell_ref].s?.alignment || {}), horizontal: "right", vertical: "center", wrapText: true }
                     };
-                } else if (sheet[cell_ref]) { // Apply border even to empty cells if they exist in the sheet object
+                } else if (sheet[cell_ref]) { 
                      sheet[cell_ref].s = {
                         ...(sheet[cell_ref].s || {}),
                          border: {
@@ -224,13 +208,13 @@ const AdminPage = () => {
         
         const colWidths = columns.map(column => ({ wch: Math.max(15, String(column.header).length + 5) }));
         sheet['!cols'] = colWidths;
-        sheet['!props'] = { rtl: true }; // Set sheet direction to RTL
+        sheet['!props'] = { rtl: true };
         sheet['!autofilter'] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(sheet['!ref']!)) };
     }
     XLSX.writeFile(wb, `${fileName}.xlsx`);
   };
 
-  const generatePdfMakeDocument = (title: string, data: any[], columnsToUse: Array<{header: string, dataKey: string}>, fileName: string) => {
+ const generatePdfMakeDocument = (title: string, data: any[], columnsToUse: Array<{header: string, dataKey: string}>, fileName: string) => {
     if (!isAmiriFontConfigured) {
       toast({
         title: "خطأ في إعداد الخط لـ PDF",
@@ -240,32 +224,38 @@ const AdminPage = () => {
       });
       return;
     }
-    
-    // For PDF, reverse columns for visual RTL
+
     const pdfColumns = [...columnsToUse].reverse();
-    
-    const tableHeaders = pdfColumns.map(col => ({ text: col.header, style: 'tableHeader', alignment: 'right' as const }));
-    
+    const tableHeaders = pdfColumns.map(col => ({
+        text: reverseArabicTextForPdfMake(col.header), // Reverse header text
+        style: 'tableHeader',
+        alignment: 'right' as const
+    }));
+
     const tableBody = data.map(item =>
       pdfColumns.map(col => {
         const cellValue = item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : '';
-        return ({ text: cellValue, alignment: 'right' as const });
+        return ({
+            text: reverseArabicTextForPdfMake(cellValue), // Reverse cell text
+            alignment: 'right' as const,
+            font: 'Amiri' // Ensure Amiri is used for cell content
+        });
       })
     );
-    
+
     const exportDateText = `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`;
 
     const docDefinition: any = {
       pageSize: 'A4',
       pageOrientation: 'landscape',
-      pageMargins: [PDF_MARGIN, PDF_MARGIN + 20, PDF_MARGIN, PDF_MARGIN + 20], 
+      pageMargins: [PDF_MARGIN, PDF_MARGIN + 20, PDF_MARGIN, PDF_MARGIN + 20],
       content: [
-        { text: title, style: 'header', alignment: 'right' as const, margin: [0, 0, 0, 10] },
-        { text: exportDateText, style: 'subheader', alignment: 'right' as const, margin: [0, 0, 0, 20] },
+        { text: reverseArabicTextForPdfMake(title), style: 'header', alignment: 'right' as const, margin: [0, 0, 0, 10] },
+        { text: reverseArabicTextForPdfMake(exportDateText), style: 'subheader', alignment: 'right' as const, margin: [0, 0, 0, 20] },
         {
           table: {
             headerRows: 1,
-            widths: pdfColumns.map(() => '*' as const), 
+            widths: pdfColumns.map(() => '*' as const),
             body: [tableHeaders, ...tableBody],
           },
           layout: {
@@ -280,29 +270,32 @@ const AdminPage = () => {
         }
       ],
       defaultStyle: {
-        font: 'Amiri', 
+        font: 'Amiri',
         fontSize: 10,
         alignment: 'right' as const
       },
       styles: {
         header: {
           fontSize: 18,
-          alignment: 'right' as const
+          alignment: 'right' as const,
+          font: 'Amiri'
         },
         subheader: {
           fontSize: 12,
-          alignment: 'right' as const
+          alignment: 'right' as const,
+          font: 'Amiri'
         },
         tableHeader: {
-          fontSize: 8, 
+          fontSize: 8,
           color: 'black',
-          alignment: 'right' as const 
+          alignment: 'right' as const,
+          font: 'Amiri' // Ensure Amiri is used for headers
         }
       },
       footer: function(currentPage: number, pageCount: number) {
         const pageNumText = `صفحة ${currentPage.toString()} من ${pageCount.toString()}`;
         return {
-          text: pageNumText,
+          text: reverseArabicTextForPdfMake(pageNumText),
           alignment: 'center' as const,
           style: { font: 'Amiri', fontSize: 8 },
           margin: [0, 10, 0, 0]
@@ -317,6 +310,7 @@ const AdminPage = () => {
       toast({ title: "خطأ في إنشاء PDF", description: "حدث خطأ أثناء محاولة إنشاء ملف PDF.", variant: "destructive" });
     }
   };
+
 
   const handleExportAllExcel = async () => {
     if (allSubmissionsForAdmin.length === 0) {
@@ -365,7 +359,7 @@ const AdminPage = () => {
       
       allDataPrepared.forEach(subPrepared => {
           let userName = subPrepared.submitterUsername || 'مستخدم_غير_معروف';
-          const userKey = userName.replace(/[<>:"/\\|?* ]/g, '_'); // Sanitize username for sheet/file name
+          const userKey = userName.replace(/[<>:"/\\|?* ]/g, '_'); 
 
           if (!submissionsByUser[userKey]) {
               submissionsByUser[userKey] = [];
@@ -376,8 +370,7 @@ const AdminPage = () => {
       for (const userNameKey in submissionsByUser) {
         const userSubmissionsData = submissionsByUser[userNameKey];
         if (userSubmissionsData.length > 0) {
-            // Use a sanitized version of the username for the filename and sheet name
-            const safeUserNameKey = userNameKey.substring(0, 30); // Excel sheet name limit
+            const safeUserNameKey = userNameKey.substring(0, 30); 
             exportToExcel(userSubmissionsData, `أضاحي_المستخدم_${safeUserNameKey}`, safeUserNameKey, commonExportColumns);
         }
       }
@@ -402,7 +395,6 @@ const AdminPage = () => {
     try {
       const dataToExport = await prepareDataForExport(allSubmissionsForAdmin);
       generatePdfMakeDocument("تقرير جميع الأضاحي", dataToExport, commonExportColumns, "جميع_الأضاحي");
-      // toast({ title: "تم تصدير جميع الأضاحي (PDF) بنجاح" }); // Toast is in generatePdfMakeDocument or on error
     } catch (error) {
       console.error("Error exporting all to PDF:", error);
       toast({ title: "خطأ في التصدير (PDF)", description: "حدث خطأ أثناء محاولة تصدير جميع الأضاحي.", variant: "destructive" });
@@ -447,7 +439,7 @@ const AdminPage = () => {
 
       allDataPrepared.forEach(subPrepared => {
           let userName = subPrepared.submitterUsername || 'مستخدم_غير_معروف';
-          const userKey = userName.replace(/[<>:"/\\|?* ]/g, '_'); // Sanitize
+          const userKey = userName.replace(/[<>:"/\\|?* ]/g, '_'); 
 
           if (!submissionsByUser[userKey]) {
               submissionsByUser[userKey] = [];
@@ -458,7 +450,7 @@ const AdminPage = () => {
       for (const userNameKey in submissionsByUser) {
         const userSubmissionsData = submissionsByUser[userNameKey];
         if (userSubmissionsData.length > 0) {
-            const safeUserNameKey = userNameKey.substring(0, 30); // Sanitize for filename
+            const safeUserNameKey = userNameKey.substring(0, 30); 
             generatePdfMakeDocument(`تقرير أضاحي المستخدم: ${userNameKey}`, userSubmissionsData, commonExportColumns, `أضاحي_${safeUserNameKey}`);
         }
       }
@@ -553,37 +545,44 @@ const AdminPage = () => {
 
       <div className="space-y-4">
         <h2 className="text-lg sm:text-xl font-semibold">خيارات التصدير وجدول الإدخالات</h2>
-        <div className="flex flex-wrap items-center justify-start gap-2 p-3 border rounded-md bg-card shadow-sm">
-          <Button onClick={handleRefresh} variant="outline" disabled={exportingType !== null || authLoading || isRefreshing}>
-            {isRefreshing ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <RefreshCw className="ml-2 h-4 w-4" />}
-            تحديث البيانات
-          </Button>
+        
+        <div className="p-3 border rounded-md bg-card shadow-sm space-y-2">
+          <div className="flex flex-wrap items-center justify-start gap-2">
+            <Button onClick={handleRefresh} variant="outline" disabled={exportingType !== null || authLoading || isRefreshing}>
+              {isRefreshing ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <RefreshCw className="ml-2 h-4 w-4" />}
+              تحديث البيانات
+            </Button>
+          </div>
 
-          <Button onClick={handleExportAllExcel} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700">
-            {exportingType === 'allExcel' ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <FileDown className="ml-2 h-4 w-4" />}
-            تصدير الكل (Excel)
-          </Button>
-          <Button onClick={handleExportGazaExcel} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.filter(s => s.distributionPreference === 'gaza').length === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700">
-            {exportingType === 'gazaExcel' ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <FileDown className="ml-2 h-4 w-4" />}
-            أضاحي غزة (Excel)
-          </Button>
-          <Button onClick={handleExportByUserExcel} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700">
-            {exportingType === 'userExcel' ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Users className="ml-2 h-4 w-4" />}
-            حسب المستخدم (Excel)
-          </Button>
+          <div className="flex flex-wrap items-center justify-start gap-2">
+            <Button onClick={handleExportAllPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0 || !isAmiriFontConfigured} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700">
+              {exportingType === 'allPdf' ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <FileText className="ml-2 h-4 w-4" />}
+              الكل (PDF)
+            </Button>
+            <Button onClick={handleExportGazaPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.filter(s => s.distributionPreference === 'gaza').length === 0 || !isAmiriFontConfigured} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700">
+              {exportingType === 'gazaPdf' ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <FileText className="ml-2 h-4 w-4" />}
+              أضاحي غزة (PDF)
+            </Button>
+            <Button onClick={handleExportByUserPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0 || !isAmiriFontConfigured} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700">
+              {exportingType === 'userPdf' ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <FileText className="ml-2 h-4 w-4" />}
+              حسب المستخدم (PDF)
+            </Button>
+          </div>
 
-          <Button onClick={handleExportAllPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0 || !isAmiriFontConfigured} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700">
-            {exportingType === 'allPdf' ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <FileText className="ml-2 h-4 w-4" />}
-            تصدير الكل (PDF)
-          </Button>
-          <Button onClick={handleExportGazaPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.filter(s => s.distributionPreference === 'gaza').length === 0 || !isAmiriFontConfigured} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700">
-            {exportingType === 'gazaPdf' ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <FileText className="ml-2 h-4 w-4" />}
-            أضاحي غزة (PDF)
-          </Button>
-          <Button onClick={handleExportByUserPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0 || !isAmiriFontConfigured} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700">
-            {exportingType === 'userPdf' ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <FileText className="ml-2 h-4 w-4" />}
-            حسب المستخدم (PDF)
-          </Button>
+          <div className="flex flex-wrap items-center justify-start gap-2">
+            <Button onClick={handleExportAllExcel} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700">
+              {exportingType === 'allExcel' ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <FileDown className="ml-2 h-4 w-4" />}
+              الكل (Excel)
+            </Button>
+            <Button onClick={handleExportGazaExcel} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.filter(s => s.distributionPreference === 'gaza').length === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700">
+              {exportingType === 'gazaExcel' ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <FileDown className="ml-2 h-4 w-4" />}
+              أضاحي غزة (Excel)
+            </Button>
+            <Button onClick={handleExportByUserExcel} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700">
+              {exportingType === 'userExcel' ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Users className="ml-2 h-4 w-4" />}
+              حسب المستخدم (Excel)
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -593,5 +592,6 @@ const AdminPage = () => {
 }
 
 export default AdminPage;
+    
 
     
