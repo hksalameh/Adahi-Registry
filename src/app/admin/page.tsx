@@ -17,21 +17,24 @@ import { ar } from "date-fns/locale";
 
 // Import pdfMake and vfs_fonts
 import pdfMake from 'pdfmake/build/pdfmake';
-// تأكد من أن هذا المسار صحيح وأن الملف vfs_fonts.js موجود فيه
-// هذا الملف يجب أن يحتوي على بيانات خط Amiri (وغيره من الخطوط التي تريدها)
-import '@/lib/vfs_fonts.js';
+//  تأكد من أن هذا المسار صحيح وأن الملف vfs_fonts.js موجود فيه
+//  هذا الملف يجب أن يحتوي على بيانات خط Amiri (وغيره من الخطوط التي تريدها)
+import '@/lib/vfs_fonts.js'; //  <<----  تم تغيير هذا السطر
 
-// يفترض أن pdfMake.vfs قد تم تهيئته الآن بواسطة الاستيراد أعلاه لملف الخطوط المخصص.
+//  يفترض أن pdfMake.vfs قد تم تهيئته الآن بواسطة الاستيراد أعلاه لملف الخطوط المخصص.
 
 // Configure Amiri font for pdfMake
+// IMPORTANT: For Amiri (or any custom font) to work correctly,
+// you need to ensure that vfs_fonts.js (or a custom one) contains the font data.
+// The code below defines the font for pdfMake, but it needs the actual font data in vfs.
 if (pdfMake.fonts) {
     pdfMake.fonts = {
-      ...pdfMake.fonts,
-      Amiri: {
-        normal: 'Amiri-Regular.ttf',
-        bold: 'Amiri-Bold.ttf',
-        italics: 'Amiri-Regular.ttf',
-        bolditalics: 'Amiri-Bold.ttf'
+      ...pdfMake.fonts, // Keep existing fonts like Roboto
+      Amiri: { // Define Amiri font
+        normal: 'Amiri-Regular.ttf', // Assumes Amiri-Regular.ttf is in vfs_fonts.js
+        bold: 'Amiri-Bold.ttf',     // Assumes Amiri-Bold.ttf is in vfs_fonts.js
+        italics: 'Amiri-Regular.ttf',// Using regular for italics if no specific italic variant
+        bolditalics: 'Amiri-Bold.ttf' // Using bold for bolditalics if no specific variant
       }
     };
 } else {
@@ -45,12 +48,7 @@ if (pdfMake.fonts) {
     };
 }
 
-const PDF_MARGIN = 40;
-
-const reverseArabicTextForPdfMake = (text: string | undefined | null): string => {
-  if (!text) return '';
-  return text.split(' ').reverse().join('  ');
-};
+const PDF_MARGIN = 40; // Define margin at a higher scope
 
 const AdminPage = () => {
   const { allSubmissionsForAdmin, loading: authLoading, refreshData, user, fetchUserById } = useAuth();
@@ -65,13 +63,13 @@ const AdminPage = () => {
     if (!isAmiriFontConfigured && (exportingType?.includes('Pdf'))) {
       toast({
         title: "تنبيه بخصوص خط PDF",
-        description: "لم يتم تكوين خط Amiri بشكل كامل لـ pdfMake. قد لا تظهر النصوص العربية بشكل صحيح في ملفات PDF.",
+        description: "لم يتم تكوين خط Amiri بشكل كامل لـ pdfMake. قد لا تظهر النصوص العربية بشكل صحيح في ملفات PDF. تأكد من أن ملف vfs_fonts.js يحتوي على بيانات خط Amiri.",
         variant: "destructive",
         duration: 10000,
       });
     }
   }, [isAmiriFontConfigured, toast, exportingType]);
-
+  
   const getDistributionLabel = useCallback((value?: DistributionPreference | string) => {
     if (!value) return "غير محدد";
     return distributionOptions.find(opt => opt.value === value)?.label || String(value);
@@ -105,6 +103,10 @@ const AdminPage = () => {
     { header: "ماذا يريد", dataKey: "sacrificeWishes" },
     { header: "تم الدفع", dataKey: "paymentConfirmedText" },
     { header: "توزع لـ", dataKey: "distributionPreferenceText" },
+    { header: "رقم الدفتر", dataKey: "receiptBookNumber"},
+    { header: "رقم السند", dataKey: "voucherNumber"},
+    { header: "عن طريق وسيط", dataKey: "throughIntermediaryText"},
+    { header: "اسم الوسيط", dataKey: "intermediaryName"},
   ];
 
   const prepareDataForExport = useCallback(async (submissions: AdahiSubmission[]): Promise<any[]> => {
@@ -161,8 +163,9 @@ const AdminPage = () => {
 
     if (wb.Sheets[sheetName]) {
         const sheet = wb.Sheets[sheetName];
-        const headerRowIndex = 0;
+        const headerRowIndex = 0; // Assuming headers are in the first row (index 0)
 
+        // Style headers
         columns.forEach((_col, C_idx) => {
             const header_cell_ref = XLSX.utils.encode_cell({ r: headerRowIndex, c: C_idx });
             if (sheet[header_cell_ref]) {
@@ -177,12 +180,15 @@ const AdminPage = () => {
                     font: { bold: true }
                 };
             }
-
-            for (let R_idx = 0; R_idx < worksheetData.length; R_idx++) {
-                const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx });
-                 if (sheet[cell_ref] && (sheet[cell_ref].v !== undefined && sheet[cell_ref].v !== null && String(sheet[cell_ref].v).trim() !== "")) {
+        });
+        
+        // Style data cells and apply borders
+        worksheetData.forEach((_row, R_idx) => {
+            columns.forEach((_col, C_idx) => {
+                const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx }); // R_idx + 1 because data starts after header
+                if (sheet[cell_ref] && (sheet[cell_ref].v !== undefined && sheet[cell_ref].v !== null && String(sheet[cell_ref].v).trim() !== "")) {
                      sheet[cell_ref].s = {
-                        ...(sheet[cell_ref].s || {}),
+                        ...(sheet[cell_ref].s || {}), // Preserve existing styles if any
                          border: {
                             top: { style: "thin", color: { auto: 1 } },
                             bottom: { style: "thin", color: { auto: 1 } },
@@ -191,7 +197,7 @@ const AdminPage = () => {
                         },
                         alignment: { ...(sheet[cell_ref].s?.alignment || {}), horizontal: "right", vertical: "center", wrapText: true }
                     };
-                } else if (sheet[cell_ref]) { 
+                } else if (sheet[cell_ref]) { // Apply border even to empty cells within the data range
                      sheet[cell_ref].s = {
                         ...(sheet[cell_ref].s || {}),
                          border: {
@@ -203,18 +209,31 @@ const AdminPage = () => {
                         alignment: { ...(sheet[cell_ref].s?.alignment || {}), horizontal: "right", vertical: "center", wrapText: true }
                     };
                 }
-            }
+            });
         });
         
+        // Set column widths
         const colWidths = columns.map(column => ({ wch: Math.max(15, String(column.header).length + 5) }));
         sheet['!cols'] = colWidths;
+        // Set sheet to RTL
         sheet['!props'] = { rtl: true };
+        // Add autofilter to the entire data range
         sheet['!autofilter'] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(sheet['!ref']!)) };
     }
     XLSX.writeFile(wb, `${fileName}.xlsx`);
   };
 
- const generatePdfMakeDocument = (title: string, data: any[], columnsToUse: Array<{header: string, dataKey: string}>, fileName: string) => {
+  const reverseArabicTextForPdfMake = (text: string | undefined | null): string => {
+    if (!text) return '';
+    // Check if the text is purely numeric or a mix that shouldn't be reversed (like phone numbers)
+    if (/^[\d\s/-]+$/.test(text) || text === "-") {
+        return text;
+    }
+    // Simple word reversal. Might need more sophisticated bidi algorithm for complex mixed text.
+    return text.split(' ').reverse().join('  ');
+  };
+
+  const generatePdfMakeDocument = (title: string, data: any[], columnsToUse: Array<{header: string, dataKey: string}>, fileName: string) => {
     if (!isAmiriFontConfigured) {
       toast({
         title: "خطأ في إعداد الخط لـ PDF",
@@ -225,20 +244,22 @@ const AdminPage = () => {
       return;
     }
 
-    const pdfColumns = [...columnsToUse].reverse();
+    const pdfColumns = [...columnsToUse].reverse(); // Reverse column order for RTL layout
+
     const tableHeaders = pdfColumns.map(col => ({
-        text: reverseArabicTextForPdfMake(col.header), // Reverse header text
+        text: reverseArabicTextForPdfMake(col.header),
         style: 'tableHeader',
-        alignment: 'right' as const
+        alignment: 'right' as const,
+        font: 'Amiri'
     }));
 
     const tableBody = data.map(item =>
       pdfColumns.map(col => {
         const cellValue = item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : '';
         return ({
-            text: reverseArabicTextForPdfMake(cellValue), // Reverse cell text
+            text: reverseArabicTextForPdfMake(cellValue),
             alignment: 'right' as const,
-            font: 'Amiri' // Ensure Amiri is used for cell content
+            font: 'Amiri'
         });
       })
     );
@@ -248,7 +269,7 @@ const AdminPage = () => {
     const docDefinition: any = {
       pageSize: 'A4',
       pageOrientation: 'landscape',
-      pageMargins: [PDF_MARGIN, PDF_MARGIN + 20, PDF_MARGIN, PDF_MARGIN + 20],
+      pageMargins: [PDF_MARGIN, PDF_MARGIN + 20, PDF_MARGIN, PDF_MARGIN + 20], // top, right, bottom, left
       content: [
         { text: reverseArabicTextForPdfMake(title), style: 'header', alignment: 'right' as const, margin: [0, 0, 0, 10] },
         { text: reverseArabicTextForPdfMake(exportDateText), style: 'subheader', alignment: 'right' as const, margin: [0, 0, 0, 20] },
@@ -272,11 +293,12 @@ const AdminPage = () => {
       defaultStyle: {
         font: 'Amiri',
         fontSize: 10,
-        alignment: 'right' as const
+        alignment: 'right' as const // Default alignment to right for RTL
       },
       styles: {
         header: {
           fontSize: 18,
+          bold: false, // Set to false, will use Amiri-Regular or what's defined in fonts for normal
           alignment: 'right' as const,
           font: 'Amiri'
         },
@@ -286,7 +308,8 @@ const AdminPage = () => {
           font: 'Amiri'
         },
         tableHeader: {
-          fontSize: 8,
+          fontSize: 8, // Adjusted size
+          bold: false, // Set to false
           color: 'black',
           alignment: 'right' as const,
           font: 'Amiri' // Ensure Amiri is used for headers
@@ -359,7 +382,8 @@ const AdminPage = () => {
       
       allDataPrepared.forEach(subPrepared => {
           let userName = subPrepared.submitterUsername || 'مستخدم_غير_معروف';
-          const userKey = userName.replace(/[<>:"/\\|?* ]/g, '_'); 
+          // Sanitize username for use as a sheet name (Excel has restrictions)
+          const userKey = userName.replace(/[<>:"/\\|?* ]/g, '_').substring(0, 31); 
 
           if (!submissionsByUser[userKey]) {
               submissionsByUser[userKey] = [];
@@ -370,8 +394,7 @@ const AdminPage = () => {
       for (const userNameKey in submissionsByUser) {
         const userSubmissionsData = submissionsByUser[userNameKey];
         if (userSubmissionsData.length > 0) {
-            const safeUserNameKey = userNameKey.substring(0, 30); 
-            exportToExcel(userSubmissionsData, `أضاحي_المستخدم_${safeUserNameKey}`, safeUserNameKey, commonExportColumns);
+            exportToExcel(userSubmissionsData, `أضاحي_المستخدم_${userNameKey}`, userNameKey, commonExportColumns);
         }
       }
       toast({ title: "تم تصدير الأضاحي حسب المستخدم (ملفات Excel منفصلة) بنجاح" });
@@ -491,7 +514,7 @@ const AdminPage = () => {
       <header className="space-y-2 pb-6 border-b">
         <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2">
           <Settings2 className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
-          تسجيل الأضاحي
+          إدارة الأضاحي
         </h1>
         <p className="text-md sm:text-lg text-muted-foreground">
           عرض وتعديل وحذف جميع الأضاحي المسجلة في النظام.
@@ -547,14 +570,14 @@ const AdminPage = () => {
         <h2 className="text-lg sm:text-xl font-semibold">خيارات التصدير وجدول الإدخالات</h2>
         
         <div className="p-3 border rounded-md bg-card shadow-sm space-y-2">
-          <div className="flex flex-wrap items-center justify-start gap-2">
+          <div className="flex flex-wrap items-center justify-center gap-2">
             <Button onClick={handleRefresh} variant="outline" disabled={exportingType !== null || authLoading || isRefreshing}>
               {isRefreshing ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <RefreshCw className="ml-2 h-4 w-4" />}
               تحديث البيانات
             </Button>
           </div>
 
-          <div className="flex flex-wrap items-center justify-start gap-2">
+          <div className="flex flex-wrap items-center justify-center gap-2">
             <Button onClick={handleExportAllPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0 || !isAmiriFontConfigured} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700">
               {exportingType === 'allPdf' ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <FileText className="ml-2 h-4 w-4" />}
               الكل (PDF)
@@ -569,7 +592,7 @@ const AdminPage = () => {
             </Button>
           </div>
 
-          <div className="flex flex-wrap items-center justify-start gap-2">
+          <div className="flex flex-wrap items-center justify-center gap-2">
             <Button onClick={handleExportAllExcel} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700">
               {exportingType === 'allExcel' ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <FileDown className="ml-2 h-4 w-4" />}
               الكل (Excel)
