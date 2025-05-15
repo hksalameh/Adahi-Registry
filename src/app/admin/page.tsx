@@ -3,7 +3,7 @@
 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { FileDown, Settings2, TableIcon, BarChart3, HandHelping, Coins, RefreshCw, Loader2, Users, FileText } from "lucide-react";
+import { FileDown, Settings2, TableIcon, BarChart3, HandHelping, Coins, RefreshCw, Loader2, Users, FileText, Sheet } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useCallback } from "react";
 import type { AdahiSubmission, DistributionPreference } from "@/lib/types";
@@ -15,11 +15,12 @@ import { saveAs } from 'file-saver';
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
 
-// Import pdfMake and vfs_fonts
+// Import pdfMake
 import pdfMake from 'pdfmake/build/pdfmake';
-//  تأكد من أن هذا المسار صحيح وأن الملف custom_vfs_fonts.js موجود فيه
+//  استيراد ملف الخطوط المخصص الذي يفترض أن المستخدم قد أنشأه ووضعه في src/lib/
+//  تأكد من أن هذا المسار صحيح وأن الملف vfs_fonts.js موجود فيه
 //  هذا الملف يجب أن يحتوي على بيانات خط Amiri (وغيره من الخطوط التي تريدها)
-import '@/lib/custom_vfs_fonts.js'; //  <<<<----  تم تغيير هذا السطر
+import '@/lib/vfs_fonts.js'; //  <<<<---- تم التأكيد على هذا السطر ليطابق الاسم الذي ذكره المستخدم
 
 //  يفترض أن pdfMake.vfs قد تم تهيئته الآن بواسطة الاستيراد أعلاه لملف الخطوط المخصص.
 
@@ -61,7 +62,7 @@ const AdminPage = () => {
 
   const PDF_MARGIN = 40;
 
-  // Check if Amiri font is configured in pdfMake.fonts AND vfs is populated with SOMETHING
+  // Check if Amiri font is configured in pdfMake.fonts AND vfs is populated
   const isAmiriFontConfigured = !!(pdfMake.fonts && pdfMake.fonts.Amiri && pdfMake.fonts.Amiri.normal && pdfMake.vfs && Object.keys(pdfMake.vfs).length > 0);
 
   useEffect(() => {
@@ -89,7 +90,7 @@ const AdminPage = () => {
         setPageLoading(false);
       }
     }
-  }, [authLoading, user]); // Removed handleRefresh from dependencies to avoid re-running on every render
+  }, [authLoading, user]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -135,7 +136,7 @@ const AdminPage = () => {
       distributionPreferenceText: getDistributionLabel(sub.distributionPreference),
       submissionDateFormatted: sub.submissionDate ? format(new Date(sub.submissionDate), "dd/MM/yyyy HH:mm", { locale: ar }) : 'N/A',
       statusText: sub.status === "entered" ? "مدخلة" : "غير مدخلة",
-      userId: sub.userId, // Keep original fields for filtering if needed
+      userId: sub.userId,
       distributionPreference: sub.distributionPreference,
     }));
   }, [getDistributionLabel]);
@@ -150,7 +151,7 @@ const AdminPage = () => {
     });
 
     const ws = XLSX.utils.json_to_sheet(worksheetData, {
-      header: columns.map(col => col.header) // Use original headers for sheet creation
+      header: columns.map(col => col.header)
     });
 
     const wb = XLSX.utils.book_new();
@@ -158,15 +159,13 @@ const AdminPage = () => {
 
     if (wb.Sheets[sheetName]) {
         const sheet = wb.Sheets[sheetName];
-        // Ensure header cells are created if they don't exist, and apply styles
-        const headerRowIndex = 0; // Typically the first row
+        const headerRowIndex = 0;
 
         columns.forEach((col, C_idx) => {
             const cell_ref = XLSX.utils.encode_cell({ r: headerRowIndex, c: C_idx });
-            if (!sheet[cell_ref]) sheet[cell_ref] = { t: 's', v: col.header }; // Create cell if not exists
-            else sheet[cell_ref].v = col.header; // Ensure header text is correct
+            if (!sheet[cell_ref]) sheet[cell_ref] = { t: 's', v: col.header };
+            else sheet[cell_ref].v = col.header;
 
-            // Style for header
             sheet[cell_ref].s = {
                 border: {
                     top: { style: "thin", color: { auto: 1 } },
@@ -179,13 +178,12 @@ const AdminPage = () => {
             };
         });
 
-        // Apply border and alignment to data cells
         worksheetData.forEach((_rowData, R_idx) => {
             columns.forEach((_col, C_idx) => {
-                const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx }); // Data rows start from R_idx + 1
+                const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx });
                 if (sheet[cell_ref] && sheet[cell_ref].v !== undefined && sheet[cell_ref].v !== null && sheet[cell_ref].v !== "") {
                     sheet[cell_ref].s = {
-                        ...(sheet[cell_ref].s || {}), // Preserve existing styles if any
+                        ...(sheet[cell_ref].s || {}),
                         border: {
                             top: { style: "thin", color: { auto: 1 } },
                             bottom: { style: "thin", color: { auto: 1 } },
@@ -194,7 +192,7 @@ const AdminPage = () => {
                         },
                         alignment: { ...(sheet[cell_ref].s?.alignment || {}), horizontal: "right", vertical: "center", wrapText: true }
                     };
-                } else if (sheet[cell_ref]) { // Cell exists but might be empty, still apply alignment
+                } else if (sheet[cell_ref]) {
                      sheet[cell_ref].s = {
                         ...(sheet[cell_ref].s || {}),
                         alignment: { ...(sheet[cell_ref].s?.alignment || {}), horizontal: "right", vertical: "center", wrapText: true }
@@ -205,13 +203,12 @@ const AdminPage = () => {
 
         const colWidths = columns.map(column => ({ wch: Math.max(15, String(column.header).length + 5) }));
         sheet['!cols'] = colWidths;
-        sheet['!props'] = { rtl: true }; // Enable RTL for the sheet
-        sheet['!autofilter'] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(sheet['!ref']!)) }; // Add autofilter
+        sheet['!props'] = { rtl: true };
+        sheet['!autofilter'] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(sheet['!ref']!)) };
     }
     XLSX.writeFile(wb, `${fileName}.xlsx`);
   };
 
-  // Function to generate PDF using pdfMake
   const generatePdfMakeDocument = (title: string, data: any[], columns: Array<{header: string, dataKey: string}>, fileName: string) => {
     if (!isAmiriFontConfigured) {
       toast({
@@ -231,48 +228,63 @@ const AdminPage = () => {
     const docDefinition: any = {
       pageSize: 'A4',
       pageOrientation: 'landscape',
-      pageMargins: [PDF_MARGIN, PDF_MARGIN, PDF_MARGIN, PDF_MARGIN + 20], // left, top, right, bottom (extra bottom for footer)
+      pageMargins: [PDF_MARGIN, PDF_MARGIN, PDF_MARGIN, PDF_MARGIN + 20], // left, top, right, bottom
       content: [
-        { text: title, style: 'header', alignment: 'center' as const, margin: [0, 0, 0, 10] },
-        { text: `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`, style: 'subheader', alignment: 'center' as const, margin: [0, 0, 0, 20] },
+        { text: title, style: 'header', alignment: 'right' as const, margin: [0, 0, 0, 10] },
+        { text: `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`, style: 'subheader', alignment: 'right' as const, margin: [0, 0, 0, 20] },
         {
           table: {
             headerRows: 1,
-            widths: columns.map(() => '*' as const), // Distribute column widths equally
+            widths: columns.map(() => '*' as const),
             body: [tableHeaders, ...tableBody],
-            layout: 'lightHorizontalLines' // A common, clean layout
           },
+          layout: {
+            fillColor: function (rowIndex: number, node: any, columnIndex: number) {
+              return (rowIndex === 0) ? '#CCCCCC' : null;
+            },
+            hLineWidth: function (i: number, node: any) {
+              return (i === 0 || i === node.table.body.length) ? 2 : 1;
+            },
+            vLineWidth: function (i: number, node: any) {
+              return (i === 0 || i === node.table.widths.length) ? 2 : 1;
+            },
+            hLineColor: function (i: number, node: any) {
+              return (i === 0 || i === node.table.body.length) ? 'black' : 'gray';
+            },
+            vLineColor: function (i: number, node: any) {
+              return (i === 0 || i === node.table.widths.length) ? 'black' : 'gray';
+            }
+          }
         }
       ],
       defaultStyle: {
-        font: 'Amiri', // Use Amiri as the default font
+        font: isAmiriFontConfigured ? 'Amiri' : 'Roboto', // Fallback to Roboto if Amiri is not configured
         fontSize: 10,
-        alignment: 'right' as const // Set default alignment to right for Arabic
+        alignment: 'right' as const
       },
       styles: {
         header: {
           fontSize: 18,
           bold: true,
-          alignment: 'center' as const
+          alignment: 'right' as const
         },
         subheader: {
           fontSize: 12,
-          alignment: 'center' as const
+          alignment: 'right' as const
         },
         tableHeader: {
           bold: true,
-          fontSize: 11, // Adjusted for better readability
+          fontSize: 8, 
           color: 'black',
-          fillColor: '#eeeeee',
-          alignment: 'right' as const // Ensure header text is also right-aligned
+          alignment: 'right' as const 
         }
       },
       footer: function(currentPage: number, pageCount: number) {
         return {
           text: `صفحة ${currentPage.toString()} من ${pageCount.toString()}`,
           alignment: 'center' as const,
-          style: 'footer',
-          margin: [0, 10, 0, 0] // margin for footer: [left, top, right, bottom]
+          style: 'footer', // Ensure you have a footer style if you customize it
+          margin: [0, 10, 0, 0]
         };
       }
     };
@@ -329,25 +341,32 @@ const AdminPage = () => {
     setExportingType('userExcel');
     try {
       const submissionsByUser: { [key: string]: AdahiSubmission[] } = {};
-      // Group submissions by userId
-      allSubmissionsForAdmin.forEach(sub => {
-        const userId = sub.userId || 'unknown_user'; // Handle cases where userId might be missing
-        if (!submissionsByUser[userId]) {
-          submissionsByUser[userId] = [];
-        }
-        submissionsByUser[userId].push(sub);
-      });
+      for (const sub of allSubmissionsForAdmin) {
+          let userId = sub.userId || 'unknown_user';
+          let userName = sub.submitterUsername || sub.userEmail || 'مستخدم_غير_معروف';
 
-      // Iterate over each user and export their submissions
-      for (const userId in submissionsByUser) {
-        const userProfile = await fetchUserById(userId);
-        const userName = userProfile?.username || userId; // Fallback to userId if username is not found
-        const userSubmissions = submissionsByUser[userId];
+          if (!sub.submitterUsername && sub.userId) {
+              const userProfile = await fetchUserById(sub.userId);
+              if (userProfile && userProfile.username) {
+                  userName = userProfile.username;
+              }
+          }
+          
+          const userKey = userName.replace(/[<>:"/\\|?* ]/g, '_'); // Make username safe for file names
+
+          if (!submissionsByUser[userKey]) {
+              submissionsByUser[userKey] = [];
+          }
+          submissionsByUser[userKey].push(sub);
+      }
+
+
+      for (const userNameKey in submissionsByUser) {
+        const userSubmissions = submissionsByUser[userNameKey];
         if (userSubmissions.length > 0) {
             const dataToExport = prepareDataForExport(userSubmissions);
-            // Sanitize username for filename
-            const safeUserName = userName.replace(/[<>:"/\\|?* ]/g, '_');
-            exportToExcel(dataToExport, `أضاحي_المستخدم_${safeUserName}`, userName, commonExportColumns);
+            // Use userNameKey directly as it's already made safe
+            exportToExcel(dataToExport, `أضاحي_المستخدم_${userNameKey}`, userNameKey, commonExportColumns);
         }
       }
       toast({ title: "تم تصدير الأضاحي حسب المستخدم (ملفات Excel منفصلة) بنجاح" });
@@ -413,22 +432,33 @@ const AdminPage = () => {
     setExportingType('userPdf');
     try {
       const submissionsByUser: { [key: string]: AdahiSubmission[] } = {};
-      allSubmissionsForAdmin.forEach(sub => {
-        const userId = sub.userId || 'unknown_user';
-        if (!submissionsByUser[userId]) {
-          submissionsByUser[userId] = [];
-        }
-        submissionsByUser[userId].push(sub);
-      });
+      
+      for (const sub of allSubmissionsForAdmin) {
+          let userId = sub.userId || 'unknown_user';
+          let userName = sub.submitterUsername || sub.userEmail || 'مستخدم_غير_معروف';
 
-      for (const userId in submissionsByUser) {
-        const userProfile = await fetchUserById(userId);
-        const userName = userProfile?.username || userId;
-        const userSubmissionsRaw = submissionsByUser[userId];
+          if (!sub.submitterUsername && sub.userId) {
+              const userProfile = await fetchUserById(sub.userId);
+              if (userProfile && userProfile.username) {
+                  userName = userProfile.username;
+              }
+          }
+          
+          const userKey = userName.replace(/[<>:"/\\|?* ]/g, '_'); // Make username safe for file names
+
+          if (!submissionsByUser[userKey]) {
+              submissionsByUser[userKey] = [];
+          }
+          submissionsByUser[userKey].push(sub);
+      }
+
+
+      for (const userNameKey in submissionsByUser) {
+        const userSubmissionsRaw = submissionsByUser[userNameKey];
         if (userSubmissionsRaw.length > 0) {
             const dataToExport = prepareDataForExport(userSubmissionsRaw);
-            const safeUserName = userName.replace(/[<>:"/\\|?* ]/g, '_');
-            generatePdfMakeDocument(`تقرير أضاحي المستخدم: ${userName}`, dataToExport, commonExportColumns, `أضاحي_${safeUserName}`);
+            // Use userNameKey directly as it's already made safe
+            generatePdfMakeDocument(`تقرير أضاحي المستخدم: ${userNameKey}`, dataToExport, commonExportColumns, `أضاحي_${userNameKey}`);
         }
       }
       toast({ title: "تم تصدير الأضاحي حسب المستخدم (ملفات PDF منفصلة) بنجاح" });
@@ -565,7 +595,5 @@ const AdminPage = () => {
 }
 
 export default AdminPage;
-
-    
 
     
