@@ -17,21 +17,26 @@ import { ar } from "date-fns/locale";
 
 // Import pdfMake and vfs_fonts
 import pdfMake from 'pdfmake/build/pdfmake';
-// Ensure this path is correct and the vfs_fonts.js file exists and is properly generated
-// This file should contain data for Amiri font (and any other fonts you want)
-import '@/lib/vfs_fonts.js'; //  <<<<---- This line was verified/changed based on user feedback
+// تأكد من أن هذا المسار صحيح وأن الملف vfs_fonts.js موجود فيه
+// هذا الملف يجب أن يحتوي على بيانات خط Amiri (وغيره من الخطوط التي تريدها)
+import '@/lib/vfs_fonts.js'; //  <<<<---- تأكد من أن هذا الملف موجود في src/lib/
 
-// pdfMake.vfs should now be initialized by the import above.
+// يفترض أن pdfMake.vfs قد تم تهيئته الآن بواسطة الاستيراد أعلاه لملف الخطوط المخصص.
 
 // Configure Amiri font for pdfMake
+// IMPORTANT: For Amiri (or any custom font) to work correctly,
+// you MUST have the font data (e.g., Amiri-Regular.ttf, Amiri-Bold.ttf)
+// properly compiled into the vfs_fonts.js file you are importing.
+// The names 'Amiri-Regular.ttf', 'Amiri-Bold.ttf' etc. in this config
+// MUST MATCH the font file names *within* your VFS.
 if (pdfMake.fonts) {
     pdfMake.fonts = {
       ...pdfMake.fonts, // Preserve any default fonts
       Amiri: {
-        normal: 'Amiri-Regular.ttf', // This filename must match the font file name *within* your VFS
+        normal: 'Amiri-Regular.ttf', 
         bold: 'Amiri-Bold.ttf',
-        italics: 'Amiri-Italic.ttf',
-        bolditalics: 'Amiri-BoldItalic.ttf'
+        italics: 'Amiri-Italic.ttf', //  يفضل أن يكون لديك ملف Amiri-Italic.ttf في VFS
+        bolditalics: 'Amiri-BoldItalic.ttf' // يفضل أن يكون لديك ملف Amiri-BoldItalic.ttf في VFS
       }
     };
 } else {
@@ -54,7 +59,6 @@ const AdminPage = () => {
   const [pageLoading, setPageLoading] = useState(true);
   const [exportingType, setExportingType] = useState<string | null>(null);
 
-
   // Check if Amiri font is configured in pdfMake.fonts AND vfs is populated
   const isAmiriFontConfigured = !!(pdfMake.fonts && pdfMake.fonts.Amiri && pdfMake.fonts.Amiri.normal && pdfMake.vfs && Object.keys(pdfMake.vfs).length > 0);
 
@@ -68,7 +72,6 @@ const AdminPage = () => {
       });
     }
   }, [isAmiriFontConfigured, toast]);
-
 
   const getDistributionLabel = useCallback((value?: DistributionPreference | string) => {
     if (!value) return "غير محدد";
@@ -91,7 +94,6 @@ const AdminPage = () => {
       }
     }
   }, [authLoading, user, handleRefresh]);
-
 
   const commonExportColumns = [
     { header: "م", dataKey: "serial" },
@@ -118,7 +120,6 @@ const AdminPage = () => {
       sacrificeWishes: sub.wantsFromSacrifice ? (sub.sacrificeWishes || "-") : "-",
       paymentConfirmedText: sub.paymentConfirmed ? "نعم" : "لا",
       distributionPreferenceText: getDistributionLabel(sub.distributionPreference),
-      // Additional fields for potential future use or if needed by other export types
       receiptBookNumber: sub.paymentConfirmed ? (sub.receiptBookNumber || "-") : "-",
       voucherNumber: sub.paymentConfirmed ? (sub.voucherNumber || "-") : "-",
       throughIntermediaryText: sub.throughIntermediary ? "نعم" : "لا",
@@ -140,7 +141,7 @@ const AdminPage = () => {
     });
 
     const ws = XLSX.utils.json_to_sheet(worksheetData, {
-      header: columns.map(col => col.header) // Use the headers from the columns definition
+      header: columns.map(col => col.header)
     });
 
     const wb = XLSX.utils.book_new();
@@ -148,12 +149,11 @@ const AdminPage = () => {
 
     if (wb.Sheets[sheetName]) {
         const sheet = wb.Sheets[sheetName];
-        const headerRowIndex = 0; // Headers are in the first row (index 0)
+        const headerRowIndex = 0;
 
-        // Apply styles to header row
         columns.forEach((_col, C_idx) => {
             const cell_ref = XLSX.utils.encode_cell({ r: headerRowIndex, c: C_idx });
-            if (sheet[cell_ref]) { // Ensure cell exists
+            if (sheet[cell_ref]) {
                 sheet[cell_ref].s = {
                     border: {
                         top: { style: "thin", color: { auto: 1 } },
@@ -167,13 +167,12 @@ const AdminPage = () => {
             }
         });
         
-        // Apply styles to data rows
         worksheetData.forEach((_rowData, R_idx) => {
             columns.forEach((_col, C_idx) => {
-                const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx }); // Data starts from row 1
+                const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx });
                 if (sheet[cell_ref] && sheet[cell_ref].v !== undefined && sheet[cell_ref].v !== null && sheet[cell_ref].v !== "") {
-                    sheet[cell_ref].s = { // Apply border and alignment to data cells with content
-                        ...(sheet[cell_ref].s || {}), // Preserve existing styles if any
+                    sheet[cell_ref].s = {
+                        ...(sheet[cell_ref].s || {}),
                         border: {
                             top: { style: "thin", color: { auto: 1 } },
                             bottom: { style: "thin", color: { auto: 1 } },
@@ -182,10 +181,10 @@ const AdminPage = () => {
                         },
                         alignment: { ...(sheet[cell_ref].s?.alignment || {}), horizontal: "right", vertical: "center", wrapText: true }
                     };
-                } else if (sheet[cell_ref]) { // For empty cells, just ensure alignment if needed, and potentially borders
+                } else if (sheet[cell_ref]) {
                      sheet[cell_ref].s = {
                         ...(sheet[cell_ref].s || {}),
-                         border: { // Apply border even to empty cells within the table range
+                         border: {
                             top: { style: "thin", color: { auto: 1 } },
                             bottom: { style: "thin", color: { auto: 1 } },
                             left: { style: "thin", color: { auto: 1 } },
@@ -197,13 +196,9 @@ const AdminPage = () => {
             });
         });
 
-        // Set column widths
-        const colWidths = columns.map(column => ({ wch: Math.max(15, String(column.header).length + 5) })); // Minimum width 15, or header length + 5
+        const colWidths = columns.map(column => ({ wch: Math.max(15, String(column.header).length + 5) }));
         sheet['!cols'] = colWidths;
-
-        // Set sheet to Right-to-Left
         sheet['!props'] = { rtl: true };
-        // Add auto-filter
         sheet['!autofilter'] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(sheet['!ref']!)) };
     }
     XLSX.writeFile(wb, `${fileName}.xlsx`);
@@ -219,8 +214,8 @@ const AdminPage = () => {
       });
       return;
     }
-    // pdfMake expects columns in the visual order (left-to-right for RTL)
-    // So we reverse the commonExportColumns for PDF generation if we want to maintain the same visual order as Excel's RTL
+    
+    // For PDF, we reverse the columns to achieve RTL layout visually.
     const pdfColumns = [...columns].reverse(); 
     
     const tableHeaders = pdfColumns.map(col => ({ text: col.header, style: 'tableHeader', alignment: 'right' as const }));
@@ -255,14 +250,14 @@ const AdminPage = () => {
         }
       ],
       defaultStyle: {
-        font: 'Amiri', // Use Amiri
+        font: 'Amiri', 
         fontSize: 10,
         alignment: 'right' as const
       },
       styles: {
         header: {
           fontSize: 18,
-          bold: true,
+          bold: false, //  تمت إزالة الخط العريض من هنا
           alignment: 'right' as const
         },
         subheader: {
@@ -270,7 +265,7 @@ const AdminPage = () => {
           alignment: 'right' as const
         },
         tableHeader: {
-          bold: true,
+          bold: false, // تمت إزالة الخط العريض من هنا
           fontSize: 8, 
           color: 'black',
           alignment: 'right' as const 
@@ -281,7 +276,7 @@ const AdminPage = () => {
         return {
           text: pageNumText,
           alignment: 'center' as const,
-          style: { font: 'Amiri', fontSize: 8 },
+          style: { font: 'Amiri', fontSize: 8 }, // التأكد من استخدام الخط هنا أيضاً
           margin: [0, 10, 0, 0]
         };
       }
@@ -460,7 +455,6 @@ const AdminPage = () => {
     setExportingType(null);
   };
 
-
   if (authLoading || pageLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
@@ -550,7 +544,6 @@ const AdminPage = () => {
             تحديث البيانات
           </Button>
 
-          {/* Excel Exports */}
           <Button onClick={handleExportAllExcel} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700">
             {exportingType === 'allExcel' ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <FileDown className="ml-2 h-4 w-4" />}
             تصدير الكل (Excel)
@@ -564,7 +557,6 @@ const AdminPage = () => {
             حسب المستخدم (Excel)
           </Button>
 
-          {/* PDF Exports */}
           <Button onClick={handleExportAllPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0 || !isAmiriFontConfigured} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700">
             {exportingType === 'allPdf' ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <FileText className="ml-2 h-4 w-4" />}
             تصدير الكل (PDF)
