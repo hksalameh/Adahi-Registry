@@ -26,12 +26,6 @@ declare module 'jspdf' {
   }
 }
 
-// Helper function to reverse Arabic text for PDF (basic implementation) - قد لا نحتاج إليها إذا كان setR2L كافيًا
-// const reverseArabicTextForPdf = (text: string): string => {
-//   if (!text || typeof text !== 'string') return '';
-//   return text.split('').reverse().join('');
-// };
-
 const AdminPage = () => {
   const { allSubmissionsForAdmin, loading: authLoading, refreshData, user, fetchUserById } = useAuth();
   const { toast } = useToast();
@@ -40,6 +34,8 @@ const AdminPage = () => {
   const [exportingType, setExportingType] = useState<string | null>(null);
   const [amiriFontBase64, setAmiriFontBase64] = useState<string | null>(null);
   const [fontLoadedSuccessfully, setFontLoadedSuccessfully] = useState<boolean>(false);
+
+  const PDF_MARGIN = 40; // Define margin at component scope
 
   const getDistributionLabel = useCallback((value?: DistributionPreference | string) => {
     if (!value) return "غير محدد";
@@ -216,41 +212,38 @@ const AdminPage = () => {
       format: 'a4'
     });
 
-    pdfDoc.setLanguage('ar'); // Set language for potential metadata
-    pdfDoc.setR2L(true); // Enable Right-to-Left text direction globally for the document
+    pdfDoc.setLanguage('ar');
+    pdfDoc.setR2L(true);
 
     if (fontLoadedSuccessfully && amiriFontBase64) {
       try {
         pdfDoc.addFileToVFS('Amiri-Regular.ttf', amiriFontBase64);
         pdfDoc.addFont('Amiri-Regular.ttf', 'Amiri', 'normal');
-        pdfDoc.setFont('Amiri'); // Set Amiri as the default font
+        pdfDoc.setFont('Amiri');
       } catch (e) {
         console.error("Error adding Amiri font to PDF (VFS or font registration):", e);
         toast({ title: "خطأ في خط PDF", description: "لم يتم تطبيق الخط العربي بشكل كامل للعناوين.", variant: "destructive"});
-        pdfDoc.setFont('Helvetica'); // Fallback
+        pdfDoc.setFont('Helvetica');
       }
     } else {
-        pdfDoc.setFont('Helvetica'); // Fallback font
+        pdfDoc.setFont('Helvetica');
     }
     
     const pageWidth = pdfDoc.internal.pageSize.getWidth();
     const pageHeight = pdfDoc.internal.pageSize.getHeight();
-    const margin = 40;
+    // PDF_MARGIN is now accessible from component scope
 
     pdfDoc.setFontSize(18);
-    // For titles, rely on setR2L(true) and the font's capabilities
-    // No need for reverseArabicTextForPdf if the font and setR2L handle it.
-    pdfDoc.text(title, pageWidth - margin, margin, { align: 'right' });
+    pdfDoc.text(title, pageWidth / 2, PDF_MARGIN, { align: 'center' });
 
     pdfDoc.setFontSize(10);
     const exportDateText = `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`;
-    pdfDoc.text(exportDateText, pageWidth - margin, margin + 20, { align: 'right' });
+    pdfDoc.text(exportDateText, pageWidth / 2, PDF_MARGIN + 25, { align: 'center' });
     
     return pdfDoc;
   };
 
   const addTableToPdf = (pdfDoc: jsPDF, data: any[], columns: Array<{header: string, dataKey: string}>, startY: number) => {
-    // For headers, rely on font and autotable's rendering. No reverseArabicTextForPdf.
     const tableHeaders = columns.map(col => col.header);
     const tableBody = data.map(item => columns.map(col => {
       let cellValue = item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : '';
@@ -263,18 +256,18 @@ const AdminPage = () => {
       body: tableBody,
       theme: 'grid',
       styles: {
-        font: fontLoadedSuccessfully ? 'Amiri' : 'Helvetica', // Ensure font is applied to table
-        halign: 'right', // Align cell content to the right
+        font: fontLoadedSuccessfully ? 'Amiri' : 'Helvetica',
+        halign: 'right', 
         cellPadding: 5,
         fontSize: 8,
         overflow: 'linebreak'
       },
       headStyles: {
-        font: fontLoadedSuccessfully ? 'Amiri' : 'Helvetica', // Ensure font is applied to headers
+        font: fontLoadedSuccessfully ? 'Amiri' : 'Helvetica',
         fontStyle: 'bold',
         fillColor: [220, 220, 220], 
         textColor: [0, 0, 0],
-        halign: 'center', // Center align header text
+        halign: 'center', 
       },
       didDrawPage: (data) => {
         const pageCount = pdfDoc.internal.pages.length -1; 
@@ -285,8 +278,7 @@ const AdminPage = () => {
         }
         pdfDoc.setFontSize(8);
         const pageNumText = `صفحة ${data.pageNumber} من ${pageCount}`;
-        // For page number, rely on setR2L(true) and font
-        pdfDoc.text(pageNumText, pdfDoc.internal.pageSize.getWidth() - margin, pdfDoc.internal.pageSize.getHeight() - 20, { align: 'right' });
+        pdfDoc.text(pageNumText, pdfDoc.internal.pageSize.getWidth() - PDF_MARGIN, pdfDoc.internal.pageSize.getHeight() - 20, { align: 'right' });
       }
     });
   };
@@ -364,11 +356,21 @@ const AdminPage = () => {
       toast({ title: "لا توجد بيانات للتصدير" });
       return;
     }
+     if (!fontLoadedSuccessfully && !amiriFontBase64) {
+        toast({
+            title: "خطأ في الخط",
+            description: "لم يتم تحميل الخط العربي اللازم لإنشاء ملفات PDF. يرجى المحاولة مرة أخرى أو التأكد من اتصال جيد بالإنترنت.",
+            variant: "destructive",
+            duration: 7000
+        });
+        setExportingType(null);
+        return;
+    }
     setExportingType('allPdf');
     try {
       const dataToExport = prepareDataForExport(allSubmissionsForAdmin);
       const pdfDoc = generatePdfDoc("تقرير جميع الأضاحي");
-      addTableToPdf(pdfDoc, dataToExport, commonExportColumns, 80); // Adjusted startY for titles
+      addTableToPdf(pdfDoc, dataToExport, commonExportColumns, PDF_MARGIN + 60);
       pdfDoc.save("جميع_الأضاحي.pdf");
       toast({ title: "تم تصدير جميع الأضاحي (PDF) بنجاح" });
     } catch (error) {
@@ -384,11 +386,21 @@ const AdminPage = () => {
       toast({ title: "لا توجد أضاحي لغزة للتصدير" });
       return;
     }
+     if (!fontLoadedSuccessfully && !amiriFontBase64) {
+        toast({
+            title: "خطأ في الخط",
+            description: "لم يتم تحميل الخط العربي اللازم لإنشاء ملفات PDF. يرجى المحاولة مرة أخرى أو التأكد من اتصال جيد بالإنترنت.",
+            variant: "destructive",
+            duration: 7000
+        });
+        setExportingType(null);
+        return;
+    }
     setExportingType('gazaPdf');
     try {
       const dataToExport = prepareDataForExport(gazaSubmissionsRaw);
       const pdfDoc = generatePdfDoc("تقرير أضاحي غزة");
-      addTableToPdf(pdfDoc, dataToExport, commonExportColumns, 80); // Adjusted startY
+      addTableToPdf(pdfDoc, dataToExport, commonExportColumns, PDF_MARGIN + 60);
       pdfDoc.save("أضاحي_غزة.pdf");
       toast({ title: "تم تصدير أضاحي غزة (PDF) بنجاح" });
     } catch (error) {
@@ -431,7 +443,7 @@ const AdminPage = () => {
         if (userSubmissionsRaw.length > 0) {
             const dataToExport = prepareDataForExport(userSubmissionsRaw);
             const pdfDoc = generatePdfDoc(`تقرير أضاحي المستخدم: ${userName}`);
-            addTableToPdf(pdfDoc, dataToExport, commonExportColumns, 80); // Adjusted startY
+            addTableToPdf(pdfDoc, dataToExport, commonExportColumns, PDF_MARGIN + 60);
             pdfDoc.save(`أضاحي_${userName.replace(/\s+/g, '_')}.pdf`);
         }
       }
