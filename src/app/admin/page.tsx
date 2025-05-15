@@ -132,8 +132,8 @@ const AdminPage = () => {
       distributionPreferenceText: getDistributionLabel(sub.distributionPreference),
       submissionDateFormatted: sub.submissionDate ? format(new Date(sub.submissionDate), "dd/MM/yyyy HH:mm", { locale: ar }) : 'N/A',
       statusText: sub.status === "entered" ? "مدخلة" : "غير مدخلة",
-      userId: sub.userId, // Keep for filtering by user
-      distributionPreference: sub.distributionPreference, // Keep for filtering by gaza
+      userId: sub.userId, 
+      distributionPreference: sub.distributionPreference, 
     }));
   }, [getDistributionLabel]);
 
@@ -147,24 +147,22 @@ const AdminPage = () => {
     });
 
     const ws = XLSX.utils.json_to_sheet(worksheetData, {
-      header: columns.map(col => col.header) // Use defined headers for order
+      header: columns.map(col => col.header) 
     });
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
 
-    // Apply styles
     if (wb.Sheets[sheetName]) {
         const sheet = wb.Sheets[sheetName];
-        const headerRowIndex = 0; // Headers are in the first row (index 0)
+        const headerRowIndex = 0; 
 
-        // Style headers
         columns.forEach((col, C_idx) => {
             const cell_ref = XLSX.utils.encode_cell({ r: headerRowIndex, c: C_idx });
-            if (!sheet[cell_ref]) sheet[cell_ref] = { t: 's', v: col.header }; // Ensure header cell exists
-            else sheet[cell_ref].v = col.header; // Ensure correct header text
+            if (!sheet[cell_ref]) sheet[cell_ref] = { t: 's', v: col.header }; 
+            else sheet[cell_ref].v = col.header; 
 
-            sheet[cell_ref].s = { // Style object
+            sheet[cell_ref].s = { 
                 border: {
                     top: { style: "thin", color: { auto: 1 } },
                     bottom: { style: "thin", color: { auto: 1 } },
@@ -176,12 +174,11 @@ const AdminPage = () => {
             };
         });
         
-        // Style data cells
-        worksheetData.forEach((_rowData, R_idx) => { // R_idx is 0-based for data rows
+        worksheetData.forEach((_rowData, R_idx) => { 
             columns.forEach((_col, C_idx) => {
-                const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx }); // Data starts at row 1
+                const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx }); 
                 if (sheet[cell_ref] && sheet[cell_ref].v !== undefined && sheet[cell_ref].v !== null && sheet[cell_ref].v !== "") {
-                    sheet[cell_ref].s = { // Ensure style object exists or create it
+                    sheet[cell_ref].s = { 
                         ...(sheet[cell_ref].s || {}), 
                         border: {
                             top: { style: "thin", color: { auto: 1 } },
@@ -191,7 +188,7 @@ const AdminPage = () => {
                         },
                         alignment: { ...(sheet[cell_ref].s?.alignment || {}), horizontal: "right", vertical: "center", wrapText: true }
                     };
-                } else if (sheet[cell_ref]) { // Cell exists but might be empty, still align
+                } else if (sheet[cell_ref]) { 
                      sheet[cell_ref].s = { 
                         ...(sheet[cell_ref].s || {}), 
                         alignment: { ...(sheet[cell_ref].s?.alignment || {}), horizontal: "right", vertical: "center", wrapText: true }
@@ -200,29 +197,21 @@ const AdminPage = () => {
             });
         });
 
-        // Set column widths (example: auto-fit based on header or a fixed width)
-        const colWidths = columns.map(column => ({ wch: Math.max(15, String(column.header).length + 5) })); // Min width 15, or header length + 5
+        const colWidths = columns.map(column => ({ wch: Math.max(15, String(column.header).length + 5) })); 
         sheet['!cols'] = colWidths;
-
-        // Set RTL direction for the sheet
         sheet['!props'] = { rtl: true };
-        // Add autofilter
         sheet['!autofilter'] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(sheet['!ref']!)) };
     }
-
     XLSX.writeFile(wb, `${fileName}.xlsx`);
   };
 
 
   const generatePdfDoc = (title: string) => {
     const pdfDoc = new jsPDF({
-      orientation: 'l', // Landscape
+      orientation: 'l', 
       unit: 'pt',
       format: 'a4'
     });
-
-    pdfDoc.setLanguage('ar');
-    pdfDoc.setR2L(true);
 
     if (fontLoadedSuccessfully && amiriFontBase64) {
       try {
@@ -233,24 +222,26 @@ const AdminPage = () => {
       } catch (e) {
         console.error("Error adding Amiri font to PDF (VFS or font registration):", e);
         toast({ title: "خطأ في خط PDF", description: "لم يتم تطبيق الخط العربي بشكل كامل للعناوين.", variant: "destructive"});
-        pdfDoc.setFont('Helvetica'); // Fallback font
+        pdfDoc.setFont('Helvetica'); 
       }
     } else {
-        pdfDoc.setFont('Helvetica'); // Fallback font if Amiri not loaded
+        pdfDoc.setFont('Helvetica'); 
         console.warn("Amiri font not loaded, using Helvetica for PDF (generatePdfDoc).")
     }
+    
+    pdfDoc.setLanguage('ar');
+    pdfDoc.setR2L(true);
 
     const pageWidth = pdfDoc.internal.pageSize.getWidth();
     
-    // Set font for title and date
     if (fontLoadedSuccessfully) pdfDoc.setFont('Amiri'); else pdfDoc.setFont('Helvetica');
     pdfDoc.setFontSize(18);
-    pdfDoc.text(title, pageWidth / 2, PDF_MARGIN, { align: 'center' }); // Align title to the right
+    pdfDoc.text(title, pageWidth - PDF_MARGIN, PDF_MARGIN, { align: 'right' }); 
     
     if (fontLoadedSuccessfully) pdfDoc.setFont('Amiri'); else pdfDoc.setFont('Helvetica');
     pdfDoc.setFontSize(10);
     const exportDateText = `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`;
-    pdfDoc.text(exportDateText, pageWidth / 2, PDF_MARGIN + 25, { align: 'center' }); // Align date to the right
+    pdfDoc.text(exportDateText, pageWidth - PDF_MARGIN, PDF_MARGIN + 25, { align: 'right' }); 
 
     return pdfDoc;
   };
@@ -259,11 +250,9 @@ const AdminPage = () => {
     const tableHeaders = columns.map(col => col.header);
     const tableBody = data.map(item => columns.map(col => {
       let cellValue = item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : '';
-      // Do not reverse cell data, rely on font and R2L for table cells
       return cellValue;
     }));
 
-    // Ensure font is set before autoTable if it's not handled by styles (though it should be)
     if (fontLoadedSuccessfully) {
         pdfDoc.setFont('Amiri');
     } else {
@@ -286,12 +275,11 @@ const AdminPage = () => {
         font: fontLoadedSuccessfully ? 'Amiri' : 'Helvetica',
         fillColor: [220, 220, 220],
         textColor: [0, 0, 0],
-        halign: 'right', // Align table headers to the right
+        halign: 'right', 
         fontSize: 8, 
       },
       didDrawPage: (data) => {
-        const pageCount = pdfDoc.internal.pages.length -1; // or doc.getNumberOfPages()
-        // Set font for page number
+        const pageCount = pdfDoc.internal.pages.length -1; 
         if (fontLoadedSuccessfully) {
           pdfDoc.setFont('Amiri');
         } else {
@@ -299,7 +287,6 @@ const AdminPage = () => {
         }
         pdfDoc.setFontSize(8);
         const pageNumText = `صفحة ${data.pageNumber} من ${pageCount}`;
-        // For page number, rely on setR2L(true) and font
         pdfDoc.text(pageNumText, pdfDoc.internal.pageSize.getWidth() - PDF_MARGIN, pdfDoc.internal.pageSize.getHeight() - 20, { align: 'right' });
       }
     });
@@ -604,5 +591,3 @@ const AdminPage = () => {
 }
 
 export default AdminPage;
-
-    
