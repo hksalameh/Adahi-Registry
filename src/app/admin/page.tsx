@@ -45,6 +45,7 @@ if (pdfMake.fonts) {
     };
 }
 
+const PDF_MARGIN = 40;
 
 const AdminPage = () => {
   const { allSubmissionsForAdmin, loading: authLoading, refreshData, user, fetchUserById } = useAuth();
@@ -53,7 +54,6 @@ const AdminPage = () => {
   const [pageLoading, setPageLoading] = useState(true);
   const [exportingType, setExportingType] = useState<string | null>(null);
 
-  const PDF_MARGIN = 40;
 
   // Check if Amiri font is configured in pdfMake.fonts AND vfs is populated
   const isAmiriFontConfigured = !!(pdfMake.fonts && pdfMake.fonts.Amiri && pdfMake.fonts.Amiri.normal && pdfMake.vfs && Object.keys(pdfMake.vfs).length > 0);
@@ -93,12 +93,12 @@ const AdminPage = () => {
   }, [authLoading, user, handleRefresh]);
 
 
-  // Define the columns for export based on user request
   const commonExportColumns = [
     { header: "م", dataKey: "serial" },
     { header: "اسم المتبرع", dataKey: "donorName" },
     { header: "الاضحية باسم", dataKey: "sacrificeFor" },
     { header: "رقم التلفون", dataKey: "phoneNumber" },
+    { header: "اسم المستخدم", dataKey: "submitterUsername"},
     { header: "يريد الحضور", dataKey: "wantsToAttendText" },
     { header: "يريد من الأضحية", dataKey: "wantsFromSacrificeText" },
     { header: "ماذا يريد", dataKey: "sacrificeWishes" },
@@ -112,13 +112,13 @@ const AdminPage = () => {
       donorName: sub.donorName,
       sacrificeFor: sub.sacrificeFor,
       phoneNumber: sub.phoneNumber,
+      submitterUsername: sub.submitterUsername || sub.userEmail || "غير معروف",
       wantsToAttendText: sub.wantsToAttend ? "نعم" : "لا",
       wantsFromSacrificeText: sub.wantsFromSacrifice ? "نعم" : "لا",
       sacrificeWishes: sub.wantsFromSacrifice ? (sub.sacrificeWishes || "-") : "-",
       paymentConfirmedText: sub.paymentConfirmed ? "نعم" : "لا",
       distributionPreferenceText: getDistributionLabel(sub.distributionPreference),
       // Additional fields for potential future use or if needed by other export types
-      submitterUsername: sub.submitterUsername || sub.userEmail || "غير معروف",
       receiptBookNumber: sub.paymentConfirmed ? (sub.receiptBookNumber || "-") : "-",
       voucherNumber: sub.paymentConfirmed ? (sub.voucherNumber || "-") : "-",
       throughIntermediaryText: sub.throughIntermediary ? "نعم" : "لا",
@@ -219,10 +219,13 @@ const AdminPage = () => {
       });
       return;
     }
-
-    const tableHeaders = columns.map(col => ({ text: col.header, style: 'tableHeader', alignment: 'right' as const }));
+    // pdfMake expects columns in the visual order (left-to-right for RTL)
+    // So we reverse the commonExportColumns for PDF generation if we want to maintain the same visual order as Excel's RTL
+    const pdfColumns = [...columns].reverse(); 
+    
+    const tableHeaders = pdfColumns.map(col => ({ text: col.header, style: 'tableHeader', alignment: 'right' as const }));
     const tableBody = data.map(item =>
-      columns.map(col => ({ text: (item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : ''), alignment: 'right' as const }))
+        pdfColumns.map(col => ({ text: (item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : ''), alignment: 'right' as const }))
     );
     
     const exportDateText = `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`;
@@ -230,14 +233,14 @@ const AdminPage = () => {
     const docDefinition: any = {
       pageSize: 'A4',
       pageOrientation: 'landscape',
-      pageMargins: [PDF_MARGIN, PDF_MARGIN + 20, PDF_MARGIN, PDF_MARGIN + 20], // Increased top margin for title
+      pageMargins: [PDF_MARGIN, PDF_MARGIN + 20, PDF_MARGIN, PDF_MARGIN + 20], 
       content: [
         { text: title, style: 'header', alignment: 'right' as const, margin: [0, 0, 0, 10] },
         { text: exportDateText, style: 'subheader', alignment: 'right' as const, margin: [0, 0, 0, 20] },
         {
           table: {
             headerRows: 1,
-            widths: columns.map(() => '*' as const), 
+            widths: pdfColumns.map(() => '*' as const), 
             body: [tableHeaders, ...tableBody],
           },
           layout: {
@@ -252,7 +255,7 @@ const AdminPage = () => {
         }
       ],
       defaultStyle: {
-        font: isAmiriFontConfigured ? 'Amiri' : 'Roboto', // Use Amiri if configured
+        font: 'Amiri', // Use Amiri
         fontSize: 10,
         alignment: 'right' as const
       },
@@ -278,7 +281,7 @@ const AdminPage = () => {
         return {
           text: pageNumText,
           alignment: 'center' as const,
-          style: { font: isAmiriFontConfigured ? 'Amiri' : 'Roboto', fontSize: 8 },
+          style: { font: 'Amiri', fontSize: 8 },
           margin: [0, 10, 0, 0]
         };
       }
