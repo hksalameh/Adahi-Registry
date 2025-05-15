@@ -19,10 +19,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ar" dir="rtl">
-      <body className={`${inter.variable} font-sans antialiased`}>
+      <body className={`${inter.variable} font-sans antialiased flex flex-col min-h-screen`}>
         <AuthProvider>
-          {children}
+          <div className="flex-grow">
+            {children}
+          </div>
           <Toaster />
+          <footer className="py-4 text-center text-sm text-muted-foreground border-t">
+            حقوق الطبع © Haitham Salameh 2025
+          </footer>
         </AuthProvider>
       </body>
     </html>
