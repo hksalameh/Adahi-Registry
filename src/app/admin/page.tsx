@@ -17,10 +17,10 @@ import { ar } from "date-fns/locale";
 
 // Import pdfMake and vfs_fonts
 import pdfMake from 'pdfmake/build/pdfmake';
-import pdfFonts from 'pdfmake/build/vfs_fonts'; // This is the default VFS, may not include Amiri
+import 'pdfmake/build/vfs_fonts'; // Import for its side-effect of populating pdfMake.vfs
 
-// Initialize pdfMake's virtual file system
-pdfMake.vfs = pdfFonts.pdfMake.vfs;
+// pdfMake.vfs should now be populated by the import above.
+// No explicit assignment like pdfMake.vfs = pdfFonts.pdfMake.vfs; needed or correct.
 
 // Configure Amiri font for pdfMake
 // IMPORTANT: For Amiri (or any custom font) to work correctly,
@@ -28,15 +28,29 @@ pdfMake.vfs = pdfFonts.pdfMake.vfs;
 // pdfMake.vfs (virtual file system). This usually means creating a custom
 // vfs_fonts.js file that includes the Base64 encoded font data and importing that.
 // The configuration below tells pdfMake *about* the font, but it still needs the data.
-pdfMake.fonts = {
-  ...pdfMake.fonts, // Preserve any default fonts
-  Amiri: {
-    normal: 'Amiri-Regular.ttf', // This filename must match the font file name *within* your VFS
-    // bold: 'Amiri-Bold.ttf',    // Uncomment and provide if you have bold variant in VFS
-    // italics: 'Amiri-Italic.ttf', // Uncomment and provide if you have italic variant in VFS
-    // bolditalics: 'Amiri-BoldItalic.ttf' // Uncomment and provide if you have bold-italic in VFS
-  }
-};
+// Ensure this configuration happens after pdfMake and its vfs are initialized.
+if (pdfMake.fonts) {
+    pdfMake.fonts = {
+      ...pdfMake.fonts, // Preserve any default fonts
+      Amiri: {
+        normal: 'Amiri-Regular.ttf', // This filename must match the font file name *within* your VFS
+        bold: 'Amiri-Bold.ttf',    // Uncomment and provide if you have bold variant in VFS
+        italics: 'Amiri-Italic.ttf', // Uncomment and provide if you have italic variant in VFS
+        bolditalics: 'Amiri-BoldItalic.ttf' // Uncomment and provide if you have bold-italic in VFS
+      }
+    };
+} else {
+    // This case might occur if pdfmake.js didn't initialize .fonts property
+    pdfMake.fonts = {
+      Amiri: {
+        normal: 'Amiri-Regular.ttf',
+        bold: 'Amiri-Bold.ttf',
+        italics: 'Amiri-Italic.ttf',
+        bolditalics: 'Amiri-BoldItalic.ttf'
+      }
+    };
+}
+
 
 const AdminPage = () => {
   const { allSubmissionsForAdmin, loading: authLoading, refreshData, user, fetchUserById } = useAuth();
@@ -45,9 +59,8 @@ const AdminPage = () => {
   const [pageLoading, setPageLoading] = useState(true);
   const [exportingType, setExportingType] = useState<string | null>(null);
 
-  // Check if Amiri font is configured in pdfMake.fonts
-  // This checks the configuration, not if the VFS data is actually present.
-  const isAmiriFontConfigured = !!(pdfMake.fonts && pdfMake.fonts.Amiri && pdfMake.fonts.Amiri.normal);
+  // Check if Amiri font is configured in pdfMake.fonts AND vfs is populated
+  const isAmiriFontConfigured = !!(pdfMake.fonts && pdfMake.fonts.Amiri && pdfMake.fonts.Amiri.normal && pdfMake.vfs && Object.keys(pdfMake.vfs).length > 0);
 
   const PDF_MARGIN = 40;
 
@@ -55,7 +68,7 @@ const AdminPage = () => {
     if (!isAmiriFontConfigured) {
       toast({
         title: "تنبيه بخصوص خط PDF",
-        description: "لم يتم تكوين خط Amiri بشكل كامل لـ pdfMake. قد لا تظهر النصوص العربية بشكل صحيح في ملفات PDF. يرجى مراجعة إعدادات الخط (vfs_fonts.js).",
+        description: "لم يتم تكوين خط Amiri بشكل كامل لـ pdfMake (قد يكون VFS غير محمل أو الخط غير مسجل). قد لا تظهر النصوص العربية بشكل صحيح في ملفات PDF. يرجى مراجعة إعدادات الخط (vfs_fonts.js).",
         variant: "destructive",
         duration: 10000,
       });
@@ -122,8 +135,8 @@ const AdminPage = () => {
       distributionPreferenceText: getDistributionLabel(sub.distributionPreference),
       submissionDateFormatted: sub.submissionDate ? format(new Date(sub.submissionDate), "dd/MM/yyyy HH:mm", { locale: ar }) : 'N/A',
       statusText: sub.status === "entered" ? "مدخلة" : "غير مدخلة",
-      userId: sub.userId, 
-      distributionPreference: sub.distributionPreference, 
+      userId: sub.userId,
+      distributionPreference: sub.distributionPreference,
     }));
   }, [getDistributionLabel]);
 
@@ -137,7 +150,7 @@ const AdminPage = () => {
     });
 
     const ws = XLSX.utils.json_to_sheet(worksheetData, {
-      header: columns.map(col => col.header) 
+      header: columns.map(col => col.header)
     });
 
     const wb = XLSX.utils.book_new();
@@ -145,14 +158,14 @@ const AdminPage = () => {
 
     if (wb.Sheets[sheetName]) {
         const sheet = wb.Sheets[sheetName];
-        const headerRowIndex = 0; 
+        const headerRowIndex = 0;
 
         columns.forEach((col, C_idx) => {
             const cell_ref = XLSX.utils.encode_cell({ r: headerRowIndex, c: C_idx });
-            if (!sheet[cell_ref]) sheet[cell_ref] = { t: 's', v: col.header }; 
-            else sheet[cell_ref].v = col.header; 
+            if (!sheet[cell_ref]) sheet[cell_ref] = { t: 's', v: col.header };
+            else sheet[cell_ref].v = col.header;
 
-            sheet[cell_ref].s = { 
+            sheet[cell_ref].s = {
                 border: {
                     top: { style: "thin", color: { auto: 1 } },
                     bottom: { style: "thin", color: { auto: 1 } },
@@ -163,13 +176,13 @@ const AdminPage = () => {
                 font: { bold: true }
             };
         });
-        
-        worksheetData.forEach((_rowData, R_idx) => { 
+
+        worksheetData.forEach((_rowData, R_idx) => {
             columns.forEach((_col, C_idx) => {
-                const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx }); 
+                const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx });
                 if (sheet[cell_ref] && sheet[cell_ref].v !== undefined && sheet[cell_ref].v !== null && sheet[cell_ref].v !== "") {
-                    sheet[cell_ref].s = { 
-                        ...(sheet[cell_ref].s || {}), 
+                    sheet[cell_ref].s = {
+                        ...(sheet[cell_ref].s || {}),
                         border: {
                             top: { style: "thin", color: { auto: 1 } },
                             bottom: { style: "thin", color: { auto: 1 } },
@@ -178,16 +191,16 @@ const AdminPage = () => {
                         },
                         alignment: { ...(sheet[cell_ref].s?.alignment || {}), horizontal: "right", vertical: "center", wrapText: true }
                     };
-                } else if (sheet[cell_ref]) { 
-                     sheet[cell_ref].s = { 
-                        ...(sheet[cell_ref].s || {}), 
+                } else if (sheet[cell_ref]) {
+                     sheet[cell_ref].s = {
+                        ...(sheet[cell_ref].s || {}),
                         alignment: { ...(sheet[cell_ref].s?.alignment || {}), horizontal: "right", vertical: "center", wrapText: true }
                     };
                 }
             });
         });
 
-        const colWidths = columns.map(column => ({ wch: Math.max(15, String(column.header).length + 5) })); 
+        const colWidths = columns.map(column => ({ wch: Math.max(15, String(column.header).length + 5) }));
         sheet['!cols'] = colWidths;
         sheet['!props'] = { rtl: true };
         sheet['!autofilter'] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(sheet['!ref']!)) };
@@ -200,69 +213,61 @@ const AdminPage = () => {
     if (!isAmiriFontConfigured) {
       toast({
         title: "خطأ في إعداد الخط لـ PDF",
-        description: "لم يتم إعداد خط Amiri بشكل صحيح. لا يمكن إنشاء PDF. يرجى التأكد من إعداد vfs_fonts.js بشكل صحيح.",
+        description: "لم يتم إعداد خط Amiri بشكل صحيح لـ pdfMake. لا يمكن إنشاء PDF. يرجى التأكد من أن vfs_fonts.js يتضمن الخط أو أن الإعدادات صحيحة.",
         variant: "destructive",
         duration: 7000,
       });
       return;
     }
 
-    const tableHeaders = columns.map(col => ({ text: col.header, style: 'tableHeader', alignment: 'right' }));
-    const tableBody = data.map(item => 
-      columns.map(col => ({ text: (item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : ''), alignment: 'right' }))
+    const tableHeaders = columns.map(col => ({ text: col.header, style: 'tableHeader', alignment: 'right' as const }));
+    const tableBody = data.map(item =>
+      columns.map(col => ({ text: (item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : ''), alignment: 'right' as const }))
     );
 
     const docDefinition: any = {
       pageSize: 'A4',
       pageOrientation: 'landscape',
       pageMargins: [PDF_MARGIN, PDF_MARGIN, PDF_MARGIN, PDF_MARGIN + 20], // left, top, right, bottom (extra bottom for footer)
-      
       content: [
-        { text: title, style: 'header', alignment: 'center', margin: [0, 0, 0, 10] },
-        { text: `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`, style: 'subheader', alignment: 'center', margin: [0, 0, 0, 20] },
+        { text: title, style: 'header', alignment: 'center' as const, margin: [0, 0, 0, 10] },
+        { text: `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`, style: 'subheader', alignment: 'center' as const, margin: [0, 0, 0, 20] },
         {
           table: {
             headerRows: 1,
-            widths: columns.map(() => '*'), // Distribute column widths equally, or define specific widths
+            widths: columns.map(() => '*' as const),
             body: [tableHeaders, ...tableBody],
+            layout: 'lightHorizontalLines' // A common, clean layout
           },
-          layout: {
-            fillColor: function (rowIndex: number, node: any, columnIndex: number) {
-              return (rowIndex === 0) ? '#CCCCCC' : null;
-            },
-            hLineWidth: function (i: number, node: any) { return (i === 0 || i === node.table.body.length) ? 2 : 1; },
-            vLineWidth: function (i: number, node: any) { return (i === 0 || i === node.table.widths.length) ? 2 : 1; },
-            hLineColor: function (i: number, node: any) { return (i === 0 || i === node.table.body.length) ? 'black' : 'gray'; },
-            vLineColor: function (i: number, node: any) { return (i === 0 || i === node.table.widths.length) ? 'black' : 'gray'; },
-          }
         }
       ],
       defaultStyle: {
-        font: 'Amiri', // Use Amiri as the default font for the document
+        font: 'Amiri',
         fontSize: 10,
+        alignment: 'right' as const // Set default alignment to right for Arabic
       },
       styles: {
         header: {
           fontSize: 18,
           bold: true,
-          alignment: 'center'
+          alignment: 'center' as const
         },
         subheader: {
           fontSize: 12,
-          alignment: 'center'
+          alignment: 'center' as const
         },
         tableHeader: {
           bold: true,
           fontSize: 11,
           color: 'black',
           fillColor: '#eeeeee',
-          alignment: 'center'
+          alignment: 'right' as const // Ensure header text is also right-aligned
         }
       },
       footer: function(currentPage: number, pageCount: number) {
         return {
           text: `صفحة ${currentPage.toString()} من ${pageCount.toString()}`,
-          alignment: 'center',
+          alignment: 'center' as const,
           style: 'footer',
           margin: [0, 10, 0, 0] // margin for footer: [left, top, right, bottom]
         };
@@ -335,7 +340,6 @@ const AdminPage = () => {
         const userSubmissions = submissionsByUser[userId];
         if (userSubmissions.length > 0) {
             const dataToExport = prepareDataForExport(userSubmissions);
-            // Create a separate Excel file for each user
             exportToExcel(dataToExport, `أضاحي_المستخدم_${userName.replace(/\s+/g, '_')}`, userName, commonExportColumns);
         }
       }
@@ -353,7 +357,7 @@ const AdminPage = () => {
       return;
     }
     if (!isAmiriFontConfigured) {
-      toast({ title: "خطأ في إعداد الخط لـ PDF", description: "لا يمكن إنشاء PDF بدون إعداد خط Amiri.", variant: "destructive" });
+      toast({ title: "خطأ في إعداد الخط لـ PDF", description: "لا يمكن إنشاء PDF بدون إعداد خط Amiri لـ pdfMake.", variant: "destructive" });
       return;
     }
     setExportingType('allPdf');
@@ -375,7 +379,7 @@ const AdminPage = () => {
       return;
     }
     if (!isAmiriFontConfigured) {
-      toast({ title: "خطأ في إعداد الخط لـ PDF", description: "لا يمكن إنشاء PDF بدون إعداد خط Amiri.", variant: "destructive" });
+      toast({ title: "خطأ في إعداد الخط لـ PDF", description: "لا يمكن إنشاء PDF بدون إعداد خط Amiri لـ pdfMake.", variant: "destructive" });
       return;
     }
     setExportingType('gazaPdf');
@@ -396,7 +400,7 @@ const AdminPage = () => {
       return;
     }
     if (!isAmiriFontConfigured) {
-      toast({ title: "خطأ في إعداد الخط لـ PDF", description: "لا يمكن إنشاء PDF بدون إعداد خط Amiri.", variant: "destructive" });
+      toast({ title: "خطأ في إعداد الخط لـ PDF", description: "لا يمكن إنشاء PDF بدون إعداد خط Amiri لـ pdfMake.", variant: "destructive" });
       return;
     }
     setExportingType('userPdf');
