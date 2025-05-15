@@ -26,13 +26,11 @@ declare module 'jspdf' {
   }
 }
 
-// Helper function to reverse Arabic text for PDF (basic implementation)
-const reverseArabicTextForPdf = (text: string): string => {
-  if (!text || typeof text !== 'string') return '';
-  // This is a basic reversal. For complex scripts or mixed LTR/RTL, a proper bidi algorithm is needed.
-  // It might not correctly handle ligatures or complex shaping.
-  return text.split('').reverse().join('');
-};
+// Helper function to reverse Arabic text for PDF (basic implementation) - قد لا نحتاج إليها إذا كان setR2L كافيًا
+// const reverseArabicTextForPdf = (text: string): string => {
+//   if (!text || typeof text !== 'string') return '';
+//   return text.split('').reverse().join('');
+// };
 
 const AdminPage = () => {
   const { allSubmissionsForAdmin, loading: authLoading, refreshData, user, fetchUserById } = useAuth();
@@ -137,8 +135,8 @@ const AdminPage = () => {
       distributionPreferenceText: getDistributionLabel(sub.distributionPreference),
       submissionDateFormatted: sub.submissionDate ? format(new Date(sub.submissionDate), "dd/MM/yyyy HH:mm", { locale: ar }) : 'N/A',
       statusText: sub.status === "entered" ? "مدخلة" : "غير مدخلة",
-      userId: sub.userId,
-      distributionPreference: sub.distributionPreference,
+      userId: sub.userId, // Kept for potential internal use during export logic
+      distributionPreference: sub.distributionPreference, // Kept for filtering
     }));
   }, [getDistributionLabel]);
 
@@ -152,7 +150,7 @@ const AdminPage = () => {
     });
 
     const ws = XLSX.utils.json_to_sheet(worksheetData, {
-      header: columns.map(col => col.header) // Ensure headers are set from columns definition
+      header: columns.map(col => col.header) 
     });
     
     const wb = XLSX.utils.book_new();
@@ -162,7 +160,6 @@ const AdminPage = () => {
         const sheet = wb.Sheets[sheetName];
         const headerRowIndex = 0;
         
-        // Style header row
         columns.forEach((col, C_idx) => {
             const cell_ref = XLSX.utils.encode_cell({ r: headerRowIndex, c: C_idx });
             if (!sheet[cell_ref]) sheet[cell_ref] = { t: 's', v: col.header };
@@ -180,11 +177,10 @@ const AdminPage = () => {
             };
         });
 
-        // Style data rows
         worksheetData.forEach((_rowData, R_idx) => { 
             columns.forEach((_col, C_idx) => {
                 const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx }); 
-                if (sheet[cell_ref] && sheet[cell_ref].v !== undefined && sheet[cell_ref].v !== null && sheet[cell_ref].v !== "") { // Style only if cell has data
+                if (sheet[cell_ref] && sheet[cell_ref].v !== undefined && sheet[cell_ref].v !== null && sheet[cell_ref].v !== "") {
                     sheet[cell_ref].s = {
                         ...(sheet[cell_ref].s || {}), 
                         border: {
@@ -195,7 +191,7 @@ const AdminPage = () => {
                         },
                         alignment: { ...(sheet[cell_ref].s?.alignment || {}), horizontal: "right", vertical: "center", wrapText: true }
                     };
-                } else if (sheet[cell_ref]) { // For empty cells that might exist, ensure alignment if needed
+                } else if (sheet[cell_ref]) {
                      sheet[cell_ref].s = {
                         ...(sheet[cell_ref].s || {}),
                         alignment: { ...(sheet[cell_ref].s?.alignment || {}), horizontal: "right", vertical: "center", wrapText: true }
@@ -220,48 +216,44 @@ const AdminPage = () => {
       format: 'a4'
     });
 
-    pdfDoc.setLanguage('ar');
-    pdfDoc.setR2L(true); 
+    pdfDoc.setLanguage('ar'); // Set language for potential metadata
+    pdfDoc.setR2L(true); // Enable Right-to-Left text direction globally for the document
 
     if (fontLoadedSuccessfully && amiriFontBase64) {
       try {
         pdfDoc.addFileToVFS('Amiri-Regular.ttf', amiriFontBase64);
         pdfDoc.addFont('Amiri-Regular.ttf', 'Amiri', 'normal');
-        pdfDoc.setFont('Amiri');
+        pdfDoc.setFont('Amiri'); // Set Amiri as the default font
       } catch (e) {
         console.error("Error adding Amiri font to PDF (VFS or font registration):", e);
         toast({ title: "خطأ في خط PDF", description: "لم يتم تطبيق الخط العربي بشكل كامل للعناوين.", variant: "destructive"});
         pdfDoc.setFont('Helvetica'); // Fallback
       }
     } else {
-        pdfDoc.setFont('Helvetica'); // Fallback
+        pdfDoc.setFont('Helvetica'); // Fallback font
     }
     
     const pageWidth = pdfDoc.internal.pageSize.getWidth();
-    
+    const pageHeight = pdfDoc.internal.pageSize.getHeight();
+    const margin = 40;
+
     pdfDoc.setFontSize(18);
-    // Apply reversal for title if Amiri is loaded (or any RTL font that might need it for jspdf.text)
-    const processedTitle = (fontLoadedSuccessfully) ? reverseArabicTextForPdf(title) : title;
-    pdfDoc.text(processedTitle, pageWidth / 2, 40, { align: 'center' });
+    // For titles, rely on setR2L(true) and the font's capabilities
+    // No need for reverseArabicTextForPdf if the font and setR2L handle it.
+    pdfDoc.text(title, pageWidth - margin, margin, { align: 'right' });
 
     pdfDoc.setFontSize(10);
     const exportDateText = `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`;
-    const processedExportDate = (fontLoadedSuccessfully) ? reverseArabicTextForPdf(exportDateText) : exportDateText;
-    pdfDoc.text(processedExportDate, pageWidth / 2, 60, { align: 'center' });
+    pdfDoc.text(exportDateText, pageWidth - margin, margin + 20, { align: 'right' });
     
     return pdfDoc;
   };
 
   const addTableToPdf = (pdfDoc: jsPDF, data: any[], columns: Array<{header: string, dataKey: string}>, startY: number) => {
-    const tableHeaders = columns.map(col => fontLoadedSuccessfully ? reverseArabicTextForPdf(col.header) : col.header);
+    // For headers, rely on font and autotable's rendering. No reverseArabicTextForPdf.
+    const tableHeaders = columns.map(col => col.header);
     const tableBody = data.map(item => columns.map(col => {
       let cellValue = item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : '';
-      // For PDF, if Amiri is loaded, reverse Arabic text in cells too if it's primarily Arabic.
-      // This is a heuristic; ideally, we'd detect Arabic text more reliably.
-      // For now, let's assume if Amiri is loaded, all text might need reversal for jspdf.text contexts.
-      // However, autotable might handle this better. Test this carefully.
-      // return fontLoadedSuccessfully && /[\u0600-\u06FF]/.test(cellValue) ? reverseArabicTextForPdf(cellValue) : cellValue;
-      // Let's assume autotable handles table cell text fine with Amiri font, so no reversal for cell data.
       return cellValue;
     }));
     
@@ -271,18 +263,18 @@ const AdminPage = () => {
       body: tableBody,
       theme: 'grid',
       styles: {
-        font: fontLoadedSuccessfully ? 'Amiri' : 'Helvetica',
-        halign: 'right',
+        font: fontLoadedSuccessfully ? 'Amiri' : 'Helvetica', // Ensure font is applied to table
+        halign: 'right', // Align cell content to the right
         cellPadding: 5,
         fontSize: 8,
         overflow: 'linebreak'
       },
       headStyles: {
-        font: fontLoadedSuccessfully ? 'Amiri' : 'Helvetica',
+        font: fontLoadedSuccessfully ? 'Amiri' : 'Helvetica', // Ensure font is applied to headers
         fontStyle: 'bold',
         fillColor: [220, 220, 220], 
         textColor: [0, 0, 0],
-        halign: 'center',
+        halign: 'center', // Center align header text
       },
       didDrawPage: (data) => {
         const pageCount = pdfDoc.internal.pages.length -1; 
@@ -293,8 +285,8 @@ const AdminPage = () => {
         }
         pdfDoc.setFontSize(8);
         const pageNumText = `صفحة ${data.pageNumber} من ${pageCount}`;
-        const processedPageNumText = fontLoadedSuccessfully ? reverseArabicTextForPdf(pageNumText) : pageNumText;
-        pdfDoc.text(processedPageNumText, pdfDoc.internal.pageSize.getWidth() / 2, pdfDoc.internal.pageSize.getHeight() - 20, { align: 'center' });
+        // For page number, rely on setR2L(true) and font
+        pdfDoc.text(pageNumText, pdfDoc.internal.pageSize.getWidth() - margin, pdfDoc.internal.pageSize.getHeight() - 20, { align: 'right' });
       }
     });
   };
@@ -376,7 +368,7 @@ const AdminPage = () => {
     try {
       const dataToExport = prepareDataForExport(allSubmissionsForAdmin);
       const pdfDoc = generatePdfDoc("تقرير جميع الأضاحي");
-      addTableToPdf(pdfDoc, dataToExport, commonExportColumns, 80);
+      addTableToPdf(pdfDoc, dataToExport, commonExportColumns, 80); // Adjusted startY for titles
       pdfDoc.save("جميع_الأضاحي.pdf");
       toast({ title: "تم تصدير جميع الأضاحي (PDF) بنجاح" });
     } catch (error) {
@@ -396,7 +388,7 @@ const AdminPage = () => {
     try {
       const dataToExport = prepareDataForExport(gazaSubmissionsRaw);
       const pdfDoc = generatePdfDoc("تقرير أضاحي غزة");
-      addTableToPdf(pdfDoc, dataToExport, commonExportColumns, 80);
+      addTableToPdf(pdfDoc, dataToExport, commonExportColumns, 80); // Adjusted startY
       pdfDoc.save("أضاحي_غزة.pdf");
       toast({ title: "تم تصدير أضاحي غزة (PDF) بنجاح" });
     } catch (error) {
@@ -439,7 +431,7 @@ const AdminPage = () => {
         if (userSubmissionsRaw.length > 0) {
             const dataToExport = prepareDataForExport(userSubmissionsRaw);
             const pdfDoc = generatePdfDoc(`تقرير أضاحي المستخدم: ${userName}`);
-            addTableToPdf(pdfDoc, dataToExport, commonExportColumns, 80);
+            addTableToPdf(pdfDoc, dataToExport, commonExportColumns, 80); // Adjusted startY
             pdfDoc.save(`أضاحي_${userName.replace(/\s+/g, '_')}.pdf`);
         }
       }
@@ -577,3 +569,4 @@ const AdminPage = () => {
 }
 
 export default AdminPage;
+
