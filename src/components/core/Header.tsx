@@ -15,22 +15,34 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-card shadow-sm">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        <Logo />
-        <div className="flex items-center gap-2 sm:gap-4">
+        {/* Left: Logo */}
+        <div className="flex-shrink-0">
+          <Logo />
+        </div>
+
+        {/* Center: Welcome Message (only if user is logged in) */}
+        <div className="flex-grow flex justify-center">
+          {user && !loading && (
+            <span className="text-lg text-muted-foreground flex items-center gap-1">
+              <UserCircle className="h-5 w-5" /> مرحبا, {user.username}
+              {user.isAdmin && <ShieldCheck className="h-5 w-5 text-primary" title="Admin" />}
+            </span>
+          )}
+        </div>
+
+        {/* Right: Auth Actions & Other Buttons */}
+        <div className="flex flex-shrink-0 items-center gap-2 sm:gap-4">
           {loading ? (
             <span className="text-sm text-muted-foreground">جاري التحميل...</span>
           ) : user ? (
             <>
-              <span className="text-lg text-muted-foreground flex items-center gap-1"> {/* Changed from text-base to text-lg */}
-                <UserCircle className="h-5 w-5" /> مرحبا, {user.username}
-                {user.isAdmin && <ShieldCheck className="h-5 w-5 text-primary" title="Admin" />}
-              </span>
-              {user.isAdmin && pathname !== "/admin" && ( // Added condition to hide if already on /admin
+              {user.isAdmin && pathname !== "/admin" && (
                  <Button variant="ghost" asChild>
                     <Link href="/admin">الإدارة</Link>
                  </Button>
               )}
-              {pathname !== "/dashboard" && (
+              {/* Conditional rendering for dashboard link was removed in previous request if user is on dashboard. Keeping it for now. */}
+              {pathname !== "/dashboard" && ( // Consider if this should always be visible or based on current page for non-admin users
                 <Button variant="ghost" asChild>
                     <Link href="/dashboard">لوحة التحكم</Link>
                 </Button>
