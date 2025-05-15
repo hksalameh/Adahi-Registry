@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useAuth } from "@/hooks/useAuth"; 
@@ -20,18 +21,18 @@ export default function Header() {
             <span className="text-sm text-muted-foreground">جاري التحميل...</span>
           ) : user ? (
             <>
-              <span className="text-sm text-muted-foreground flex items-center gap-1">
+              <span className="text-base text-muted-foreground flex items-center gap-1"> {/* Changed from text-sm to text-base */}
                 <UserCircle className="h-5 w-5" /> مرحبا, {user.username}
                 {user.isAdmin && <ShieldCheck className="h-5 w-5 text-primary" title="Admin" />}
               </span>
-              {user.isAdmin && (
+              {user.isAdmin && pathname !== "/admin" && ( // Added condition to hide if already on /admin
                  <Button variant="ghost" asChild>
                     <Link href="/admin">الإدارة</Link>
                  </Button>
               )}
               {pathname !== "/dashboard" && (
                 <Button variant="ghost" asChild>
-                    <Link href="/dashboard">لوحة التحكم</Link>
+                    <Link href="/dashboard">سجل أضحية</Link>
                 </Button>
               )}
               <Button variant="outline" size="sm" onClick={logout}>
