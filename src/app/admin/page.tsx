@@ -26,7 +26,11 @@ import {
 
 // Import pdfMake and vfs_fonts
 import pdfMake from 'pdfmake/build/pdfmake';
-import '@/lib/vfs_fonts.js'; // تأكد من أن هذا المسار صحيح وأن الملف vfs_fonts.js موجود فيه ويحتوي على Amiri
+//  تأكد من أن هذا المسار صحيح وأن الملف vfs_fonts.js موجود فيه
+//  هذا الملف يجب أن يحتوي على بيانات خط Amiri (وغيره من الخطوط التي تريدها)
+import '@/lib/vfs_fonts.js'; //  <<<<----  تم تغيير هذا السطر
+
+//  يفترض أن pdfMake.vfs قد تم تهيئته الآن بواسطة الاستيراد أعلاه لملف الخطوط المخصص.
 
 const PDF_MARGIN = 40;
 
@@ -70,7 +74,7 @@ const AdminPage = () => {
     pdfMake.fonts &&
     pdfMake.fonts.Amiri &&
     pdfMake.fonts.Amiri.normal && // Check if 'Amiri' is defined in pdfMake.fonts
-    pdfMake.vfs &&
+    pdfMake.vfs && // Check if vfs itself exists
     Object.keys(pdfMake.vfs).includes('Amiri-Regular.ttf') // Check if the font file data is in VFS
   );
 
@@ -112,10 +116,10 @@ const AdminPage = () => {
     { header: "اسم المتبرع", dataKey: "donorName" },
     { header: "الاضحية باسم", dataKey: "sacrificeFor" },
     { header: "رقم التلفون", dataKey: "phoneNumber" },
-    { header: "اسم المستخدم", dataKey: "submitterUsername"},
     { header: "يريد الحضور", dataKey: "wantsToAttendText" },
     { header: "يريد من الأضحية", dataKey: "wantsFromSacrificeText" },
     { header: "ماذا يريد", dataKey: "sacrificeWishes" },
+    { header: "اسم المستخدم", dataKey: "submitterUsername"}, // تم نقل هذا العمود هنا
     { header: "تم الدفع", dataKey: "paymentConfirmedText" },
     { header: "عن طريق وسيط", dataKey: "throughIntermediaryText"},
     { header: "اسم الوسيط", dataKey: "intermediaryName"},
@@ -143,10 +147,10 @@ const AdminPage = () => {
         wantsFromSacrificeText: sub.wantsFromSacrifice ? "نعم" : "لا",
         sacrificeWishes: sub.wantsFromSacrifice ? (sub.sacrificeWishes || "-") : "-",
         paymentConfirmedText: sub.paymentConfirmed ? "نعم" : "لا",
-        receiptBookNumber: sub.paymentConfirmed ? (sub.receiptBookNumber || "-") : "-",
-        voucherNumber: sub.paymentConfirmed ? (sub.voucherNumber || "-") : "-",
+        receiptBookNumber: sub.paymentConfirmed ? (sub.receiptBookNumber || "-") : "-", // لا يزال يُحضر لكنه غير مستخدم في commonExportColumns
+        voucherNumber: sub.paymentConfirmed ? (sub.voucherNumber || "-") : "-", // لا يزال يُحضر لكنه غير مستخدم في commonExportColumns
         throughIntermediaryText: sub.throughIntermediary ? "نعم" : "لا",
-        intermediaryName: sub.throughIntermediary ? (sub.intermediaryName || (sub.submitterUsername === sub.intermediaryName ? "المستخدم نفسه" : (sub.intermediaryName || "-") )) : "-",
+        intermediaryName: sub.throughIntermediary ? (sub.intermediaryName || "-") : "-",
         distributionPreferenceText: getDistributionLabel(sub.distributionPreference),
         submissionDateFormatted: sub.submissionDate ? format(new Date(sub.submissionDate), "dd/MM/yyyy HH:mm", { locale: ar }) : 'N/A',
         statusText: sub.status === "entered" ? "مدخلة" : "غير مدخلة",
@@ -235,17 +239,15 @@ const AdminPage = () => {
     const pdfColumns = [...columns].reverse();
 
     const tableHeaders = pdfColumns.map(col => ({
-        text: col.header, // Original Arabic text
+        text: col.header, 
         style: 'tableHeader',
         alignment: 'right' as const,
-        font: 'Amiri'
     }));
 
     const tableBody = data.map(item =>
       pdfColumns.map(col => ({
-        text: item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : '', // Original Arabic text
+        text: item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : '', 
         alignment: 'right' as const,
-        font: 'Amiri'
       }))
     );
 
@@ -256,12 +258,12 @@ const AdminPage = () => {
       pageOrientation: 'landscape',
       pageMargins: [PDF_MARGIN, PDF_MARGIN + 20, PDF_MARGIN, PDF_MARGIN + 20],
       content: [
-        { text: title, style: 'header', alignment: 'center' as const, margin: [0, 0, 0, 10], font: 'Amiri' },
-        { text: exportDateText, style: 'subheader', alignment: 'center' as const, margin: [0, 0, 0, 20], font: 'Amiri' },
+        { text: title, style: 'header', alignment: 'center' as const, margin: [0, 0, 0, 10] },
+        { text: exportDateText, style: 'subheader', alignment: 'center' as const, margin: [0, 0, 0, 20] },
         {
           table: {
             headerRows: 1,
-            widths: pdfColumns.map(() => '*' as const),
+            widths: pdfColumns.map(() => '*' as const), // Equal column widths
             body: [tableHeaders, ...tableBody],
           },
           layout: {
@@ -276,26 +278,26 @@ const AdminPage = () => {
         }
       ],
       defaultStyle: {
-        font: 'Amiri', // Set Amiri as default for the entire document
+        font: 'Amiri', 
         fontSize: 10,
-        alignment: 'right' as const // Default alignment for content
+        alignment: 'right' as const 
       },
       styles: {
         header: {
           fontSize: 18,
           alignment: 'center' as const,
-          font: 'Amiri' // Ensure Amiri is used for header
+          font: 'Amiri' 
         },
         subheader: {
           fontSize: 12,
           alignment: 'center' as const,
-          font: 'Amiri' // Ensure Amiri is used for subheader
+          font: 'Amiri' 
         },
         tableHeader: {
-          fontSize: 8,
+          fontSize: 8, // حجم خط أصغر لرؤوس الأعمدة لتوفير مساحة
           color: 'black',
           alignment: 'right' as const,
-          font: 'Amiri' // Ensure Amiri is used for table headers
+          font: 'Amiri' 
         }
       },
       footer: function(currentPage: number, pageCount: number) {
