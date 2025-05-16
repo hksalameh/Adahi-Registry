@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { AdahiSubmission } from "@/lib/types";
@@ -35,7 +34,7 @@ export default function UserSubmissionsTable({ submissions }: UserSubmissionsTab
   }
 
   return (
-    <div className="mt-8 rounded-lg border shadow-md">
+    <div className="mt-8 rounded-lg border shadow-md overflow-x-auto">
       <Table>
         <TableCaption>قائمة الأضاحي المسجلة من قبلك. مجموع الأضاحي: {submissions.length}</TableCaption>
         <TableHeader>

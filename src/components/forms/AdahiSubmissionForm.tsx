@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useForm, Controller, type SubmitHandler } from "react-hook-form";
@@ -247,22 +246,22 @@ export default function AdahiSubmissionForm({ onFormSubmit, defaultValues, isEdi
                     <FormControl>
                       <RadioGroup
                         onValueChange={field.onChange}
-                        value={field.value} // Use value for controlled component
+                        value={field.value} 
                         className="flex space-x-4 space-x-reverse"
                         ref={field.ref}
                         name={field.name}
                       >
                         <FormItem className="flex items-center space-x-2 space-x-reverse">
                           <FormControl>
-                            <RadioGroupItem value="yes" id={`${field.name}-yes`} />
+                            <RadioGroupItem value="yes" id={`${field.name}-attend-yes`} />
                           </FormControl>
-                          <Label htmlFor={`${field.name}-yes`} className="font-normal">نعم</Label>
+                          <Label htmlFor={`${field.name}-attend-yes`} className="font-normal">نعم</Label>
                         </FormItem>
                         <FormItem className="flex items-center space-x-2 space-x-reverse">
                           <FormControl>
-                             <RadioGroupItem value="no" id={`${field.name}-no`} />
+                             <RadioGroupItem value="no" id={`${field.name}-attend-no`} />
                           </FormControl>
-                          <Label htmlFor={`${field.name}-no`} className="font-normal">لا</Label>
+                          <Label htmlFor={`${field.name}-attend-no`} className="font-normal">لا</Label>
                         </FormItem>
                       </RadioGroup>
                     </FormControl>
@@ -281,22 +280,22 @@ export default function AdahiSubmissionForm({ onFormSubmit, defaultValues, isEdi
                   <FormControl>
                     <RadioGroup
                       onValueChange={field.onChange}
-                      value={field.value} // Use value for controlled component
+                      value={field.value} 
                       className="flex space-x-4 space-x-reverse"
                       ref={field.ref}
                       name={field.name}
                     >
                       <FormItem className="flex items-center space-x-2 space-x-reverse">
                         <FormControl>
-                          <RadioGroupItem value="yes" id={`${field.name}-yes`} />
+                          <RadioGroupItem value="yes" id={`${field.name}-sacrifice-yes`} />
                         </FormControl>
-                        <Label htmlFor={`${field.name}-yes`} className="font-normal">نعم</Label>
+                        <Label htmlFor={`${field.name}-sacrifice-yes`} className="font-normal">نعم</Label>
                       </FormItem>
                       <FormItem className="flex items-center space-x-2 space-x-reverse">
                         <FormControl>
-                           <RadioGroupItem value="no" id={`${field.name}-no`} />
+                           <RadioGroupItem value="no" id={`${field.name}-sacrifice-no`} />
                         </FormControl>
-                        <Label htmlFor={`${field.name}-no`} className="font-normal">لا</Label>
+                        <Label htmlFor={`${field.name}-sacrifice-no`} className="font-normal">لا</Label>
                       </FormItem>
                     </RadioGroup>
                   </FormControl>
@@ -331,22 +330,22 @@ export default function AdahiSubmissionForm({ onFormSubmit, defaultValues, isEdi
                     <FormControl>
                       <RadioGroup
                         onValueChange={field.onChange}
-                        value={field.value} // Use value for controlled component
+                        value={field.value} 
                         className="flex space-x-4 space-x-reverse"
                         ref={field.ref}
                         name={field.name}
                       >
                         <FormItem className="flex items-center space-x-2 space-x-reverse">
                            <FormControl>
-                            <RadioGroupItem value="yes" id={`${field.name}-yes`} />
+                            <RadioGroupItem value="yes" id={`${field.name}-payment-yes`} />
                            </FormControl>
-                          <Label htmlFor={`${field.name}-yes`} className="font-normal">نعم</Label>
+                          <Label htmlFor={`${field.name}-payment-yes`} className="font-normal">نعم</Label>
                         </FormItem>
                         <FormItem className="flex items-center space-x-2 space-x-reverse">
                           <FormControl>
-                            <RadioGroupItem value="no" id={`${field.name}-no`} />
+                            <RadioGroupItem value="no" id={`${field.name}-payment-no`} />
                           </FormControl>
-                          <Label htmlFor={`${field.name}-no`} className="font-normal">لا</Label>
+                          <Label htmlFor={`${field.name}-payment-no`} className="font-normal">لا</Label>
                         </FormItem>
                       </RadioGroup>
                     </FormControl>
@@ -396,22 +395,22 @@ export default function AdahiSubmissionForm({ onFormSubmit, defaultValues, isEdi
                   <FormControl>
                     <RadioGroup
                       onValueChange={field.onChange}
-                      value={field.value} // Use value for controlled component
+                      value={field.value} 
                       className="flex space-x-4 space-x-reverse"
                       ref={field.ref}
                       name={field.name}
                     >
                       <FormItem className="flex items-center space-x-2 space-x-reverse">
                         <FormControl>
-                          <RadioGroupItem value="yes" id={`${field.name}-yes`} />
+                          <RadioGroupItem value="yes" id={`${field.name}-intermediary-yes`} />
                         </FormControl>
-                        <Label htmlFor={`${field.name}-yes`} className="font-normal">نعم</Label>
+                        <Label htmlFor={`${field.name}-intermediary-yes`} className="font-normal">نعم</Label>
                       </FormItem>
                       <FormItem className="flex items-center space-x-2 space-x-reverse">
                         <FormControl>
-                          <RadioGroupItem value="no" id={`${field.name}-no`} />
+                          <RadioGroupItem value="no" id={`${field.name}-intermediary-no`} />
                         </FormControl>
-                        <Label htmlFor={`${field.name}-no`} className="font-normal">لا</Label>
+                        <Label htmlFor={`${field.name}-intermediary-no`} className="font-normal">لا</Label>
                       </FormItem>
                     </RadioGroup>
                   </FormControl>
@@ -448,7 +447,7 @@ export default function AdahiSubmissionForm({ onFormSubmit, defaultValues, isEdi
                         <SelectValue placeholder="اختر وجهة التوزيع" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent position="popper" sideOffset={0} className="max-h-[50vh] overflow-y-auto">
                       {distributionOptions.map(option => (
                         <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                       ))}
@@ -469,8 +468,3 @@ export default function AdahiSubmissionForm({ onFormSubmit, defaultValues, isEdi
     </Card>
   );
 }
-
-
-    
-
-    
