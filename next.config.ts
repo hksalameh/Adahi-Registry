@@ -19,7 +19,13 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'placehold.co', // تمت الإضافة هنا
+        hostname: 'placehold.co', 
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'www.islamicc.org', // تمت إضافة نطاق الشعار الجديد
         port: '',
         pathname: '/**',
       },
@@ -40,3 +46,4 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+

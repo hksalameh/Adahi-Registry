@@ -26,7 +26,7 @@ export default function LoginPage() {
           <div className="flex items-start justify-between mb-3">
             <div className="flex-shrink-0">
               <Image 
-                src="https://placehold.co/80x80.png" 
+                src="https://www.islamicc.org/img/logo344.png" 
                 alt="شعار جمعية المركز الاسلامي الخيرية"
                 width={80}
                 height={80}
@@ -78,3 +78,4 @@ export default function LoginPage() {
     </div>
   );
 }
+
