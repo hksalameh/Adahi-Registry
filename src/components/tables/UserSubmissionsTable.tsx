@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { AdahiSubmission } from "@/lib/types";
@@ -40,7 +41,7 @@ export default function UserSubmissionsTable({ submissions }: UserSubmissionsTab
         <TableHeader>
           <TableRow>
             <TableHead>اسم المتبرع</TableHead>
-            <TableHead>الأضحية عن</TableHead>
+            <TableHead>الأضحية باسم</TableHead>
             <TableHead>رقم التلفون</TableHead>
             <TableHead>يريد الحضور</TableHead>
             <TableHead>التاريخ</TableHead>
@@ -70,3 +71,4 @@ export default function UserSubmissionsTable({ submissions }: UserSubmissionsTab
     </div>
   );
 }
+

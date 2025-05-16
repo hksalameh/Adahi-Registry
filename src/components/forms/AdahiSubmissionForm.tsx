@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useForm, Controller, type SubmitHandler } from "react-hook-form";
@@ -170,7 +171,7 @@ export default function AdahiSubmissionForm({ onFormSubmit, defaultValues, isEdi
     return (
       <Card className="w-full shadow-lg">
         <CardHeader>
-          <CardTitle className="text-xl sm:text-2xl flex items-center gap-2 text-primary">
+          <CardTitle className="text-lg sm:text-2xl flex items-center gap-2 text-primary">
             <Loader2 className="animate-spin" /> {isEditing ? "تحميل بيانات التعديل..." : "تحميل نموذج الإضافة..."}
           </CardTitle>
         </CardHeader>
@@ -189,7 +190,7 @@ export default function AdahiSubmissionForm({ onFormSubmit, defaultValues, isEdi
   return (
     <Card className="w-full shadow-lg">
       <CardHeader>
-        <CardTitle className="text-xl sm:text-2xl flex items-center gap-2 text-primary">
+        <CardTitle className="text-lg sm:text-2xl flex items-center gap-2 text-primary">
           <ListTree /> {isEditing ? "تعديل بيانات الأضحية" : "إضافة أضحية جديدة"}
         </CardTitle>
         <CardDescription>الرجاء ملء جميع الحقول المطلوبة بعناية.</CardDescription>
@@ -447,7 +448,7 @@ export default function AdahiSubmissionForm({ onFormSubmit, defaultValues, isEdi
                         <SelectValue placeholder="اختر وجهة التوزيع" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent position="popper" sideOffset={0} className="max-h-[50vh] overflow-y-auto">
+                    <SelectContent className="max-h-[50vh] overflow-y-auto">
                       {distributionOptions.map(option => (
                         <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                       ))}
@@ -468,3 +469,4 @@ export default function AdahiSubmissionForm({ onFormSubmit, defaultValues, isEdi
     </Card>
   );
 }
+
