@@ -1,5 +1,14 @@
 
 import type { NextConfig } from 'next';
+import withPWAInit from 'next-pwa';
+
+const withPWA = withPWAInit({
+  dest: 'public',
+  register: true,
+  skipWaiting: true,
+  disable: process.env.NODE_ENV === 'development',
+  // يمكنك إضافة المزيد من إعدادات PWA هنا إذا لزم الأمر
+});
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -25,7 +34,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'www.islamicc.org', // تمت إضافة نطاق الشعار الجديد
+        hostname: 'www.islamicc.org',
         port: '',
         pathname: '/**',
       },
@@ -33,17 +42,11 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     allowedDevOrigins: [
-      // النطاق الذي ظهر في تحذير npm run dev
       "https://3000-firebase-studio-1747137389331.cluster-jbb3mjctu5cbgsi6hwq6u4btwe.cloudworkstations.dev",
-      // النطاق الذي يستخدمه Prototyper والذي أظهر خطأ 502
       "https://6000-firebase-studio-1747137389331.cluster-jbb3mjctu5cbgsi6hwq6u4btwe.cloudworkstations.dev",
-      // نطاق عام لـ Firebase Studio للمشروع (احتياطي)
       "https://firebase-studio-1747137389331.cluster-jbb3mjctu5cbgsi6hwq6u4btwe.cloudworkstations.dev",
-      // قد تحتاج أيضًا إلى السماح للوصول من localhost إذا كنت تختبر محليًا خارج IDX
-      // "http://localhost:3000" // إذا كنت تستخدم منفذًا آخر محليًا، قم بتغييره
     ],
   },
 };
 
-export default nextConfig;
-
+export default withPWA(nextConfig);
