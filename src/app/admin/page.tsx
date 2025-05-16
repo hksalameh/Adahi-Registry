@@ -26,18 +26,22 @@ import {
 
 // Import pdfMake and vfs_fonts
 import pdfMake from 'pdfmake/build/pdfmake';
-import '@/lib/vfs_fonts.js'; // Make sure this path is correct and the file exists
+import '@/lib/vfs_fonts.js'; // تأكد من أن هذا المسار صحيح وأن الملف vfs_fonts.js موجود فيه ويحتوي على Amiri
 
 const PDF_MARGIN = 40;
 
 // Configure Amiri font for pdfMake
+// IMPORTANT: For Amiri (or any custom font) to work correctly,
+// you need to have a vfs_fonts.js file that includes the font data.
+// The default vfs_fonts.js from pdfmake might not include Amiri.
+// You typically generate a custom vfs_fonts.js using a build tool.
 if (pdfMake.fonts) {
     pdfMake.fonts = {
-      ...pdfMake.fonts, 
-      Amiri: { 
-        normal: 'Amiri-Regular.ttf', 
-        bold: 'Amiri-Bold.ttf',     
-        italics: 'Amiri-Regular.ttf', // Often, regular is used for italics if a specific italic variant isn't available or needed
+      ...pdfMake.fonts, // Preserve existing fonts (like Roboto)
+      Amiri: { // The name 'Amiri' here must match the font name used in defaultStyle and styles
+        normal: 'Amiri-Regular.ttf', // This should match the filename added to VFS
+        bold: 'Amiri-Bold.ttf',     // This should match the filename added to VFS
+        italics: 'Amiri-Regular.ttf', // Often, regular is used for italics
         bolditalics: 'Amiri-Bold.ttf' // Same for bolditalics
       }
     };
@@ -61,20 +65,26 @@ const AdminPage = () => {
   const [exportingType, setExportingType] = useState<string | null>(null);
   const [isRegisterDialogOpen, setIsRegisterDialogOpen] = useState(false);
 
-  // Check if Amiri font data is available in pdfMake.vfs
-  const isAmiriFontConfigured = !!(pdfMake.fonts && pdfMake.fonts.Amiri && pdfMake.fonts.Amiri.normal && pdfMake.vfs && Object.keys(pdfMake.vfs).length > 0 && Object.keys(pdfMake.vfs).includes('Amiri-Regular.ttf'));
+  // Check if Amiri font is available in pdfMake.vfs and configured in pdfMake.fonts
+  const isAmiriFontConfigured = !!(
+    pdfMake.fonts &&
+    pdfMake.fonts.Amiri &&
+    pdfMake.fonts.Amiri.normal && // Check if 'Amiri' is defined in pdfMake.fonts
+    pdfMake.vfs &&
+    Object.keys(pdfMake.vfs).includes('Amiri-Regular.ttf') // Check if the font file data is in VFS
+  );
 
   useEffect(() => {
     if (!isAmiriFontConfigured && (exportingType?.includes('Pdf'))) {
       toast({
         title: "تنبيه بخصوص خط PDF",
-        description: "لم يتم تكوين خط Amiri بشكل كامل لـ pdfMake. قد لا تظهر النصوص العربية بشكل صحيح في ملفات PDF. تأكد من أن ملف vfs_fonts.js يحتوي على بيانات خط Amiri وأن اسم الخط مطابق.",
+        description: "لم يتم تكوين خط Amiri بشكل كامل لـ pdfMake. قد لا تظهر النصوص العربية بشكل صحيح في ملفات PDF. تأكد من أن ملف vfs_fonts.js (المستورد في السطر 22) يحتوي على بيانات خط Amiri وأن اسم الخط مطابق لما هو مُعرّف في pdfMake.fonts.",
         variant: "destructive",
         duration: 10000,
       });
     }
   }, [isAmiriFontConfigured, toast, exportingType]);
-  
+
   const getDistributionLabel = useCallback((value?: DistributionPreference | string) => {
     if (!value) return "غير محدد";
     return distributionOptions.find(opt => opt.value === value)?.label || String(value);
@@ -92,7 +102,7 @@ const AdminPage = () => {
       if (user && user.isAdmin) {
         handleRefresh().finally(() => setPageLoading(false));
       } else {
-        setPageLoading(false); // Ensure pageLoading is set to false for non-admins or if user is null
+        setPageLoading(false);
       }
     }
   }, [authLoading, user, handleRefresh]);
@@ -107,8 +117,6 @@ const AdminPage = () => {
     { header: "يريد من الأضحية", dataKey: "wantsFromSacrificeText" },
     { header: "ماذا يريد", dataKey: "sacrificeWishes" },
     { header: "تم الدفع", dataKey: "paymentConfirmedText" },
-    // { header: "رقم الدفتر", dataKey: "receiptBookNumber"}, // Removed as per request
-    // { header: "رقم السند", dataKey: "voucherNumber"}, // Removed as per request
     { header: "عن طريق وسيط", dataKey: "throughIntermediaryText"},
     { header: "اسم الوسيط", dataKey: "intermediaryName"},
     { header: "توزع لـ", dataKey: "distributionPreferenceText" },
@@ -135,8 +143,8 @@ const AdminPage = () => {
         wantsFromSacrificeText: sub.wantsFromSacrifice ? "نعم" : "لا",
         sacrificeWishes: sub.wantsFromSacrifice ? (sub.sacrificeWishes || "-") : "-",
         paymentConfirmedText: sub.paymentConfirmed ? "نعم" : "لا",
-        receiptBookNumber: sub.paymentConfirmed ? (sub.receiptBookNumber || "-") : "-", // Still preparing for other uses
-        voucherNumber: sub.paymentConfirmed ? (sub.voucherNumber || "-") : "-", // Still preparing for other uses
+        receiptBookNumber: sub.paymentConfirmed ? (sub.receiptBookNumber || "-") : "-",
+        voucherNumber: sub.paymentConfirmed ? (sub.voucherNumber || "-") : "-",
         throughIntermediaryText: sub.throughIntermediary ? "نعم" : "لا",
         intermediaryName: sub.throughIntermediary ? (sub.intermediaryName || (sub.submitterUsername === sub.intermediaryName ? "المستخدم نفسه" : (sub.intermediaryName || "-") )) : "-",
         distributionPreferenceText: getDistributionLabel(sub.distributionPreference),
@@ -159,22 +167,20 @@ const AdminPage = () => {
     });
 
     const ws = XLSX.utils.json_to_sheet(worksheetData, {
-      header: columns.map(col => col.header) // Use only header names for the sheet header row
+      header: columns.map(col => col.header)
     });
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
 
-    // Apply styles to the sheet
     if (wb.Sheets[sheetName]) {
         const sheet = wb.Sheets[sheetName];
-        const headerRowIndex = 0; // Assuming headers are in the first row (index 0)
+        const headerRowIndex = 0;
 
-        // Style header row
         columns.forEach((_col, C_idx) => {
             const header_cell_ref = XLSX.utils.encode_cell({ r: headerRowIndex, c: C_idx });
             if (sheet[header_cell_ref]) {
-                sheet[header_cell_ref].s = { 
+                sheet[header_cell_ref].s = {
                     border: {
                         top: { style: "thin", color: { auto: 1 } },
                         bottom: { style: "thin", color: { auto: 1 } },
@@ -186,14 +192,13 @@ const AdminPage = () => {
                 };
             }
         });
-        
-        // Style data rows
+
         worksheetData.forEach((_row, R_idx) => {
             columns.forEach((_col, C_idx) => {
-                const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx }); // R_idx + 1 because data starts from the second row
+                const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx });
                 if (sheet[cell_ref]) {
-                     sheet[cell_ref].s = { 
-                        ...(sheet[cell_ref].s || {}), // Preserve existing styles if any
+                     sheet[cell_ref].s = {
+                        ...(sheet[cell_ref].s || {}),
                          border: {
                             top: { style: "thin", color: { auto: 1 } },
                             bottom: { style: "thin", color: { auto: 1 } },
@@ -205,11 +210,10 @@ const AdminPage = () => {
                 }
             });
         });
-        
-        // Set column widths
-        const colWidths = columns.map(column => ({ wch: Math.max(15, String(column.header).length + 5) })); // Minimum width of 15, or header length + 5
+
+        const colWidths = columns.map(column => ({ wch: Math.max(15, String(column.header).length + 5) }));
         sheet['!cols'] = colWidths;
-        sheet['!props'] = { rtl: true }; // Set sheet direction to RTL
+        sheet['!props'] = { rtl: true };
         sheet['!autofilter'] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(sheet['!ref']!)) };
     }
     XLSX.writeFile(wb, `${fileName}.xlsx`);
@@ -227,73 +231,71 @@ const AdminPage = () => {
       return;
     }
 
-    const pdfColumns = [...columns].reverse(); // Reverse for visual RTL in PDF table
+    // For PDF, reverse the column order for visual RTL
+    const pdfColumns = [...columns].reverse();
 
     const tableHeaders = pdfColumns.map(col => ({
-        text: col.header, // Original text, pdfMake will handle RTL display with Amiri
+        text: col.header, // Original Arabic text
         style: 'tableHeader',
-        alignment: 'right' as const, // Ensure cells are right-aligned
+        alignment: 'right' as const,
         font: 'Amiri'
     }));
 
     const tableBody = data.map(item =>
-      pdfColumns.map(col => {
-        const cellValue = item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : '';
-        return ({
-            text: cellValue, // Original text
-            alignment: 'right' as const, // Ensure cells are right-aligned
-            font: 'Amiri'
-        });
-      })
+      pdfColumns.map(col => ({
+        text: item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : '', // Original Arabic text
+        alignment: 'right' as const,
+        font: 'Amiri'
+      }))
     );
 
     const exportDateText = `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`;
 
     const docDefinition: any = {
       pageSize: 'A4',
-      pageOrientation: 'landscape', // 'landscape' for wider tables
-      pageMargins: [PDF_MARGIN, PDF_MARGIN + 20, PDF_MARGIN, PDF_MARGIN + 20], // [left, top, right, bottom]
+      pageOrientation: 'landscape',
+      pageMargins: [PDF_MARGIN, PDF_MARGIN + 20, PDF_MARGIN, PDF_MARGIN + 20],
       content: [
-        { text: title, style: 'header', alignment: 'center' as const, margin: [0, 0, 0, 10] }, // Centered title
-        { text: exportDateText, style: 'subheader', alignment: 'center' as const, margin: [0, 0, 0, 20] }, // Centered date
+        { text: title, style: 'header', alignment: 'center' as const, margin: [0, 0, 0, 10], font: 'Amiri' },
+        { text: exportDateText, style: 'subheader', alignment: 'center' as const, margin: [0, 0, 0, 20], font: 'Amiri' },
         {
           table: {
             headerRows: 1,
-            widths: pdfColumns.map(() => '*' as const), // Auto-adjust column widths
+            widths: pdfColumns.map(() => '*' as const),
             body: [tableHeaders, ...tableBody],
           },
           layout: {
-            fillColor: function (rowIndex: number, node: any, columnIndex: number) {
-              return (rowIndex === 0) ? '#CCCCCC' : null; // Gray background for header row
+            fillColor: function (rowIndex: number) {
+              return (rowIndex === 0) ? '#CCCCCC' : null;
             },
             hLineWidth: function (i: number, node: any) { return (i === 0 || i === node.table.body.length) ? 1 : 1; },
             vLineWidth: function (i: number, node: any) { return (i === 0 || i === node.table.widths.length) ? 1 : 1; },
-            hLineColor: function (i: number, node: any) { return 'black'; },
-            vLineColor: function (i: number, node: any) { return 'black'; }
+            hLineColor: function () { return 'black'; },
+            vLineColor: function () { return 'black'; }
           }
         }
       ],
       defaultStyle: {
-        font: 'Amiri',
-        fontSize: 10, // Adjusted for potentially more columns
+        font: 'Amiri', // Set Amiri as default for the entire document
+        fontSize: 10,
         alignment: 'right' as const // Default alignment for content
       },
       styles: {
         header: {
           fontSize: 18,
           alignment: 'center' as const,
-          font: 'Amiri'
+          font: 'Amiri' // Ensure Amiri is used for header
         },
         subheader: {
           fontSize: 12,
           alignment: 'center' as const,
-          font: 'Amiri'
+          font: 'Amiri' // Ensure Amiri is used for subheader
         },
         tableHeader: {
-          fontSize: 8, // Smaller font for headers to fit more
+          fontSize: 8,
           color: 'black',
-          alignment: 'right' as const, // Right align header text
-          font: 'Amiri'
+          alignment: 'right' as const,
+          font: 'Amiri' // Ensure Amiri is used for table headers
         }
       },
       footer: function(currentPage: number, pageCount: number) {
@@ -302,7 +304,7 @@ const AdminPage = () => {
           text: pageNumText,
           alignment: 'center' as const,
           style: { font: 'Amiri', fontSize: 8 },
-          margin: [0, 10, 0, 0] // Margin for the footer
+          margin: [0, 10, 0, 0]
         };
       }
     };
@@ -359,11 +361,10 @@ const AdminPage = () => {
     try {
       const submissionsByUser: { [key: string]: any[] } = {};
       const allDataPrepared = await prepareDataForExport(allSubmissionsForAdmin);
-      
+
       allDataPrepared.forEach(subPrepared => {
           let userName = subPrepared.submitterUsername || 'مستخدم_غير_معروف';
-          // Ensure sheet names are valid (Excel has a 31 char limit and some restricted chars)
-          const userKey = userName.replace(/[<>:"/\\|?* ]/g, '_').substring(0, 31); 
+          const userKey = userName.replace(/[<>:"/\\|?* ]/g, '_').substring(0, 31);
 
           if (!submissionsByUser[userKey]) {
               submissionsByUser[userKey] = [];
@@ -374,7 +375,6 @@ const AdminPage = () => {
       for (const userNameKey in submissionsByUser) {
         const userSubmissionsData = submissionsByUser[userNameKey];
         if (userSubmissionsData.length > 0) {
-            // Create a separate Excel file for each user
             exportToExcel(userSubmissionsData, `أضاحي_المستخدم_${userNameKey}`, userNameKey, commonExportColumns);
         }
       }
@@ -443,8 +443,7 @@ const AdminPage = () => {
 
       allDataPrepared.forEach(subPrepared => {
           let userName = subPrepared.submitterUsername || 'مستخدم_غير_معروف';
-          // Sanitize username for use as a key or part of a filename
-          const userKey = userName.replace(/[<>:"/\\|?* ]/g, '_'); 
+          const userKey = userName.replace(/[<>:"/\\|?* ]/g, '_');
 
           if (!submissionsByUser[userKey]) {
               submissionsByUser[userKey] = [];
@@ -455,8 +454,7 @@ const AdminPage = () => {
       for (const userNameKey in submissionsByUser) {
         const userSubmissionsData = submissionsByUser[userNameKey];
         if (userSubmissionsData.length > 0) {
-            // Ensure filenames are valid (e.g., limit length, avoid special characters)
-            const safeUserNameKey = userNameKey.substring(0, 30); // Example: limit filename part to 30 chars
+            const safeUserNameKey = userNameKey.substring(0, 30);
             generatePdfMakeDocument(`تقرير أضاحي المستخدم: ${userNameKey}`, userSubmissionsData, commonExportColumns, `أضاحي_${safeUserNameKey}`);
         }
       }
@@ -478,8 +476,6 @@ const AdminPage = () => {
   }
 
   if (!user || !user.isAdmin) {
-    // This part should ideally be handled by the AdminLayout, which redirects.
-    // If AdminLayout is working correctly, this should not be displayed for long.
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <p className="text-destructive text-center">غير مصرح لك بالدخول لهذه الصفحة. يتم توجيهك...</p>
@@ -499,7 +495,7 @@ const AdminPage = () => {
       <header className="space-y-2 pb-4 md:pb-6 border-b">
         <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2">
           <Settings2 className="h-5 w-5 sm:h-6 sm:w-7 md:h-8 md:w-8 text-primary" />
-          تسجيل الأضاحي
+          إدارة الأضاحي
         </h1>
         <p className="text-sm sm:text-md md:text-lg text-muted-foreground">
           عرض وتعديل وحذف جميع الأضاحي المسجلة في النظام.
@@ -629,3 +625,5 @@ const AdminPage = () => {
 }
 
 export default AdminPage;
+
+    
