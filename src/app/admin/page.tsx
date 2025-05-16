@@ -3,7 +3,7 @@
 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { Settings2, TableIcon, BarChart3, HandHelping, Coins, RefreshCw, Loader2, Users, FileText, Sheet } from "lucide-react";
+import { Settings2, TableIcon, BarChart3, HandHelping, Coins, RefreshCw, Loader2, Users, FileText, Sheet, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useCallback } from "react";
 import type { AdahiSubmission, DistributionPreference } from "@/lib/types";
@@ -14,12 +14,19 @@ import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
+import RegisterForm from "@/components/auth/RegisterForm";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 // Import pdfMake and vfs_fonts
 import pdfMake from 'pdfmake/build/pdfmake';
-import '@/lib/vfs_fonts.js'; //  <<<<----  تأكد أن هذا هو المسار الصحيح لملف الخطوط المخصص
-
-//  يفترض أن pdfMake.vfs قد تم تهيئته الآن بواسطة الاستيراد أعلاه لملف الخطوط المخصص.
+import '@/lib/vfs_fonts.js';
 
 // Configure Amiri font for pdfMake
 if (pdfMake.fonts) {
@@ -28,8 +35,8 @@ if (pdfMake.fonts) {
       Amiri: { 
         normal: 'Amiri-Regular.ttf', 
         bold: 'Amiri-Bold.ttf',     
-        italics: 'Amiri-Regular.ttf', // عادة ما يكون الخط المائل هو نفسه العادي إذا لم يتوفر خط مائل خاص
-        bolditalics: 'Amiri-Bold.ttf' // وكذلك هنا
+        italics: 'Amiri-Regular.ttf',
+        bolditalics: 'Amiri-Bold.ttf'
       }
     };
 } else {
@@ -43,7 +50,7 @@ if (pdfMake.fonts) {
     };
 }
 
-const PDF_MARGIN = 40; // Define margin at a higher scope
+const PDF_MARGIN = 40;
 
 const AdminPage = () => {
   const { allSubmissionsForAdmin, loading: authLoading, refreshData, user, fetchUserById } = useAuth();
@@ -51,6 +58,7 @@ const AdminPage = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
   const [exportingType, setExportingType] = useState<string | null>(null);
+  const [isRegisterDialogOpen, setIsRegisterDialogOpen] = useState(false);
 
   const isAmiriFontConfigured = !!(pdfMake.fonts && pdfMake.fonts.Amiri && pdfMake.fonts.Amiri.normal && pdfMake.vfs && Object.keys(pdfMake.vfs).length > 0 && Object.keys(pdfMake.vfs).includes('Amiri-Regular.ttf'));
 
@@ -139,7 +147,6 @@ const AdminPage = () => {
     return prepared;
   }, [getDistributionLabel, fetchUserById]);
 
-
   const exportToExcel = (dataToExportRaw: any[], fileName: string, sheetName: string, columns: Array<{header: string, dataKey: string}>) => {
     const worksheetData = dataToExportRaw.map(item => {
       const orderedItem: any = {};
@@ -158,13 +165,12 @@ const AdminPage = () => {
 
     if (wb.Sheets[sheetName]) {
         const sheet = wb.Sheets[sheetName];
-        const headerRowIndex = 0; // الصف الأول هو صف العناوين
+        const headerRowIndex = 0; 
 
-        // تطبيق أنماط على خلايا العناوين
         columns.forEach((_col, C_idx) => {
             const header_cell_ref = XLSX.utils.encode_cell({ r: headerRowIndex, c: C_idx });
             if (sheet[header_cell_ref]) {
-                sheet[header_cell_ref].s = { // s for style
+                sheet[header_cell_ref].s = { 
                     border: {
                         top: { style: "thin", color: { auto: 1 } },
                         bottom: { style: "thin", color: { auto: 1 } },
@@ -177,13 +183,12 @@ const AdminPage = () => {
             }
         });
         
-        // تطبيق أنماط على خلايا البيانات
         worksheetData.forEach((_row, R_idx) => {
             columns.forEach((_col, C_idx) => {
-                const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx }); // +1 لأن البيانات تبدأ بعد العناوين
+                const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx }); 
                 if (sheet[cell_ref]) {
-                     sheet[cell_ref].s = { // s for style
-                        ...(sheet[cell_ref].s || {}), // Keep existing style if any
+                     sheet[cell_ref].s = { 
+                        ...(sheet[cell_ref].s || {}), 
                          border: {
                             top: { style: "thin", color: { auto: 1 } },
                             bottom: { style: "thin", color: { auto: 1 } },
@@ -196,10 +201,9 @@ const AdminPage = () => {
             });
         });
         
-        // تحديد عرض الأعمدة تلقائيًا
-        const colWidths = columns.map(column => ({ wch: Math.max(15, String(column.header).length + 5) })); // wch لـ width in characters
+        const colWidths = columns.map(column => ({ wch: Math.max(15, String(column.header).length + 5) })); 
         sheet['!cols'] = colWidths;
-        sheet['!props'] = { rtl: true }; // لجعل الورقة من اليمين لليسار
+        sheet['!props'] = { rtl: true }; 
         sheet['!autofilter'] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(sheet['!ref']!)) };
     }
     XLSX.writeFile(wb, `${fileName}.xlsx`);
@@ -216,7 +220,7 @@ const AdminPage = () => {
       return;
     }
 
-    const pdfColumns = [...columns].reverse(); // نعكس ترتيب الأعمدة للغة العربية في PDF
+    const pdfColumns = [...columns].reverse(); 
 
     const tableHeaders = pdfColumns.map(col => ({
         text: col.header, 
@@ -241,14 +245,14 @@ const AdminPage = () => {
     const docDefinition: any = {
       pageSize: 'A4',
       pageOrientation: 'landscape',
-      pageMargins: [PDF_MARGIN, PDF_MARGIN + 20, PDF_MARGIN, PDF_MARGIN + 20], // [يمين، أعلى، يسار، أسفل]
+      pageMargins: [PDF_MARGIN, PDF_MARGIN + 20, PDF_MARGIN, PDF_MARGIN + 20], 
       content: [
         { text: title, style: 'header', alignment: 'right' as const, margin: [0, 0, 0, 10] },
         { text: exportDateText, style: 'subheader', alignment: 'right' as const, margin: [0, 0, 0, 20] },
         {
           table: {
             headerRows: 1,
-            widths: pdfColumns.map(() => '*' as const), // توزيع متساوٍ مبدئيًا
+            widths: pdfColumns.map(() => '*' as const), 
             body: [tableHeaders, ...tableBody],
           },
           layout: {
@@ -279,10 +283,10 @@ const AdminPage = () => {
           font: 'Amiri'
         },
         tableHeader: {
-          fontSize: 8, // تم تصغير حجم الخط في رؤوس الأعمدة
+          fontSize: 8, 
           color: 'black',
           alignment: 'right' as const,
-          font: 'Amiri' //  تم التأكيد على استخدام خط Amiri
+          font: 'Amiri'
         }
       },
       footer: function(currentPage: number, pageCount: number) {
@@ -291,7 +295,7 @@ const AdminPage = () => {
           text: pageNumText,
           alignment: 'center' as const,
           style: { font: 'Amiri', fontSize: 8 },
-          margin: [0, 10, 0, 0] // هامش التذييل
+          margin: [0, 10, 0, 0] 
         };
       }
     };
@@ -303,7 +307,6 @@ const AdminPage = () => {
       toast({ title: "خطأ في إنشاء PDF", description: "حدث خطأ أثناء محاولة إنشاء ملف PDF.", variant: "destructive" });
     }
   };
-
 
   const handleExportAllExcel = async () => {
     if (allSubmissionsForAdmin.length === 0) {
@@ -351,9 +354,8 @@ const AdminPage = () => {
       const allDataPrepared = await prepareDataForExport(allSubmissionsForAdmin);
       
       allDataPrepared.forEach(subPrepared => {
-          // استخدم اسم المستخدم كمعرف للورقة، مع تعديل ليكون صالحًا كاسم ورقة
           let userName = subPrepared.submitterUsername || 'مستخدم_غير_معروف';
-          const userKey = userName.replace(/[<>:"/\\|?* ]/g, '_').substring(0, 31); // أسماء الأوراق في Excel لها قيود على الطول والأحرف
+          const userKey = userName.replace(/[<>:"/\\|?* ]/g, '_').substring(0, 31); 
 
           if (!submissionsByUser[userKey]) {
               submissionsByUser[userKey] = [];
@@ -364,7 +366,6 @@ const AdminPage = () => {
       for (const userNameKey in submissionsByUser) {
         const userSubmissionsData = submissionsByUser[userNameKey];
         if (userSubmissionsData.length > 0) {
-            // اسم الملف سيحتوي على اسم المستخدم أيضًا
             exportToExcel(userSubmissionsData, `أضاحي_المستخدم_${userNameKey}`, userNameKey, commonExportColumns);
         }
       }
@@ -432,9 +433,7 @@ const AdminPage = () => {
       const allDataPrepared = await prepareDataForExport(allSubmissionsForAdmin);
 
       allDataPrepared.forEach(subPrepared => {
-          // استخدام اسم المستخدم لإنشاء ملفات PDF منفصلة
           let userName = subPrepared.submitterUsername || 'مستخدم_غير_معروف';
-          // تنظيف اسم المستخدم ليكون صالحًا كجزء من اسم الملف
           const userKey = userName.replace(/[<>:"/\\|?* ]/g, '_'); 
 
           if (!submissionsByUser[userKey]) {
@@ -446,8 +445,7 @@ const AdminPage = () => {
       for (const userNameKey in submissionsByUser) {
         const userSubmissionsData = submissionsByUser[userNameKey];
         if (userSubmissionsData.length > 0) {
-            // اسم الملف سيحتوي على اسم المستخدم
-            const safeUserNameKey = userNameKey.substring(0, 30); // لتجنب أسماء ملفات طويلة جدًا
+            const safeUserNameKey = userNameKey.substring(0, 30); 
             generatePdfMakeDocument(`تقرير أضاحي المستخدم: ${userNameKey}`, userSubmissionsData, commonExportColumns, `أضاحي_${safeUserNameKey}`);
         }
       }
@@ -469,7 +467,6 @@ const AdminPage = () => {
   }
 
   if (!user || !user.isAdmin) {
-    // تم التعامل مع هذا في AdminLayout, لذا يمكن عرض رسالة أو تركه فارغًا ليعتمد على AdminLayout
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <p className="text-destructive text-center">غير مصرح لك بالدخول لهذه الصفحة. يتم توجيهك...</p>
@@ -501,6 +498,33 @@ const AdminPage = () => {
           لصندوق التضامن: {stats.fund}
         </p>
       </header>
+
+      <section aria-labelledby="admin-actions" className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-md sm:text-lg">إجراءات إدارية</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Dialog open={isRegisterDialogOpen} onOpenChange={setIsRegisterDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="text-xs sm:text-sm">
+                  <UserPlus className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />
+                  إنشاء حساب مستخدم جديد
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>إنشاء حساب مستخدم جديد</DialogTitle>
+                  <DialogDescription>
+                    أدخل بيانات المستخدم الجديد. سيتمكن المستخدم من تسجيل الدخول بهذه البيانات.
+                  </DialogDescription>
+                </DialogHeader>
+                <RegisterForm />
+              </DialogContent>
+            </Dialog>
+          </CardContent>
+        </Card>
+      </section>
 
       <section aria-labelledby="stats-heading" className="grid gap-2 sm:gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
@@ -590,8 +614,3 @@ const AdminPage = () => {
 }
 
 export default AdminPage;
-    
-
-    
-
-    
