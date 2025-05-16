@@ -4,29 +4,28 @@
 import AdahiSubmissionForm from "@/components/forms/AdahiSubmissionForm";
 import UserSubmissionsTable from "@/components/tables/UserSubmissionsTable";
 import { useAuth } from "@/hooks/useAuth";
-import { useState, useEffect } from "react";
+// Removed useState and useEffect as currentSubmissions is no longer used
 import type { AdahiSubmission } from "@/lib/types";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"; 
 import { ListTree, Eye } from "lucide-react"; 
 
 export default function DashboardPage() {
-  const { user, submissions: initialSubmissions, loading } = useAuth(); 
-  const [currentSubmissions, setCurrentSubmissions] = useState<AdahiSubmission[]>(initialSubmissions);
-
-  useEffect(() => {
-    setCurrentSubmissions(initialSubmissions);
-  }, [initialSubmissions]);
+  const { user, submissions, loading, refreshData } = useAuth(); 
+  // Removed currentSubmissions state and its useEffect
 
   const handleFormSubmit = () => {
-    // The submissions state in AuthContext should re-render the table automatically
+    // refreshData from AuthContext is called within addSubmission,
+    // which should trigger an update to the submissions list from useAuth.
+    // If an explicit refresh is still needed here, it can be called.
+    // For now, relying on AuthContext's refresh mechanism.
+    // refreshData(); // Uncomment if needed after testing
   };
 
   return (
-    <div className="space-y-8 md:space-y-10 p-4">
-      <header className="space-y-2 md:space-y-3 pb-4 md:pb-6 border-b text-center">
-        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-primary">مركز الرمثا للخدمات المجتمعية</h1>
-        <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-muted-foreground">اضاحي 2025</h2>
-        <p className="text-sm sm:text-md md:text-lg text-muted-foreground pt-1 md:pt-2">
+    <div className="space-y-6 md:space-y-8 p-2 sm:p-4">
+      <header className="space-y-1 md:space-y-2 pb-3 md:pb-4 border-b text-center">
+        <h1 className="text-lg sm:text-xl md:text-2xl font-bold tracking-tight text-primary">مركز الرمثا للخدمات المجتمعية</h1>
+        <h2 className="text-base sm:text-lg md:text-xl font-semibold text-muted-foreground">اضاحي 2025</h2>
+        <p className="text-xs sm:text-sm md:text-base text-muted-foreground pt-1">
           من خلال هذه الصفحة يمكنك إضافة أضحية جديدة أو الاطلاع على الأضاحي التي قمت بتسجيلها.
         </p>
       </header>
@@ -45,10 +44,9 @@ export default function DashboardPage() {
             قائمة بجميع الأضاحي التي قمت بإدخالها.
           </p>
         </div>
-        <UserSubmissionsTable submissions={currentSubmissions} />
+        {/* Directly pass submissions from useAuth */}
+        <UserSubmissionsTable submissions={submissions} />
       </section>
     </div>
   );
 }
-
-    
