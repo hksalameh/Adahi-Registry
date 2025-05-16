@@ -21,10 +21,9 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl">
       <head>
-        {/* يمكنك إبقاء <meta name="theme-color" ... /> هنا أو الاعتماد على ما في manifest.json */}
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <meta name="theme-color" content="#4CAF50" />
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" /> 
-        {/* يمكنك إضافة المزيد من أيقونات apple-touch-icon بأحجام مختلفة إذا أردت */}
       </head>
       <body className={`${inter.variable} font-sans antialiased flex flex-col min-h-screen`}>
         <AuthProvider>
