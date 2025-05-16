@@ -34,13 +34,15 @@ export default function LoginPage() {
                 data-ai-hint="islamic charity logo" 
               />
             </div>
-            <div className="text-right ml-4">
+            {/* تم تغيير text-right إلى text-center هنا، وتم إزالة div الوسيط للعنوان الفرعي */}
+            <div className="flex-1 text-center ml-4"> 
               <CardTitle className="text-xl sm:text-2xl font-bold tracking-tight text-primary">
                 جمعية المركز الاسلامي الخيرية
               </CardTitle>
-              <CardDescription className="text-sm text-muted-foreground mt-1">
+              {/* العنوان الفرعي أصبح P مباشراً وسيتم توسطه بفعل text-center في الـ div الأب */}
+              <p className="text-base text-muted-foreground mt-1">
                 مركز الرمثا للخدمات المجتمعية
-              </CardDescription>
+              </p>
             </div>
           </div>
 
@@ -78,4 +80,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
