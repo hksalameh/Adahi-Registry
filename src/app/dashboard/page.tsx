@@ -22,11 +22,11 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="space-y-10">
-      <header className="space-y-3 pb-6 border-b text-center sm:text-right">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-primary">مركز الرمثا للخدمات المجتمعية</h1>
-        <h2 className="text-xl sm:text-2xl font-semibold text-muted-foreground">اضاحي 2025</h2>
-        <p className="text-md sm:text-lg text-muted-foreground pt-2">
+    <div className="space-y-8 md:space-y-10 p-4">
+      <header className="space-y-2 md:space-y-3 pb-4 md:pb-6 border-b text-center">
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-primary">مركز الرمثا للخدمات المجتمعية</h1>
+        <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-muted-foreground">اضاحي 2025</h2>
+        <p className="text-sm sm:text-md md:text-lg text-muted-foreground pt-1 md:pt-2">
           من خلال هذه الصفحة يمكنك إضافة أضحية جديدة أو الاطلاع على الأضاحي التي قمت بتسجيلها.
         </p>
       </header>
@@ -35,13 +35,13 @@ export default function DashboardPage() {
         <AdahiSubmissionForm onFormSubmit={handleFormSubmit} />
       </section>
 
-      <section aria-labelledby="view-submissions-heading" className="space-y-6">
-        <div className="space-y-1">
-          <h2 id="view-submissions-heading" className="text-xl sm:text-2xl font-semibold tracking-tight flex items-center gap-2">
-            <Eye className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
+      <section aria-labelledby="view-submissions-heading" className="space-y-4 md:space-y-6">
+        <div className="space-y-1 text-center sm:text-right">
+          <h2 id="view-submissions-heading" className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight flex items-center justify-center sm:justify-start gap-2">
+            <Eye className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-primary" />
             الأضاحي المسجلة
           </h2>
-          <p className="text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             قائمة بجميع الأضاحي التي قمت بإدخالها.
           </p>
         </div>
@@ -50,3 +50,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
