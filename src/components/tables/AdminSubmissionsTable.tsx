@@ -56,7 +56,7 @@ const formatDateTime = (dateString: string | undefined | null): string => {
 
 
 export default function AdminSubmissionsTable({ submissions, onDataChange }: AdminSubmissionsTableProps) {
-  const { updateSubmissionStatus, deleteSubmission, refreshData } = useAuth();
+  const { updateSubmissionStatus, deleteSubmission } = useAuth(); // Removed refreshData from here
   const { toast } = useToast();
   const [editingSubmission, setEditingSubmission] = useState<AdahiSubmission | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<string | null>(null);
@@ -68,8 +68,7 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
     const success = await updateSubmissionStatus(id, newStatus);
     if (success) {
       toast({ title: "تم تحديث الحالة بنجاح." });
-      // refreshData(); // This will be called by onDataChange from parent if needed
-      onDataChange();
+      onDataChange(); // Call onDataChange passed from parent to trigger refresh
     } else {
       toast({ title: "فشل تحديث الحالة.", variant: "destructive" });
     }
@@ -81,8 +80,7 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
     const success = await deleteSubmission(id);
     if (success) {
       toast({ title: "تم حذف السجل بنجاح." });
-      // refreshData(); // This will be called by onDataChange from parent
-      onDataChange();
+      onDataChange(); // Call onDataChange passed from parent to trigger refresh
     } else {
       toast({ title: "فشل حذف السجل.", variant: "destructive" });
     }
@@ -100,7 +98,7 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
 
   const closeEditDialog = () => {
     setEditingSubmission(null);
-    onDataChange();
+    onDataChange(); // Call onDataChange passed from parent to trigger refresh
   }
 
   return (
@@ -111,7 +109,7 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
           <TableRow>
             <TableHead className="whitespace-nowrap">مدخل البيانات</TableHead>
             <TableHead className="whitespace-nowrap">اسم المتبرع</TableHead>
-            <TableHead className="whitespace-nowrap">الأضحية عن</TableHead>
+            <TableHead className="whitespace-nowrap">الأضحية باسم</TableHead>
             <TableHead className="whitespace-nowrap">رقم التلفون</TableHead>
             <TableHead className="whitespace-nowrap">يريد الحضور</TableHead>
             <TableHead className="whitespace-nowrap">يريد من الأضحية</TableHead>
@@ -196,7 +194,7 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
                                 <div className="grid grid-cols-2 gap-2 items-center"><strong><Mail className="inline-block ml-1 h-4 w-4"/>البريد الإلكتروني للمستخدم:</strong> <p>{sub.userEmail || "غير متوفر"}</p></div>
                                 <hr className="my-2 col-span-2"/>
                                 <div className="grid grid-cols-2 gap-2 items-center"><strong><UserCircle className="inline-block ml-1 h-4 w-4"/>اسم المتبرع:</strong> <p>{sub.donorName}</p></div>
-                                <div className="grid grid-cols-2 gap-2 items-center"><strong><Heart className="inline-block ml-1 h-4 w-4"/>الأضحية عن:</strong> <p>{sub.sacrificeFor}</p></div>
+                                <div className="grid grid-cols-2 gap-2 items-center"><strong><Heart className="inline-block ml-1 h-4 w-4"/>الأضحية باسم:</strong> <p>{sub.sacrificeFor}</p></div>
                                 <div className="grid grid-cols-2 gap-2 items-center"><strong><Phone className="inline-block ml-1 h-4 w-4"/>رقم الهاتف:</strong> <p>{sub.phoneNumber}</p></div>
                                 <hr className="my-2 col-span-2"/>
                                 <div className="grid grid-cols-2 gap-2 items-center"><strong><CalendarCheck2 className="inline-block ml-1 h-4 w-4"/>يريد الحضور:</strong> <p>{sub.wantsToAttend ? "نعم" : "لا"}</p></div>

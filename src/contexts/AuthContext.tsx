@@ -51,7 +51,7 @@ interface AuthContextType {
   refreshData: () => Promise<void>;
 }
 
-const ADMIN_UID = "vqhrldpAdeWGcCgcMpWWRGdslOS2"; 
+const ADMIN_UID = "vqhrldpAdeWGcCgcMpWWRGdslOS2";
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -80,7 +80,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           id: userDocSnap.id,
           email: userData.email || "",
           username: userData.username || "مستخدم",
-          isAdmin: userData.isAdmin === true || userId === ADMIN_UID, // Ensure admin check here too
+          isAdmin: userData.isAdmin === true || userId === ADMIN_UID,
         } as AppUser;
       } else {
          if (userId === ADMIN_UID) {
@@ -99,7 +99,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error("Error fetching user by ID:", error);
       return null;
     }
-  }, []); 
+  }, [toast]);
 
   const fetchUserByUsername = useCallback(async (username: string): Promise<AppUser | null> => {
     if (!db) {
@@ -109,8 +109,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     try {
       const usersRef = collection(db, "users");
-      // Case-insensitive query for username if needed, but Firestore is case-sensitive by default.
-      // For simplicity, we assume exact match for username.
       const q = query(usersRef, where("username", "==", username));
       const querySnapshot = await getDocs(q);
 
@@ -130,7 +128,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         id: userDoc.id,
         email: userData.email,
         username: userData.username,
-        isAdmin: userData.isAdmin === true || userDoc.id === ADMIN_UID, // Ensure admin check
+        isAdmin: userData.isAdmin === true || userDoc.id === ADMIN_UID,
       } as AppUser;
 
     } catch (error) {
@@ -138,7 +136,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       toast({ variant: "destructive", title: "خطأ", description: "فشل في جلب بيانات المستخدم." });
       return null;
     }
-  }, [toast]); 
+  }, [toast]);
 
   useEffect(() => {
     if (!auth || !db) {
@@ -156,26 +154,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.log("[AuthContext onAuthStateChanged] Component unmounted, aborting state update.");
         return;
       }
-      setLoading(true); // Set loading true while processing auth state
+      setLoading(true);
       if (firebaseUser) {
-        let appUser = await fetchUserById(firebaseUser.uid); // fetchUserById now also checks ADMIN_UID
+        let appUser = await fetchUserById(firebaseUser.uid);
         
-        if (appUser) { 
+        if (appUser) {
             const finalAppUser: AppUser = {
-                ...appUser, // Contains id, username, email, isAdmin from fetchUserById
-                // Override isAdmin just in case, to ensure ADMIN_UID check is prioritized
-                isAdmin: firebaseUser.uid === ADMIN_UID || appUser.isAdmin, 
+                ...appUser,
+                isAdmin: firebaseUser.uid === ADMIN_UID || appUser.isAdmin,
             };
             console.log(`[AuthContext onAuthStateChanged] Firebase UID: ${firebaseUser.uid}, ADMIN_UID: ${ADMIN_UID}. Determined isAdmin: ${finalAppUser.isAdmin}`);
             console.log("[AuthContext onAuthStateChanged] Setting user (from appUser):", JSON.stringify(finalAppUser));
             if (isMounted) setUser(finalAppUser);
         } else {
-            // This case should ideally not be hit if fetchUserById handles ADMIN_UID correctly,
-            // but as a fallback for non-admin users without a profile:
             console.warn(`[AuthContext onAuthStateChanged] User with UID ${firebaseUser.uid} authenticated but no appUser profile returned from fetchUserById. Setting user to null.`);
             if (isMounted) setUser(null);
         }
-      } else { // No firebaseUser
+      } else {
         console.log("[AuthContext onAuthStateChanged] No FirebaseUser, setting user to null.");
         if (isMounted) setUser(null);
       }
@@ -188,7 +183,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log("[AuthContext useEffect] Unsubscribing from onAuthStateChanged.");
       unsubscribeAuthStateChanged();
     };
-  }, [fetchUserById]); // fetchUserById is stable due to useCallback
+  }, [fetchUserById]);
 
 
   const login = async (identifier: string, pass: string): Promise<AppUser | null> => {
@@ -199,14 +194,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     let emailToLogin = identifier;
     const isLoginByUsername = !(identifier.includes('@') && identifier.includes('.'));
-    const isAdminLoginAttemptByUsername = identifier === process.env.NEXT_PUBLIC_ADMIN_USERNAME;
     
     console.log(`[AuthContext Login] Attempting login with identifier: ${identifier}`);
 
     if (identifier === process.env.NEXT_PUBLIC_ADMIN_USERNAME && process.env.NEXT_PUBLIC_ADMIN_EMAIL) {
         emailToLogin = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
         console.log(`[AuthContext Login] Admin login with username, using admin email: ${emailToLogin}`);
-    } else if (isLoginByUsername && !isAdminLoginAttemptByUsername) {
+    } else if (isLoginByUsername && identifier !== (process.env.NEXT_PUBLIC_ADMIN_USERNAME || "Admin_default_username_placeholder")) {
         console.log(`[AuthContext Login] Regular user login with username: ${identifier}`);
         const userProfile = await fetchUserByUsername(identifier);
         if (userProfile && userProfile.email) {
@@ -222,7 +216,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             return null;
         }
     } else {
-      console.log(`[AuthContext Login] Login attempt with email (or admin email directly): ${identifier}`);
+      console.log(`[AuthContext Login] Login attempt with email (or admin username that resolves to admin email): ${identifier}`);
     }
     
     try {
@@ -230,8 +224,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const firebaseUser = userCredential.user;
       console.log(`[AuthContext Login] Firebase signInWithEmailAndPassword successful for UID: ${firebaseUser.uid}`);
       
-      // Fetch user details to determine isAdmin status for immediate return
-      // onAuthStateChanged will also run and set the context's user state
       const appUser = await fetchUserById(firebaseUser.uid); 
 
       if (!appUser && firebaseUser.uid !== ADMIN_UID) {
@@ -242,22 +234,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       const finalAppUser: AppUser = appUser ? {
-          ...appUser, // id, username, email from Firestore or defaults
-          isAdmin: firebaseUser.uid === ADMIN_UID || appUser.isAdmin, // Prioritize ADMIN_UID check
-          // Ensure username and email are up-to-date if admin details change via env vars
+          ...appUser,
+          isAdmin: firebaseUser.uid === ADMIN_UID || appUser.isAdmin,
           username: (firebaseUser.uid === ADMIN_UID) ? (process.env.NEXT_PUBLIC_ADMIN_USERNAME || appUser.username || "Admin") : (appUser.username || "مستخدم"),
           email: (firebaseUser.uid === ADMIN_UID) ? (firebaseUser.email || process.env.NEXT_PUBLIC_ADMIN_EMAIL || appUser.email) : (firebaseUser.email || appUser.email),
       } : { 
-          // This case should only be hit if appUser is null, which means firebaseUser.uid must be ADMIN_UID
-          // due to the check above.
           id: ADMIN_UID,
           email: emailToLogin, 
           username: process.env.NEXT_PUBLIC_ADMIN_USERNAME || "Admin",
-          isAdmin: true, // Explicitly admin
+          isAdmin: true,
       };
       
       console.log(`[AuthContext Login] Login successful. Firebase UID: ${firebaseUser.uid}, ADMIN_UID: ${ADMIN_UID}. Determined isAdmin: ${finalAppUser.isAdmin}`);
       console.log("[AuthContext Login] Returning finalAppUser from login function:", JSON.stringify(finalAppUser));
+      // setLoading(false); // Removed from here, onAuthStateChanged handles this
       return finalAppUser;
 
     } catch (error: any) {
@@ -271,6 +261,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         errorMessage += "الرجاء التحقق من بيانات الاعتماد أو الاتصال بالمسؤول.";
       }
       toast({ variant: "destructive", title: "خطأ في تسجيل الدخول", description: errorMessage });
+      // setLoading(false); // Removed from here, onAuthStateChanged handles this
       return null;
     }
   };
@@ -288,14 +279,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return null;
     }
 
-    // Check if username already exists
     const existingUserByUsername = await fetchUserByUsername(username);
     if (existingUserByUsername) {
       toast({ variant: "destructive", title: "خطأ في التسجيل", description: "اسم المستخدم هذا موجود بالفعل. الرجاء اختيار اسم آخر." });
       return null;
     }
     
-    // Check if email already exists
     try {
       const signInMethods = await fetchSignInMethodsForEmail(auth, email);
       if (signInMethods.length > 0) {
@@ -313,7 +302,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     console.log(`[AuthContext Register] Attempting to register username: ${username}, email: ${email}`);
-    // setLoading(true); // onAuthStateChanged will manage loading state
+    
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
       const firebaseUser = userCredential.user;
@@ -323,7 +312,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const newUserFirestoreData = {
         username,
         email: firebaseUser.email || email, 
-        isAdmin: isAdminUser, // Should be false unless registering the admin UID itself
+        isAdmin: isAdminUser,
         createdAt: serverTimestamp(),
       };
       await setDoc(doc(db, "users", firebaseUser.uid), newUserFirestoreData);
@@ -335,14 +324,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         email: newUserFirestoreData.email,
         isAdmin: newUserFirestoreData.isAdmin,
       };
-      // onAuthStateChanged will handle setting the user in context and loading state
       toast({ title: "تم التسجيل بنجاح! يمكنك الآن تسجيل الدخول." });
       return appUser; 
     } catch (error: any) {
       console.error("[AuthContext Register] Registration error:", error);
       let errorMessage = "فشل التسجيل. ";
       if (error.code === 'auth/email-already-in-use') {
-        // This should ideally be caught by the pre-check, but as a fallback
         errorMessage += "هذا البريد الإلكتروني مسجل بالفعل.";
       } else if (error.code === 'auth/weak-password') {
         errorMessage += "كلمة المرور ضعيفة جداً (يجب أن تكون 6 أحرف على الأقل).";
@@ -368,7 +355,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.log("[AuthContext Logout] Attempting to sign out.");
         await signOut(auth);
         console.log("[AuthContext Logout] Sign out successful. Navigating to login.");
-        // onAuthStateChanged will set user to null and loading to false.
         router.push("/auth/login");
     } catch (error: any) {
         console.error("[AuthContext Logout] Logout error:", error);
@@ -382,9 +368,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
     console.log(`[AuthContext refreshData] Starting data refresh for user ID: ${user.id}, isAdmin: ${user.isAdmin}`);
-    // setLoading(true); // Consider if this specific loading is needed
     try {
-      if (user.isAdmin) { // Check if the current context user is admin
+      if (user.isAdmin) {
         console.log("[AuthContext refreshData] User is Admin. Fetching all submissions.");
         const adminQuery = query(collection(db, "submissions"), orderBy("submissionDate", "desc"));
         const adminSnapshot = await getDocs(adminQuery);
@@ -409,8 +394,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.log("[AuthContext refreshData] Admin submissions fetched:", resolvedAdminSubs.length);
       }
 
-      // Always fetch submissions for the logged-in user, regardless of admin status
-      // This allows admins to also have their own submissions if they create any.
       console.log(`[AuthContext refreshData] Fetching submissions for current user: ${user.id}`);
       const userQuery = query(collection(db, "submissions"), where("userId", "==", user.id), orderBy("submissionDate", "desc"));
       const userSnapshot = await getDocs(userQuery);
@@ -429,7 +412,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.error("[AuthContext refreshData] Error refreshing data:", error);
         toast({variant: "destructive", title: "خطأ", description: `فشل في تحديث البيانات: ${error.message}`});
     } finally {
-        // setLoading(false);
         console.log("[AuthContext refreshData] Data refresh complete.");
     }
   }, [db, user, toast, fetchUserById]);
@@ -467,8 +449,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         userId: newSubmissionData.userId,
         userEmail: newSubmissionData.userEmail,
         status: "pending",
-        submissionDate: new Date().toISOString(), // Approximate client-side date
-        lastUpdated: new Date().toISOString(), // Approximate client-side date
+        submissionDate: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
         lastUpdatedBy: newSubmissionData.lastUpdatedBy,
         lastUpdatedByEmail: newSubmissionData.lastUpdatedByEmail,
         submitterUsername: user.username,
@@ -486,7 +468,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       toast({ variant: "destructive", title: "خطأ", description: "قاعدة البيانات غير مهيأة." });
       return false;
     }
-    if (!user || !user.isAdmin) { // Simpler check: only admin can update status
+    if (!user || !user.isAdmin) {
         toast({variant: "destructive", title: "غير مصرح به", description: "ليس لديك صلاحية لتحديث الحالة."});
         return false;
     }
@@ -498,7 +480,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         lastUpdatedBy: user.id,
         lastUpdatedByEmail: user.email,
        });
-      await refreshData(); 
+      // await refreshData(); // No longer calling refreshData from here. It will be called from AdminSubmissionsTable.
       return true;
     } catch (error: any) {
       console.error("[AuthContext updateSubmissionStatus] Error updating status:", error);
@@ -512,7 +494,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       toast({ variant: "destructive", title: "خطأ", description: "قاعدة البيانات غير مهيأة." });
       return null;
     }
-    if (!user || !user.isAdmin) { // Simpler check: only admin can update
+    if (!user || !user.isAdmin) {
         toast({variant: "destructive", title: "غير مصرح به", description: "ليس لديك صلاحية لتحديث البيانات."});
         return null;
     }
@@ -526,7 +508,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         lastUpdatedByEmail: user.email,
       };
       await updateDoc(submissionDocRef, updateData);
-      await refreshData(); 
+      // await refreshData(); // No longer calling refreshData from here. It will be called from AdminSubmissionsTable.
 
 
       const updatedDocSnap = await getDoc(submissionDocRef);
@@ -562,14 +544,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
        toast({ variant: "destructive", title: "خطأ", description: "قاعدة البيانات غير مهيأة." });
       return false;
     }
-    if (!user || !user.isAdmin) { // Simpler check: only admin can delete
+    if (!user || !user.isAdmin) {
         toast({variant: "destructive", title: "غير مصرح به", description: "ليس لديك صلاحية لحذف البيانات."});
         return false;
     }
     try {
       const submissionDocRef = doc(db, "submissions", submissionId);
       await deleteDoc(submissionDocRef);
-      await refreshData(); 
+      // await refreshData(); // No longer calling refreshData from here. It will be called from AdminSubmissionsTable.
       return true;
     } catch (error: any) {
       console.error("[AuthContext deleteSubmission] Error deleting submission:", error);
@@ -599,3 +581,4 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     </AuthContext.Provider>
   );
 };
+
