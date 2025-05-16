@@ -26,7 +26,9 @@ import {
 
 // Import pdfMake and vfs_fonts
 import pdfMake from 'pdfmake/build/pdfmake';
-import '@/lib/vfs_fonts.js';
+import '@/lib/vfs_fonts.js'; // Make sure this path is correct and the file exists
+
+const PDF_MARGIN = 40;
 
 // Configure Amiri font for pdfMake
 if (pdfMake.fonts) {
@@ -35,8 +37,8 @@ if (pdfMake.fonts) {
       Amiri: { 
         normal: 'Amiri-Regular.ttf', 
         bold: 'Amiri-Bold.ttf',     
-        italics: 'Amiri-Regular.ttf',
-        bolditalics: 'Amiri-Bold.ttf'
+        italics: 'Amiri-Regular.ttf', // Often, regular is used for italics if a specific italic variant isn't available or needed
+        bolditalics: 'Amiri-Bold.ttf' // Same for bolditalics
       }
     };
 } else {
@@ -50,7 +52,6 @@ if (pdfMake.fonts) {
     };
 }
 
-const PDF_MARGIN = 40;
 
 const AdminPage = () => {
   const { allSubmissionsForAdmin, loading: authLoading, refreshData, user, fetchUserById } = useAuth();
@@ -60,6 +61,7 @@ const AdminPage = () => {
   const [exportingType, setExportingType] = useState<string | null>(null);
   const [isRegisterDialogOpen, setIsRegisterDialogOpen] = useState(false);
 
+  // Check if Amiri font data is available in pdfMake.vfs
   const isAmiriFontConfigured = !!(pdfMake.fonts && pdfMake.fonts.Amiri && pdfMake.fonts.Amiri.normal && pdfMake.vfs && Object.keys(pdfMake.vfs).length > 0 && Object.keys(pdfMake.vfs).includes('Amiri-Regular.ttf'));
 
   useEffect(() => {
@@ -90,7 +92,7 @@ const AdminPage = () => {
       if (user && user.isAdmin) {
         handleRefresh().finally(() => setPageLoading(false));
       } else {
-        setPageLoading(false);
+        setPageLoading(false); // Ensure pageLoading is set to false for non-admins or if user is null
       }
     }
   }, [authLoading, user, handleRefresh]);
@@ -105,11 +107,11 @@ const AdminPage = () => {
     { header: "يريد من الأضحية", dataKey: "wantsFromSacrificeText" },
     { header: "ماذا يريد", dataKey: "sacrificeWishes" },
     { header: "تم الدفع", dataKey: "paymentConfirmedText" },
-    { header: "توزع لـ", dataKey: "distributionPreferenceText" },
-    { header: "رقم الدفتر", dataKey: "receiptBookNumber"},
-    { header: "رقم السند", dataKey: "voucherNumber"},
+    // { header: "رقم الدفتر", dataKey: "receiptBookNumber"}, // Removed as per request
+    // { header: "رقم السند", dataKey: "voucherNumber"}, // Removed as per request
     { header: "عن طريق وسيط", dataKey: "throughIntermediaryText"},
     { header: "اسم الوسيط", dataKey: "intermediaryName"},
+    { header: "توزع لـ", dataKey: "distributionPreferenceText" },
   ];
 
   const prepareDataForExport = useCallback(async (submissions: AdahiSubmission[]): Promise<any[]> => {
@@ -133,11 +135,11 @@ const AdminPage = () => {
         wantsFromSacrificeText: sub.wantsFromSacrifice ? "نعم" : "لا",
         sacrificeWishes: sub.wantsFromSacrifice ? (sub.sacrificeWishes || "-") : "-",
         paymentConfirmedText: sub.paymentConfirmed ? "نعم" : "لا",
-        distributionPreferenceText: getDistributionLabel(sub.distributionPreference),
-        receiptBookNumber: sub.paymentConfirmed ? (sub.receiptBookNumber || "-") : "-",
-        voucherNumber: sub.paymentConfirmed ? (sub.voucherNumber || "-") : "-",
+        receiptBookNumber: sub.paymentConfirmed ? (sub.receiptBookNumber || "-") : "-", // Still preparing for other uses
+        voucherNumber: sub.paymentConfirmed ? (sub.voucherNumber || "-") : "-", // Still preparing for other uses
         throughIntermediaryText: sub.throughIntermediary ? "نعم" : "لا",
-        intermediaryName: sub.throughIntermediary ? (sub.intermediaryName || "-") : "-",
+        intermediaryName: sub.throughIntermediary ? (sub.intermediaryName || (sub.submitterUsername === sub.intermediaryName ? "المستخدم نفسه" : (sub.intermediaryName || "-") )) : "-",
+        distributionPreferenceText: getDistributionLabel(sub.distributionPreference),
         submissionDateFormatted: sub.submissionDate ? format(new Date(sub.submissionDate), "dd/MM/yyyy HH:mm", { locale: ar }) : 'N/A',
         statusText: sub.status === "entered" ? "مدخلة" : "غير مدخلة",
         userId: sub.userId,
@@ -157,16 +159,18 @@ const AdminPage = () => {
     });
 
     const ws = XLSX.utils.json_to_sheet(worksheetData, {
-      header: columns.map(col => col.header)
+      header: columns.map(col => col.header) // Use only header names for the sheet header row
     });
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
 
+    // Apply styles to the sheet
     if (wb.Sheets[sheetName]) {
         const sheet = wb.Sheets[sheetName];
-        const headerRowIndex = 0; 
+        const headerRowIndex = 0; // Assuming headers are in the first row (index 0)
 
+        // Style header row
         columns.forEach((_col, C_idx) => {
             const header_cell_ref = XLSX.utils.encode_cell({ r: headerRowIndex, c: C_idx });
             if (sheet[header_cell_ref]) {
@@ -183,12 +187,13 @@ const AdminPage = () => {
             }
         });
         
+        // Style data rows
         worksheetData.forEach((_row, R_idx) => {
             columns.forEach((_col, C_idx) => {
-                const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx }); 
+                const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx }); // R_idx + 1 because data starts from the second row
                 if (sheet[cell_ref]) {
                      sheet[cell_ref].s = { 
-                        ...(sheet[cell_ref].s || {}), 
+                        ...(sheet[cell_ref].s || {}), // Preserve existing styles if any
                          border: {
                             top: { style: "thin", color: { auto: 1 } },
                             bottom: { style: "thin", color: { auto: 1 } },
@@ -201,15 +206,17 @@ const AdminPage = () => {
             });
         });
         
-        const colWidths = columns.map(column => ({ wch: Math.max(15, String(column.header).length + 5) })); 
+        // Set column widths
+        const colWidths = columns.map(column => ({ wch: Math.max(15, String(column.header).length + 5) })); // Minimum width of 15, or header length + 5
         sheet['!cols'] = colWidths;
-        sheet['!props'] = { rtl: true }; 
+        sheet['!props'] = { rtl: true }; // Set sheet direction to RTL
         sheet['!autofilter'] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(sheet['!ref']!)) };
     }
     XLSX.writeFile(wb, `${fileName}.xlsx`);
   };
 
- const generatePdfMakeDocument = (title: string, data: any[], columns: Array<{header: string, dataKey: string}>, fileName: string) => {
+
+  const generatePdfMakeDocument = (title: string, data: any[], columns: Array<{header: string, dataKey: string}>, fileName: string) => {
     if (!isAmiriFontConfigured) {
       toast({
         title: "خطأ في إعداد الخط لـ PDF",
@@ -220,12 +227,12 @@ const AdminPage = () => {
       return;
     }
 
-    const pdfColumns = [...columns].reverse(); 
+    const pdfColumns = [...columns].reverse(); // Reverse for visual RTL in PDF table
 
     const tableHeaders = pdfColumns.map(col => ({
-        text: col.header, 
+        text: col.header, // Original text, pdfMake will handle RTL display with Amiri
         style: 'tableHeader',
-        alignment: 'right' as const,
+        alignment: 'right' as const, // Ensure cells are right-aligned
         font: 'Amiri'
     }));
 
@@ -233,8 +240,8 @@ const AdminPage = () => {
       pdfColumns.map(col => {
         const cellValue = item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : '';
         return ({
-            text: cellValue,
-            alignment: 'right' as const,
+            text: cellValue, // Original text
+            alignment: 'right' as const, // Ensure cells are right-aligned
             font: 'Amiri'
         });
       })
@@ -244,20 +251,20 @@ const AdminPage = () => {
 
     const docDefinition: any = {
       pageSize: 'A4',
-      pageOrientation: 'landscape',
-      pageMargins: [PDF_MARGIN, PDF_MARGIN + 20, PDF_MARGIN, PDF_MARGIN + 20], 
+      pageOrientation: 'landscape', // 'landscape' for wider tables
+      pageMargins: [PDF_MARGIN, PDF_MARGIN + 20, PDF_MARGIN, PDF_MARGIN + 20], // [left, top, right, bottom]
       content: [
-        { text: title, style: 'header', alignment: 'right' as const, margin: [0, 0, 0, 10] },
-        { text: exportDateText, style: 'subheader', alignment: 'right' as const, margin: [0, 0, 0, 20] },
+        { text: title, style: 'header', alignment: 'center' as const, margin: [0, 0, 0, 10] }, // Centered title
+        { text: exportDateText, style: 'subheader', alignment: 'center' as const, margin: [0, 0, 0, 20] }, // Centered date
         {
           table: {
             headerRows: 1,
-            widths: pdfColumns.map(() => '*' as const), 
+            widths: pdfColumns.map(() => '*' as const), // Auto-adjust column widths
             body: [tableHeaders, ...tableBody],
           },
           layout: {
             fillColor: function (rowIndex: number, node: any, columnIndex: number) {
-              return (rowIndex === 0) ? '#CCCCCC' : null;
+              return (rowIndex === 0) ? '#CCCCCC' : null; // Gray background for header row
             },
             hLineWidth: function (i: number, node: any) { return (i === 0 || i === node.table.body.length) ? 1 : 1; },
             vLineWidth: function (i: number, node: any) { return (i === 0 || i === node.table.widths.length) ? 1 : 1; },
@@ -268,24 +275,24 @@ const AdminPage = () => {
       ],
       defaultStyle: {
         font: 'Amiri',
-        fontSize: 10,
-        alignment: 'right' as const 
+        fontSize: 10, // Adjusted for potentially more columns
+        alignment: 'right' as const // Default alignment for content
       },
       styles: {
         header: {
           fontSize: 18,
-          alignment: 'right' as const,
+          alignment: 'center' as const,
           font: 'Amiri'
         },
         subheader: {
           fontSize: 12,
-          alignment: 'right' as const,
+          alignment: 'center' as const,
           font: 'Amiri'
         },
         tableHeader: {
-          fontSize: 8, 
+          fontSize: 8, // Smaller font for headers to fit more
           color: 'black',
-          alignment: 'right' as const,
+          alignment: 'right' as const, // Right align header text
           font: 'Amiri'
         }
       },
@@ -295,7 +302,7 @@ const AdminPage = () => {
           text: pageNumText,
           alignment: 'center' as const,
           style: { font: 'Amiri', fontSize: 8 },
-          margin: [0, 10, 0, 0] 
+          margin: [0, 10, 0, 0] // Margin for the footer
         };
       }
     };
@@ -355,6 +362,7 @@ const AdminPage = () => {
       
       allDataPrepared.forEach(subPrepared => {
           let userName = subPrepared.submitterUsername || 'مستخدم_غير_معروف';
+          // Ensure sheet names are valid (Excel has a 31 char limit and some restricted chars)
           const userKey = userName.replace(/[<>:"/\\|?* ]/g, '_').substring(0, 31); 
 
           if (!submissionsByUser[userKey]) {
@@ -366,6 +374,7 @@ const AdminPage = () => {
       for (const userNameKey in submissionsByUser) {
         const userSubmissionsData = submissionsByUser[userNameKey];
         if (userSubmissionsData.length > 0) {
+            // Create a separate Excel file for each user
             exportToExcel(userSubmissionsData, `أضاحي_المستخدم_${userNameKey}`, userNameKey, commonExportColumns);
         }
       }
@@ -434,6 +443,7 @@ const AdminPage = () => {
 
       allDataPrepared.forEach(subPrepared => {
           let userName = subPrepared.submitterUsername || 'مستخدم_غير_معروف';
+          // Sanitize username for use as a key or part of a filename
           const userKey = userName.replace(/[<>:"/\\|?* ]/g, '_'); 
 
           if (!submissionsByUser[userKey]) {
@@ -445,7 +455,8 @@ const AdminPage = () => {
       for (const userNameKey in submissionsByUser) {
         const userSubmissionsData = submissionsByUser[userNameKey];
         if (userSubmissionsData.length > 0) {
-            const safeUserNameKey = userNameKey.substring(0, 30); 
+            // Ensure filenames are valid (e.g., limit length, avoid special characters)
+            const safeUserNameKey = userNameKey.substring(0, 30); // Example: limit filename part to 30 chars
             generatePdfMakeDocument(`تقرير أضاحي المستخدم: ${userNameKey}`, userSubmissionsData, commonExportColumns, `أضاحي_${safeUserNameKey}`);
         }
       }
@@ -467,6 +478,8 @@ const AdminPage = () => {
   }
 
   if (!user || !user.isAdmin) {
+    // This part should ideally be handled by the AdminLayout, which redirects.
+    // If AdminLayout is working correctly, this should not be displayed for long.
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <p className="text-destructive text-center">غير مصرح لك بالدخول لهذه الصفحة. يتم توجيهك...</p>
@@ -576,6 +589,7 @@ const AdminPage = () => {
             </Button>
           </div>
 
+          {/* PDF Export Buttons */}
           <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
             <Button onClick={handleExportAllPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0 || !isAmiriFontConfigured} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700 text-xs sm:text-sm">
               {exportingType === 'allPdf' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
@@ -591,6 +605,7 @@ const AdminPage = () => {
             </Button>
           </div>
 
+          {/* Excel Export Buttons */}
           <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
             <Button onClick={handleExportAllExcel} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700 text-xs sm:text-sm">
               {exportingType === 'allExcel' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Sheet className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
