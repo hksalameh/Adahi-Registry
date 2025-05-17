@@ -44,9 +44,6 @@ if (vfsFontsDataFromLib) {
   }
 }
 
-
-//  يفترض أن pdfMake.vfs قد تم تهيئته الآن بواسطة الاستيراد أعلاه لملف الخطوط المخصص.
-
 // Configure Amiri font for pdfMake
 // IMPORTANT: For Amiri (or any custom font) to work correctly,
 // you need to have a vfs_fonts.js file that includes the font data,
@@ -56,18 +53,18 @@ if (pdfMake.fonts) {
       ...pdfMake.fonts, // Preserve existing fonts (like Roboto from default vfs_fonts if it was loaded)
       Amiri: { // The name 'Amiri' here must match the font name used in defaultStyle and styles
         normal: 'Amiri-Regular.ttf', // This assumes Amiri-Regular.ttf data is in pdfMake.vfs (from your custom vfs_fonts.js)
-        bold: 'Amiri-Bold.ttf',     // This assumes Amiri-Bold.ttf data is in pdfMake.vfs
-        italics: 'Amiri-Regular.ttf', // Using regular for italics if no specific italic font
-        bolditalics: 'Amiri-Bold.ttf' // Using bold for bolditalics if no specific bold-italic font
+        // bold: 'Amiri-Bold.ttf',     // Temporarily removed to debug "offsets" error
+        // italics: 'Amiri-Regular.ttf', // Temporarily removed
+        // bolditalics: 'Amiri-Bold.ttf' // Temporarily removed
       }
     };
 } else {
     pdfMake.fonts = {
       Amiri: {
         normal: 'Amiri-Regular.ttf',
-        bold: 'Amiri-Bold.ttf',
-        italics: 'Amiri-Regular.ttf',
-        bolditalics: 'Amiri-Bold.ttf'
+        // bold: 'Amiri-Bold.ttf',     // Temporarily removed
+        // italics: 'Amiri-Regular.ttf', // Temporarily removed
+        // bolditalics: 'Amiri-Bold.ttf' // Temporarily removed
       }
     };
 }
@@ -86,14 +83,12 @@ const AdminPage = () => {
   const isAmiriFontConfigured = !!(
     pdfMake.fonts &&
     pdfMake.fonts.Amiri &&
-    pdfMake.fonts.Amiri.normal &&
+    pdfMake.fonts.Amiri.normal && // Check for normal style
     pdfMake.vfs && // Check if vfs itself exists and is populated
     Object.keys(pdfMake.vfs).includes('Amiri-Regular.ttf') // Check if the font file data is in VFS
   );
 
   useEffect(() => {
-    // This toast will appear if Amiri is defined in pdfMake.fonts, but the actual font data for Amiri-Regular.ttf is missing from pdfMake.vfs
-    // This can happen if the custom vfs_fonts.js is missing or doesn't include Amiri-Regular.ttf correctly.
     if (pdfMake.fonts?.Amiri && (!pdfMake.vfs || !Object.keys(pdfMake.vfs).includes('Amiri-Regular.ttf'))) {
       toast({
         title: "تنبيه بخصوص خط PDF (Amiri)",
@@ -102,7 +97,6 @@ const AdminPage = () => {
         duration: 10000,
       });
     } else if (!pdfMake.fonts?.Amiri && (exportingType?.includes('Pdf'))) {
-      // This toast appears if Amiri is not even defined in pdfMake.fonts
       toast({
         title: "تنبيه بخصوص خط PDF",
         description: "لم يتم تكوين خط Amiri لـ pdfMake. قد لا تظهر النصوص العربية بشكل صحيح في ملفات PDF. يُنصح باستخدام تصدير Excel للحصول على أفضل دعم للغة العربية.",
@@ -171,8 +165,8 @@ const AdminPage = () => {
         wantsFromSacrificeText: sub.wantsFromSacrifice ? "نعم" : "لا",
         sacrificeWishes: sub.wantsFromSacrifice ? (sub.sacrificeWishes || "-") : "-",
         paymentConfirmedText: sub.paymentConfirmed ? "نعم" : "لا",
-        receiptBookNumber: sub.paymentConfirmed ? (sub.receiptBookNumber || "-") : "-",
-        voucherNumber: sub.paymentConfirmed ? (sub.voucherNumber || "-") : "-",
+        receiptBookNumber: sub.paymentConfirmed ? (sub.receiptBookNumber || "-") : "-", // Not in commonExportColumns but prepared
+        voucherNumber: sub.paymentConfirmed ? (sub.voucherNumber || "-") : "-", // Not in commonExportColumns but prepared
         throughIntermediaryText: sub.throughIntermediary ? "نعم" : "لا",
         intermediaryName: sub.throughIntermediary ? (sub.intermediaryName || "-") : "-",
         distributionPreferenceText: getDistributionLabel(sub.distributionPreference),
@@ -203,8 +197,9 @@ const AdminPage = () => {
 
     if (wb.Sheets[sheetName]) {
         const sheet = wb.Sheets[sheetName];
+        
+        // Style header row
         const headerRowIndex = 0;
-
         columns.forEach((_col, C_idx) => {
             const header_cell_ref = XLSX.utils.encode_cell({ r: headerRowIndex, c: C_idx });
             if (sheet[header_cell_ref]) {
@@ -221,12 +216,13 @@ const AdminPage = () => {
             }
         });
 
+        // Style data rows
         worksheetData.forEach((_row, R_idx) => {
             columns.forEach((_col, C_idx) => {
-                const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx });
-                if (sheet[cell_ref]) {
+                const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx }); // R_idx + 1 because data rows start after header
+                if (sheet[cell_ref]) { // Check if cell exists
                      sheet[cell_ref].s = {
-                        ...(sheet[cell_ref].s || {}),
+                        ...(sheet[cell_ref].s || {}), // Preserve existing styles if any
                          border: {
                             top: { style: "thin", color: { auto: 1 } },
                             bottom: { style: "thin", color: { auto: 1 } },
@@ -238,7 +234,7 @@ const AdminPage = () => {
                 }
             });
         });
-
+        
         const colWidths = columns.map(column => ({ wch: Math.max(15, String(column.header).length + 5) }));
         sheet['!cols'] = colWidths;
         sheet['!props'] = { rtl: true };
@@ -248,7 +244,6 @@ const AdminPage = () => {
     }
     XLSX.writeFile(wb, `${fileName}.xlsx`);
   };
-
 
   const generatePdfMakeDocument = (title: string, data: any[], columns: Array<{header: string, dataKey: string}>, fileName: string) => {
     if (!isAmiriFontConfigured) {
@@ -261,17 +256,17 @@ const AdminPage = () => {
       return;
     }
 
-    const pdfColumns = [...columns].reverse();
+    const pdfColumns = [...columns].reverse(); // Reverse for RTL table layout
 
     const tableHeaders = pdfColumns.map(col => ({
-        text: col.header,
+        text: col.header, // Text as is, pdfMake with Amiri should handle RTL
         style: 'tableHeader',
         alignment: 'right' as const,
     }));
 
     const tableBody = data.map(item =>
       pdfColumns.map(col => ({
-        text: item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : '',
+        text: item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : '', // Text as is
         alignment: 'right' as const,
       }))
     );
@@ -281,14 +276,14 @@ const AdminPage = () => {
     const docDefinition: any = {
       pageSize: 'A4',
       pageOrientation: 'landscape',
-      pageMargins: [PDF_MARGIN, PDF_MARGIN + 20, PDF_MARGIN, PDF_MARGIN + 20],
+      pageMargins: [PDF_MARGIN, PDF_MARGIN + 20, PDF_MARGIN, PDF_MARGIN + 20], // top, right, bottom, left
       content: [
         { text: title, style: 'header', alignment: 'center' as const, margin: [0, 0, 0, 10] },
         { text: exportDateText, style: 'subheader', alignment: 'center' as const, margin: [0, 0, 0, 20] },
         {
           table: {
             headerRows: 1,
-            widths: pdfColumns.map(() => '*' as const),
+            widths: pdfColumns.map(() => '*' as const), // Equal column widths
             body: [tableHeaders, ...tableBody],
           },
           layout: {
@@ -303,9 +298,9 @@ const AdminPage = () => {
         }
       ],
       defaultStyle: {
-        font: 'Amiri',
+        font: 'Amiri', // Ensure Amiri is the default
         fontSize: 10,
-        alignment: 'right' as const
+        alignment: 'right' as const // Default alignment for text
       },
       styles: {
         header: {
@@ -319,9 +314,9 @@ const AdminPage = () => {
           font: 'Amiri'
         },
         tableHeader: {
-          fontSize: 8,
+          fontSize: 8, // Reduced font size for header to fit more
           color: 'black',
-          alignment: 'right' as const,
+          alignment: 'right' as const, // Ensure header text is right-aligned
           font: 'Amiri'
         }
       },
@@ -331,7 +326,7 @@ const AdminPage = () => {
           text: pageNumText,
           alignment: 'center' as const,
           style: { font: 'Amiri', fontSize: 8 },
-          margin: [0, 10, 0, 0]
+          margin: [0, 10, 0, 0] // Adjust margin for footer as needed
         };
       }
     };
@@ -391,6 +386,7 @@ const AdminPage = () => {
 
       allDataPrepared.forEach(subPrepared => {
           let userName = subPrepared.submitterUsername || 'مستخدم_غير_معروف';
+          // Sanitize username for sheet name (max 31 chars, no invalid chars)
           const userKey = userName.replace(/[<>:"/\\|?* [\]]/g, '_').substring(0, 31);
 
 
@@ -420,6 +416,7 @@ const AdminPage = () => {
       return;
     }
     if (!isAmiriFontConfigured) {
+      // Toast is already shown by generatePdfMakeDocument if font is not configured
       return;
     }
     setExportingType('allPdf');
@@ -468,7 +465,7 @@ const AdminPage = () => {
 
       allDataPrepared.forEach(subPrepared => {
           let userName = subPrepared.submitterUsername || 'مستخدم_غير_معروف';
-          const userKey = userName.replace(/[<>:"/\\|?* [\]]/g, '_');
+          const userKey = userName.replace(/[<>:"/\\|?* [\]]/g, '_'); // Sanitize for filename
 
           if (!submissionsByUser[userKey]) {
               submissionsByUser[userKey] = [];
@@ -479,7 +476,7 @@ const AdminPage = () => {
       for (const userNameKey in submissionsByUser) {
         const userSubmissionsData = submissionsByUser[userNameKey];
         if (userSubmissionsData.length > 0) {
-            const safeUserNameKey = userNameKey.substring(0, 30);
+            const safeUserNameKey = userNameKey.substring(0, 30); // Ensure filename isn't too long
             generatePdfMakeDocument(`تقرير أضاحي المستخدم: ${userNameKey}`, userSubmissionsData, commonExportColumns, `أضاحي_${safeUserNameKey}`);
         }
       }
@@ -500,7 +497,7 @@ const AdminPage = () => {
     );
   }
 
-  if (!user || !user.isAdmin) {
+  if (!user || !user.isAdmin) { // Should be caught by AdminLayout, but as a fallback
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <p className="text-destructive text-center">غير مصرح لك بالدخول لهذه الصفحة. يتم توجيهك...</p>
