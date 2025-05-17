@@ -41,14 +41,15 @@ interface AuthContextType {
   register: (username: string, email: string, pass: string) => Promise<AppUser | null>;
   logout: () => void;
   submissions: AdahiSubmission[];
-  addSubmission: (submission: Omit<AdahiSubmission, "id" | "submissionDate" | "status" | "userId" | "userEmail" | "lastUpdatedBy" | "lastUpdatedByEmail" | "lastUpdated" | "submitterUsername">) => Promise<AdahiSubmission | null>;
+  addSubmission: (submission: Omit<AdahiSubmission, "id" | "submissionDate" | "status" | "userId" | "userEmail" | "lastUpdatedBy" | "lastUpdatedByEmail" | "lastUpdated" | "submitterUsername" | "isSlaughtered" | "slaughterDate">) => Promise<AdahiSubmission | null>;
   updateSubmissionStatus: (submissionId: string, status: 'pending' | 'entered') => Promise<boolean>;
-  updateSubmission: (submissionId: string, data: Partial<Omit<AdahiSubmission, 'id' | 'userId' | 'userEmail' | 'submissionDate' | 'lastUpdated' | 'lastUpdatedBy' | 'lastUpdatedByEmail' | "submitterUsername">>) => Promise<AdahiSubmission | null>;
+  updateSubmission: (submissionId: string, data: Partial<Omit<AdahiSubmission, 'id' | 'userId' | 'userEmail' | 'submissionDate' | 'lastUpdated' | 'lastUpdatedBy' | 'lastUpdatedByEmail' | "submitterUsername" | "isSlaughtered" | "slaughterDate">>) => Promise<AdahiSubmission | null>;
   deleteSubmission: (submissionId: string) => Promise<boolean>;
   allSubmissionsForAdmin: AdahiSubmission[];
   fetchUserById: (userId: string) => Promise<AppUser | null>;
   fetchUserByUsername: (username: string) => Promise<AppUser | null>;
   refreshData: () => Promise<void>;
+  markAsSlaughtered: (submissionId: string, donorName: string, phoneNumber: string) => Promise<boolean>;
 }
 
 const ADMIN_UID = "vqhrldpAdeWGcCgcMpWWRGdslOS2";
@@ -99,7 +100,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error("Error fetching user by ID:", error);
       return null;
     }
-  }, [toast]);
+  }, []); // Removed toast from dependencies as it's stable
 
   const fetchUserByUsername = useCallback(async (username: string): Promise<AppUser | null> => {
     if (!db) {
@@ -136,7 +137,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       toast({ variant: "destructive", title: "خطأ", description: "فشل في جلب بيانات المستخدم." });
       return null;
     }
-  }, [toast]);
+  }, [toast]); // toast is okay here as it's a stable function from useToast
 
   useEffect(() => {
     if (!auth || !db) {
@@ -165,14 +166,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             };
             console.log(`[AuthContext onAuthStateChanged] Firebase UID: ${firebaseUser.uid}, ADMIN_UID: ${ADMIN_UID}. Determined isAdmin: ${finalAppUser.isAdmin}`);
             console.log("[AuthContext onAuthStateChanged] Setting user (from appUser):", JSON.stringify(finalAppUser));
-            if (isMounted) setUser(finalAppUser);
+            if (isMounted) {
+              setUser(finalAppUser);
+              await refreshData(finalAppUser); // Pass the newly set user to refreshData
+            }
         } else {
             console.warn(`[AuthContext onAuthStateChanged] User with UID ${firebaseUser.uid} authenticated but no appUser profile returned from fetchUserById. Setting user to null.`);
             if (isMounted) setUser(null);
         }
       } else {
         console.log("[AuthContext onAuthStateChanged] No FirebaseUser, setting user to null.");
-        if (isMounted) setUser(null);
+        if (isMounted) {
+          setUser(null);
+          setSubmissions([]); // Clear submissions if no user
+          setAllSubmissions([]); // Clear admin submissions if no user
+        }
       }
       console.log("[AuthContext onAuthStateChanged] Setting loading to false.");
       if (isMounted) setLoading(false);
@@ -183,7 +191,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log("[AuthContext useEffect] Unsubscribing from onAuthStateChanged.");
       unsubscribeAuthStateChanged();
     };
-  }, [fetchUserById]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchUserById]); // refreshData will be called internally by onAuthStateChanged after user is set
 
 
   const login = async (identifier: string, pass: string): Promise<AppUser | null> => {
@@ -200,7 +209,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (identifier === process.env.NEXT_PUBLIC_ADMIN_USERNAME && process.env.NEXT_PUBLIC_ADMIN_EMAIL) {
         emailToLogin = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
         console.log(`[AuthContext Login] Admin login with username, using admin email: ${emailToLogin}`);
-    } else if (isLoginByUsername && identifier !== (process.env.NEXT_PUBLIC_ADMIN_USERNAME || "Admin_default_username_placeholder")) {
+    } else if (isLoginByUsername && identifier !== (process.env.NEXT_PUBLIC_ADMIN_USERNAME || "Admin")) { // Ensure "Admin" is handled or remove if not needed
         console.log(`[AuthContext Login] Regular user login with username: ${identifier}`);
         const userProfile = await fetchUserByUsername(identifier);
         if (userProfile && userProfile.email) {
@@ -247,7 +256,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       console.log(`[AuthContext Login] Login successful. Firebase UID: ${firebaseUser.uid}, ADMIN_UID: ${ADMIN_UID}. Determined isAdmin: ${finalAppUser.isAdmin}`);
       console.log("[AuthContext Login] Returning finalAppUser from login function:", JSON.stringify(finalAppUser));
-      // setLoading(false); // Removed from here, onAuthStateChanged handles this
       return finalAppUser;
 
     } catch (error: any) {
@@ -261,7 +269,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         errorMessage += "الرجاء التحقق من بيانات الاعتماد أو الاتصال بالمسؤول.";
       }
       toast({ variant: "destructive", title: "خطأ في تسجيل الدخول", description: errorMessage });
-      // setLoading(false); // Removed from here, onAuthStateChanged handles this
       return null;
     }
   };
@@ -355,6 +362,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.log("[AuthContext Logout] Attempting to sign out.");
         await signOut(auth);
         console.log("[AuthContext Logout] Sign out successful. Navigating to login.");
+        // setUser(null); // This will be handled by onAuthStateChanged
+        // setSubmissions([]);
+        // setAllSubmissions([]);
         router.push("/auth/login");
     } catch (error: any) {
         console.error("[AuthContext Logout] Logout error:", error);
@@ -362,14 +372,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const refreshData = useCallback(async () => {
-    if (!db || !user) {
-      console.log("[AuthContext refreshData] Aborted: DB not ready or no user.");
+  const refreshData = useCallback(async (currentUser: AppUser | null = user) => { // Accept user as parameter, default to context's user
+    if (!db || !currentUser) {
+      console.log("[AuthContext refreshData] Aborted: DB not ready or no user.", { dbReady: !!db, currentUserExists: !!currentUser });
+      setSubmissions([]); // Clear submissions if no user or db
+      setAllSubmissions([]); // Clear admin submissions
       return;
     }
-    console.log(`[AuthContext refreshData] Starting data refresh for user ID: ${user.id}, isAdmin: ${user.isAdmin}`);
+    console.log(`[AuthContext refreshData] Starting data refresh for user ID: ${currentUser.id}, isAdmin: ${currentUser.isAdmin}`);
     try {
-      if (user.isAdmin) {
+      if (currentUser.isAdmin) {
         console.log("[AuthContext refreshData] User is Admin. Fetching all submissions.");
         const adminQuery = query(collection(db, "submissions"), orderBy("submissionDate", "desc"));
         const adminSnapshot = await getDocs(adminQuery);
@@ -386,6 +398,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             id: docSnapshot.id, ...data,
             submissionDate: data.submissionDate?.toDate ? data.submissionDate.toDate().toISOString() : (data.submissionDate ? new Date(data.submissionDate).toISOString() : new Date().toISOString()),
             lastUpdated: data.lastUpdated?.toDate ? data.lastUpdated.toDate().toISOString() : (data.lastUpdated ? new Date(data.lastUpdated).toISOString() : new Date().toISOString()),
+            slaughterDate: data.slaughterDate?.toDate ? data.slaughterDate.toDate().toISOString() : (data.slaughterDate ? new Date(data.slaughterDate).toISOString() : undefined),
             submitterUsername,
           } as AdahiSubmission;
         });
@@ -394,8 +407,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.log("[AuthContext refreshData] Admin submissions fetched:", resolvedAdminSubs.length);
       }
 
-      console.log(`[AuthContext refreshData] Fetching submissions for current user: ${user.id}`);
-      const userQuery = query(collection(db, "submissions"), where("userId", "==", user.id), orderBy("submissionDate", "desc"));
+      console.log(`[AuthContext refreshData] Fetching submissions for current user: ${currentUser.id}`);
+      const userQuery = query(collection(db, "submissions"), where("userId", "==", currentUser.id), orderBy("submissionDate", "desc"));
       const userSnapshot = await getDocs(userQuery);
       const userSubs = userSnapshot.docs.map(docSnapshot => {
         const data = docSnapshot.data();
@@ -403,10 +416,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             id: docSnapshot.id, ...data,
             submissionDate: data.submissionDate?.toDate ? data.submissionDate.toDate().toISOString() : (data.submissionDate ? new Date(data.submissionDate).toISOString() : new Date().toISOString()),
             lastUpdated: data.lastUpdated?.toDate ? data.lastUpdated.toDate().toISOString() : (data.lastUpdated ? new Date(data.lastUpdated).toISOString() : new Date().toISOString()),
+            slaughterDate: data.slaughterDate?.toDate ? data.slaughterDate.toDate().toISOString() : (data.slaughterDate ? new Date(data.slaughterDate).toISOString() : undefined),
         } as AdahiSubmission;
       });
       setSubmissions(userSubs);
-      console.log("[AuthContext refreshData] User submissions fetched:", userSubs.length);
+      console.log("[AuthContext refreshData - User] User submissions fetched:", userSubs.length, userSubs);
 
     } catch (error: any) {
         console.error("[AuthContext refreshData] Error refreshing data:", error);
@@ -414,10 +428,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
         console.log("[AuthContext refreshData] Data refresh complete.");
     }
-  }, [db, user, toast, fetchUserById]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [db, user, toast, fetchUserById]); // Keep 'user' in dependency array if refreshData is called outside onAuthStateChanged context
 
 
-  const addSubmission = async (submissionData: Omit<AdahiSubmission, "id" | "submissionDate" | "status" | "userId" | "userEmail" | "lastUpdatedBy" | "lastUpdatedByEmail" | "lastUpdated" | "submitterUsername">): Promise<AdahiSubmission | null> => {
+  const addSubmission = async (submissionData: Omit<AdahiSubmission, "id" | "submissionDate" | "status" | "userId" | "userEmail" | "lastUpdatedBy" | "lastUpdatedByEmail" | "lastUpdated" | "submitterUsername" | "isSlaughtered" | "slaughterDate">): Promise<AdahiSubmission | null> => {
     if (!db) {
       toast({ variant: "destructive", title: "خطأ", description: "قاعدة البيانات غير مهيأة." });
       return null;
@@ -437,7 +452,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         lastUpdated: serverTimestamp(),
         lastUpdatedBy: user.id,
         lastUpdatedByEmail: user.email,
-        submitterUsername: user.username 
+        submitterUsername: user.username,
+        isSlaughtered: false, // Default value
       };
       const docRef = await addDoc(collection(db, "submissions"), newSubmissionData);
       
@@ -454,6 +470,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         lastUpdatedBy: newSubmissionData.lastUpdatedBy,
         lastUpdatedByEmail: newSubmissionData.lastUpdatedByEmail,
         submitterUsername: user.username,
+        isSlaughtered: false,
       };
       return clientSideRepresentation;
     } catch (error: any) {
@@ -480,7 +497,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         lastUpdatedBy: user.id,
         lastUpdatedByEmail: user.email,
        });
-      // await refreshData(); // No longer calling refreshData from here. It will be called from AdminSubmissionsTable.
+      await refreshData(); 
       return true;
     } catch (error: any) {
       console.error("[AuthContext updateSubmissionStatus] Error updating status:", error);
@@ -489,7 +506,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const updateSubmission = async (submissionId: string, data: Partial<Omit<AdahiSubmission, 'id' | 'userId' | 'userEmail' | 'submissionDate' | 'lastUpdated' | 'lastUpdatedBy' | 'lastUpdatedByEmail' | 'submitterUsername'>>): Promise<AdahiSubmission | null> => {
+  const updateSubmission = async (submissionId: string, data: Partial<Omit<AdahiSubmission, 'id' | 'userId' | 'userEmail' | 'submissionDate' | 'lastUpdated' | 'lastUpdatedBy' | 'lastUpdatedByEmail' | 'submitterUsername' | "isSlaughtered" | "slaughterDate">>): Promise<AdahiSubmission | null> => {
     if (!db) {
       toast({ variant: "destructive", title: "خطأ", description: "قاعدة البيانات غير مهيأة." });
       return null;
@@ -508,7 +525,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         lastUpdatedByEmail: user.email,
       };
       await updateDoc(submissionDocRef, updateData);
-      // await refreshData(); // No longer calling refreshData from here. It will be called from AdminSubmissionsTable.
+      await refreshData();
 
 
       const updatedDocSnap = await getDoc(submissionDocRef);
@@ -524,9 +541,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         const result = {
           id: updatedDocSnap.id,
-          ...(updatedDataFirebase as Omit<AdahiSubmission, 'id' | 'submissionDate' | 'lastUpdated' | 'submitterUsername'>),
+          ...(updatedDataFirebase as Omit<AdahiSubmission, 'id' | 'submissionDate' | 'lastUpdated' | 'submitterUsername' | 'slaughterDate'>),
           submissionDate: updatedDataFirebase.submissionDate?.toDate ? updatedDataFirebase.submissionDate.toDate().toISOString() : (updatedDataFirebase.submissionDate ? new Date(updatedDataFirebase.submissionDate).toISOString() : new Date().toISOString()),
           lastUpdated: updatedDataFirebase.lastUpdated?.toDate ? updatedDataFirebase.lastUpdated.toDate().toISOString() : (updatedDataFirebase.lastUpdated ? new Date(updatedDataFirebase.lastUpdated).toISOString() : new Date().toISOString()),
+          slaughterDate: updatedDataFirebase.slaughterDate?.toDate ? updatedDataFirebase.slaughterDate.toDate().toISOString() : (updatedDataFirebase.slaughterDate ? new Date(updatedDataFirebase.slaughterDate).toISOString() : undefined),
           submitterUsername,
          } as AdahiSubmission;
          return result;
@@ -551,11 +569,50 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const submissionDocRef = doc(db, "submissions", submissionId);
       await deleteDoc(submissionDocRef);
-      // await refreshData(); // No longer calling refreshData from here. It will be called from AdminSubmissionsTable.
+      await refreshData(); 
       return true;
     } catch (error: any) {
       console.error("[AuthContext deleteSubmission] Error deleting submission:", error);
       toast({ variant: "destructive", title: "خطأ في حذف البيانات", description: `فشل في حذف البيانات: ${error.message}` });
+      return false;
+    }
+  };
+
+  const markAsSlaughtered = async (submissionId: string, donorName: string, phoneNumber: string): Promise<boolean> => {
+    if (!db || !user || !user.isAdmin) {
+      toast({ variant: "destructive", title: "غير مصرح به", description: "ليس لديك صلاحية لتحديث حالة الذبح." });
+      return false;
+    }
+    console.log(`[AuthContext markAsSlaughtered] Attempting to mark submission ${submissionId} as slaughtered.`);
+    try {
+      const submissionDocRef = doc(db, "submissions", submissionId);
+      await updateDoc(submissionDocRef, {
+        isSlaughtered: true,
+        slaughterDate: serverTimestamp(), // Records the time of slaughter
+        lastUpdated: serverTimestamp(),
+        lastUpdatedBy: user.id,
+        lastUpdatedByEmail: user.email,
+      });
+
+      // Attempt to open WhatsApp for notification
+      const message = `السيد/السيدة ${donorName} تقبل الله طاعتكم وكل عام وانتم بالف خير تم ذبح اضحيتك ربنا يتقبل منكم`;
+      // Basic phone number formatting (assuming Jordan, +962)
+      let formattedPhoneNumber = phoneNumber.startsWith("0") ? phoneNumber.substring(1) : phoneNumber;
+      if (!formattedPhoneNumber.startsWith("962")) {
+        formattedPhoneNumber = `962${formattedPhoneNumber}`;
+      }
+      const whatsappUrl = `https://wa.me/${formattedPhoneNumber}?text=${encodeURIComponent(message)}`;
+      
+      if (typeof window !== "undefined") {
+        window.open(whatsappUrl, '_blank'); // Opens in a new tab/window, user needs to send
+      }
+
+      toast({ title: "تم تسجيل الذبح بنجاح", description: `سيتم محاولة فتح WhatsApp لإشعار ${donorName}.` });
+      await refreshData(); // Refresh data to update the UI
+      return true;
+    } catch (error: any) {
+      console.error("[AuthContext markAsSlaughtered] Error marking as slaughtered:", error);
+      toast({ variant: "destructive", title: "خطأ", description: `فشل تحديث حالة الذبح: ${error.message}` });
       return false;
     }
   };
@@ -575,10 +632,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         allSubmissionsForAdmin: allSubmissions,
         fetchUserById,
         fetchUserByUsername,
-        refreshData
+        refreshData,
+        markAsSlaughtered 
     }}>
       {children}
     </AuthContext.Provider>
   );
 };
-

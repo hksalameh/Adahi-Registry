@@ -32,6 +32,8 @@ export interface AdahiSubmission {
   lastUpdated: string; // Stored as ISO string
   lastUpdatedBy?: string; // Firebase UID of the user who last updated
   lastUpdatedByEmail?: string; // Email of the user who last updated
+  isSlaughtered?: boolean; // To track slaughter status
+  slaughterDate?: string; // To store the date of slaughter
 }
 
 export const distributionOptions: { value: DistributionPreference; label: string }[] = [
@@ -40,4 +42,3 @@ export const distributionOptions: { value: DistributionPreference; label: string
   { value: 'donor', label: 'لنفس المتبرع' },
   { value: 'fund', label: 'لصندوق التكافل والتضامن' },
 ];
-
