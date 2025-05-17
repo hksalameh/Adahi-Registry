@@ -36,7 +36,6 @@ const AdminPage = () => {
   const [exportingType, setExportingType] = useState<string | null>(null);
   const [isRegisterDialogOpen, setIsRegisterDialogOpen] = useState(false);
 
-
   const getDistributionLabel = useCallback((value?: DistributionPreference | string) => {
     if (!value) return "غير محدد";
     return distributionOptions.find(opt => opt.value === value)?.label || String(value);
@@ -55,7 +54,6 @@ const AdminPage = () => {
         if (typeof handleRefresh === 'function') {
             handleRefresh().finally(() => setPageLoading(false));
         } else {
-            console.warn("handleRefresh is not defined at the time of calling in useEffect");
             setPageLoading(false);
         }
       } else {
@@ -86,9 +84,13 @@ const AdminPage = () => {
       const sub = submissions[i];
       let submitterUsername = sub.submitterUsername || sub.userEmail || "غير معروف";
       if (!sub.submitterUsername && sub.userId) {
-        const submitterProfile = await fetchUserById(sub.userId);
-        if (submitterProfile && submitterProfile.username) {
-          submitterUsername = submitterProfile.username;
+        try {
+            const submitterProfile = await fetchUserById(sub.userId);
+            if (submitterProfile && submitterProfile.username) {
+            submitterUsername = submitterProfile.username;
+            }
+        } catch (e) {
+            console.error("Error fetching submitter profile for export:", e);
         }
       }
       prepared.push({
@@ -190,16 +192,16 @@ const AdminPage = () => {
     try {
       const exportDateText = `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`;
       
-      let tableHtml = `<table style="width: 100%; border-collapse: collapse; font-family: 'Amiri', Arial, sans-serif; font-size: 8pt; direction: rtl;">`; // Added font-size: 8pt and direction: rtl
+      let tableHtml = `<table style="width: 100%; border-collapse: collapse; font-family: 'Amiri', Arial, sans-serif; font-size: 8pt; direction: rtl;">`;
       tableHtml += `<thead><tr>`;
-      columns.forEach(col => { // Use original columns order for HTML, RTL will handle visual
+      columns.forEach(col => {
         tableHtml += `<th style="border: 1px solid black; padding: 5px; text-align: center; vertical-align: middle; background-color: #eeeeee; font-family: 'Amiri', Arial, sans-serif; font-weight: bold;">${col.header}</th>`;
       });
       tableHtml += `</tr></thead>`;
       tableHtml += `<tbody>`;
       data.forEach(item => {
         tableHtml += `<tr>`;
-        columns.forEach(col => { // Use original columns order for HTML
+        columns.forEach(col => { 
           const value = item.hasOwnProperty(col.dataKey) ? item[col.dataKey] : "";
           tableHtml += `<td style="border: 1px solid black; padding: 5px; text-align: center; vertical-align: middle; font-family: 'Amiri', Arial, sans-serif;">${value}</td>`;
         });
@@ -275,7 +277,7 @@ const AdminPage = () => {
     }
     setExportingType(null);
   };
-
+  
   const handleExportAllExceptGazaExcel = async () => {
     const exceptGazaSubmissions = allSubmissionsForAdmin.filter(s => s.distributionPreference !== 'gaza');
     if (exceptGazaSubmissions.length === 0) {
@@ -513,9 +515,7 @@ const AdminPage = () => {
                  </Button>
             </div>
 
-            <div className="flex justify-center">
-                <p className="text-sm font-medium text-center mt-2 mb-1">تصدير PDF</p>
-            </div>
+            {/* PDF Export Buttons Row */}
             <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
                 <Button onClick={handleExportAllPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700 text-xs sm:text-sm">
                     {exportingType === 'allPdf' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
@@ -535,9 +535,7 @@ const AdminPage = () => {
                 </Button>
             </div>
 
-            <div className="flex justify-center">
-                <p className="text-sm font-medium text-center mt-2 mb-1">تصدير Excel</p>
-            </div>
+            {/* Excel Export Buttons Row */}
             <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
                 <Button onClick={handleExportAllExcel} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700 text-xs sm:text-sm">
                     {exportingType === 'allExcel' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Sheet className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
@@ -565,6 +563,5 @@ const AdminPage = () => {
 }
 
 export default AdminPage;
-    
 
     
