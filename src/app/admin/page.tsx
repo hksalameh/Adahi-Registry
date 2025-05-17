@@ -52,12 +52,9 @@ const AdminPage = () => {
   useEffect(() => {
     if (!authLoading) {
       if (user && user.isAdmin) {
-        // Ensure handleRefresh is defined before being called or added to dependency array
         if (typeof handleRefresh === 'function') {
           handleRefresh().finally(() => setPageLoading(false));
         } else {
-          // Fallback or error handling if handleRefresh is not yet defined
-          // This case should ideally not happen with useCallback
           refreshData().finally(() => setPageLoading(false));
         }
       } else {
@@ -191,16 +188,17 @@ const AdminPage = () => {
     XLSX.writeFile(wb, `${fileName}.xlsx`);
   };
 
-  const generatePdfWithHtml2Pdf = (title: string, data: any[], columns: Array<{header: string, dataKey: string}>, fileName: string) => {
-    setExportingType('pdf'); 
+  const generatePdfWithHtml2Pdf = (title: string, data: any[], columns: Array<{header: string, dataKey: string}>, fileNameSuffix: string) => {
+    setExportingType('pdf'); // A general 'pdf' type, specific loader handled by button's condition
     try {
       const exportDateText = `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`;
       
       let tableHtml = `<table style="width: 100%; border-collapse: collapse; font-family: 'Amiri', Arial, sans-serif;">`;
       tableHtml += `<thead><tr>`;
+      // Use original columns for PDF to maintain requested order
       columns.forEach(col => {
-        tableHtml += `<th style="border: 1px solid black; padding: 0px; background-color: #eeeeee; text-align: center;">
-                        <div style="display: flex; align-items: center; justify-content: center; height: 100%; padding: 5px; font-size: 9pt; line-height: 1.2;">
+        tableHtml += `<th style="border: 1px solid black; background-color: #eeeeee; text-align: center; vertical-align: middle; line-height: 1.2; font-size: 9pt; padding: 5px;">
+                        <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
                           ${col.header}
                         </div>
                       </th>`;
@@ -211,8 +209,8 @@ const AdminPage = () => {
         tableHtml += `<tr>`;
         columns.forEach(col => {
           const value = item.hasOwnProperty(col.dataKey) ? item[col.dataKey] : "";
-          tableHtml += `<td style="border: 1px solid black; padding: 0px; text-align: center;">
-                          <div style="display: flex; align-items: center; justify-content: center; height: 100%; padding: 5px; font-size: 9pt; line-height: 1.2;">
+          tableHtml += `<td style="border: 1px solid black; text-align: center; vertical-align: middle; line-height: 1.2; font-size: 9pt; padding: 5px;">
+                          <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
                             ${value}
                           </div>
                         </td>`;
@@ -220,6 +218,8 @@ const AdminPage = () => {
         tableHtml += `</tr>`;
       });
       tableHtml += `</tbody></table>`;
+
+      const finalFileName = `${fileNameSuffix}`; // Use the provided suffix directly
 
       const contentHtml = `
         <div style="direction: rtl; text-align: center; font-family: 'Amiri', Arial, sans-serif; margin: ${PDF_MARGIN}mm;">
@@ -234,7 +234,7 @@ const AdminPage = () => {
       
       const opt = {
         margin: PDF_MARGIN,
-        filename: `${fileName}.pdf`,
+        filename: `${finalFileName}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, logging: true, dpi: 192, letterRendering: true },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
@@ -242,10 +242,10 @@ const AdminPage = () => {
       };
 
       html2pdf().from(element).set(opt).save().then(() => {
-         toast({ title: `تم تصدير ${fileName} (PDF) بنجاح` });
+         toast({ title: `تم تصدير ${finalFileName} (PDF) بنجاح` });
       }).catch(err => {
-        console.error(`Error exporting ${fileName} to PDF:`, err);
-        toast({ title: "خطأ في التصدير (PDF)", description: `حدث خطأ أثناء محاولة تصدير ${fileName}.`, variant: "destructive" });
+        console.error(`Error exporting ${finalFileName} to PDF:`, err);
+        toast({ title: "خطأ في التصدير (PDF)", description: `حدث خطأ أثناء محاولة تصدير ${finalFileName}.`, variant: "destructive" });
       }).finally(() => {
         setExportingType(null);
       });
@@ -332,6 +332,7 @@ const AdminPage = () => {
       toast({ title: "لا توجد بيانات للتصدير" });
       return;
     }
+    setExportingType('allPdf');
     const dataToExport = await prepareDataForExport(allSubmissionsForAdmin);
     generatePdfWithHtml2Pdf("تقرير جميع الأضاحي", dataToExport, commonExportColumns, "جميع_الأضاحي");
   };
@@ -342,6 +343,7 @@ const AdminPage = () => {
       toast({ title: "لا توجد أضاحي لغزة للتصدير" });
       return;
     }
+    setExportingType('gazaPdf');
     const dataToExport = await prepareDataForExport(gazaSubmissionsRaw);
     generatePdfWithHtml2Pdf("تقرير أضاحي غزة", dataToExport, commonExportColumns, "أضاحي_غزة");
   };
@@ -370,29 +372,22 @@ const AdminPage = () => {
         const userData = submissionsByUser[userNameKey];
         if (userData.data.length > 0) {
             const safeUserNameKey = userNameKey.substring(0, 30); 
-            const pdfTitle = `تقرير أضاحي ${userData.originalUserName}`; // Original username for title
+            const pdfTitle = `تقرير أضاحي ${userData.originalUserName}`;
             generatePdfWithHtml2Pdf(pdfTitle, userData.data, commonExportColumns, `أضاحي_${safeUserNameKey}`);
             await new Promise(resolve => setTimeout(resolve, 500)); 
         }
       }
+      // Toast for overall success will be handled by individual PDF generations or a final one if preferred.
+      // For now, individual toasts are in generatePdfWithHtml2Pdf.
     } catch (error) {
       console.error("Error in by-user PDF export loop:", error);
       toast({ title: "خطأ في التصدير (مجموعة PDF)", description: "حدث خطأ أثناء محاولة تصدير الأضاحي حسب المستخدم.", variant: "destructive" });
-    } finally {
-       // Ensure exportingType is reset even if errors occur within the loop,
-       // but only if this is the last one or a general reset is needed.
-       // For multiple files, better to reset outside if the process is fully async.
-       // Given the current structure, resetting here might be premature if more files are to be generated.
-       // Consider moving this if the loop is fully awaited or a global state is managed.
-       // For now, assuming each generatePdfWithHtml2Pdf call manages its own toast and error.
-       // The setExportingType(null) inside generatePdfWithHtml2Pdf.finally() will handle each file.
-       // If the loop itself fails, we might need a general reset here.
+      setExportingType(null); // Reset exporting type in case of loop error
     }
-    // This setExportingType(null) should be called after the loop has completed or if it fails.
-    // Since generatePdfWithHtml2Pdf sets it to null in its finally block,
-    // we might not need it here unless the loop itself breaks.
-    // To be safe, and if the loop is meant to complete all generation before resetting:
-    // setExportingType(null); // uncomment if this is the desired behavior
+    // If the loop completes without throwing an error itself, setExportingType(null) will be called by the last generatePdfWithHtml2Pdf.
+    // If the loop itself could fail and bypass the .finally in generatePdfWithHtml2Pdf, add it here.
+    // For safety, ensure it's reset if the function completes this block, unless individual PDFs are still generating.
+    // Given the await new Promise, it is somewhat sequential for the start of each PDF generation.
   };
 
 
@@ -425,7 +420,7 @@ const AdminPage = () => {
       <header className="space-y-2 pb-4 md:pb-6 border-b">
         <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2">
           <Settings2 className="h-5 w-5 sm:h-6 sm:w-7 md:h-8 md:w-8 text-primary" />
-          إدارة الأضاحي
+          تسجيل الأضاحي
         </h1>
         <p className="text-sm sm:text-md md:text-lg text-muted-foreground">
           عرض وتعديل وحذف جميع الأضاحي المسجلة في النظام.
@@ -517,15 +512,15 @@ const AdminPage = () => {
             <div className="flex justify-center mb-2">
                 <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
                     <Button onClick={handleExportAllPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700 text-xs sm:text-sm">
-                        {exportingType === 'allPdf' || (exportingType === 'pdf' && !fileName.includes('غزة') && !fileName.includes('المستخدم')) ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
+                        {exportingType === 'allPdf' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
                         الكل (PDF)
                     </Button>
                     <Button onClick={handleExportGazaPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.filter(s => s.distributionPreference === 'gaza').length === 0} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700 text-xs sm:text-sm">
-                        {exportingType === 'gazaPdf' || (exportingType === 'pdf' && fileName.includes('غزة')) ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
+                        {exportingType === 'gazaPdf' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
                         غزة (PDF)
                     </Button>
                     <Button onClick={handleExportByUserPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700 text-xs sm:text-sm">
-                        {exportingType === 'userPdf' || (exportingType === 'pdf' && fileName.includes('المستخدم'))? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
+                        {exportingType === 'userPdf' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
                         حسب المستخدم (PDF)
                     </Button>
                 </div>
@@ -555,5 +550,3 @@ const AdminPage = () => {
 }
 
 export default AdminPage;
-
-    
