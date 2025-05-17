@@ -3,10 +3,10 @@
 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-// Updated icon imports to include ClipboardList
+// Updated icon imports to include ClipboardList and other relevant icons
 import { Settings2, TableIcon, BarChart3, HandHelping, Coins, RefreshCw, Loader2, Users, FileText, Sheet, UserPlus, ListChecks, ClipboardList } from "lucide-react"; 
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react"; // Added useRef
 import type { AdahiSubmission, DistributionPreference } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import AdminSubmissionsTable from "@/components/tables/AdminSubmissionsTable";
@@ -37,6 +37,30 @@ const AdminPage = () => {
   const [pageLoading, setPageLoading] = useState(true);
   const [exportingType, setExportingType] = useState<string | null>(null);
   const [isRegisterDialogOpen, setIsRegisterDialogOpen] = useState(false);
+  
+  const prevSubmissionIdsRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    const currentSubmissionIds = new Set(allSubmissionsForAdmin.map(s => s.id));
+    let newSubmissionsCount = 0;
+
+    if (prevSubmissionIdsRef.current.size > 0) { // Only check for new if there was a previous state
+      currentSubmissionIds.forEach(id => {
+        if (!prevSubmissionIdsRef.current.has(id)) {
+          newSubmissionsCount++;
+        }
+      });
+
+      if (newSubmissionsCount > 0) {
+        toast({
+          title: "تنبيه إداري",
+          description: `تم إضافة ${newSubmissionsCount} أضحية جديدة.`,
+        });
+      }
+    }
+    prevSubmissionIdsRef.current = currentSubmissionIds;
+  }, [allSubmissionsForAdmin, toast]);
+
 
   const getDistributionLabel = useCallback((value?: DistributionPreference | string) => {
     if (!value) return "غير محدد";
@@ -45,16 +69,29 @@ const AdminPage = () => {
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
+    // Store current IDs before refresh to compare after refresh
+    const idsBeforeRefresh = new Set(allSubmissionsForAdmin.map(s => s.id));
     await refreshData();
+    // After refresh, allSubmissionsForAdmin will be updated,
+    // the useEffect listening to allSubmissionsForAdmin will handle the notification.
     setIsRefreshing(false);
     toast({ title: "تم تحديث البيانات" });
-  }, [refreshData, toast]);
+  }, [refreshData, toast, allSubmissionsForAdmin]); // Added allSubmissionsForAdmin to dependencies
 
   useEffect(() => {
     if (!authLoading) {
       if (user && user.isAdmin) {
         if (typeof handleRefresh === 'function') {
-            handleRefresh().finally(() => setPageLoading(false));
+            // Initial fetch logic
+            if (allSubmissionsForAdmin.length === 0) { // Fetch if initially empty
+                handleRefresh().finally(() => setPageLoading(false));
+            } else {
+                setPageLoading(false);
+                 // Set initial prevSubmissionIdsRef on first load with data
+                if (prevSubmissionIdsRef.current.size === 0) {
+                    prevSubmissionIdsRef.current = new Set(allSubmissionsForAdmin.map(s => s.id));
+                }
+            }
         } else {
             setPageLoading(false);
         }
@@ -62,7 +99,7 @@ const AdminPage = () => {
         setPageLoading(false);
       }
     }
-  }, [authLoading, user, handleRefresh]);
+  }, [authLoading, user, handleRefresh, allSubmissionsForAdmin]);
 
 
   const commonExportColumns = [
@@ -193,20 +230,22 @@ const AdminPage = () => {
   };
   
   const generatePdfWithHtml2Pdf = async (title: string, data: any[], columns: Array<{header: string, dataKey: string}>, fileName: string) => {
-    setExportingType(fileName.includes('المستخدم') ? 'userPdf' : (fileName.includes('غزة') && !fileName.includes('ما_عدا') ? 'gazaPdf' : (fileName.includes('ما_عدا_غزة') ? 'allExceptGazaPdf' : 'allPdf')));
+    const currentExportType = fileName.includes('المستخدم') ? 'userPdf' : (fileName.includes('غزة') && !fileName.includes('ما_عدا') ? 'gazaPdf' : (fileName.includes('ما_عدا_غزة') ? 'allExceptGazaPdf' : 'allPdf'));
+    setExportingType(currentExportType);
+    
     try {
       const exportDateText = `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`;
       
       let tableHtml = `<table style="width: 100%; border-collapse: collapse; font-family: 'Amiri', Arial, sans-serif; font-size: 8pt; direction: rtl;">`;
       tableHtml += `<thead><tr>`;
-      columns.forEach(col => {
+      columns.forEach(col => { // Use the passed 'columns' which might be reversed
         tableHtml += `<th style="border: 1px solid black; padding: 5px; text-align: center; vertical-align: middle; line-height: 1.5; background-color: #eeeeee; font-family: 'Amiri', Arial, sans-serif; font-weight: bold;">${col.header}</th>`;
       });
       tableHtml += `</tr></thead>`;
       tableHtml += `<tbody>`;
       data.forEach(item => {
         tableHtml += `<tr>`;
-        columns.forEach(col => { 
+        columns.forEach(col => { // Use the passed 'columns' for data mapping
           const value = item.hasOwnProperty(col.dataKey) ? item[col.dataKey] : "";
           tableHtml += `<td style="border: 1px solid black; padding: 5px; text-align: center; vertical-align: middle; line-height: 1.5; font-family: 'Amiri', Arial, sans-serif;">${value}</td>`;
         });
@@ -369,7 +408,7 @@ const AdminPage = () => {
       toast({ title: "لا توجد بيانات للتصدير" });
       return;
     }
-    setExportingType('userPdf');
+    
     try {
       const submissionsByUser: { [key: string]: { data: any[], originalUserName: string } } = {};
       const allDataPrepared = await prepareDataForExport(allSubmissionsForAdmin);
@@ -389,6 +428,7 @@ const AdminPage = () => {
         const userData = submissionsByUser[userNameKey];
         if (userData.data.length > 0) {
             const pdfTitle = `تقرير أضاحي ${userData.originalUserName}`;
+            // Pass commonExportColumns for PDF generation as well
             await generatePdfWithHtml2Pdf(pdfTitle, userData.data, commonExportColumns, `أضاحي_${userNameKey}`);
         }
       }
@@ -397,7 +437,10 @@ const AdminPage = () => {
       console.error("Error in by-user PDF export loop:", error);
       toast({ title: "خطأ في التصدير (مجموعة PDF)", description: "حدث خطأ أثناء محاولة تصدير الأضاحي حسب المستخدم.", variant: "destructive" });
     } finally {
-        setExportingType(null);
+        // Moved setExportingType(null) inside the finally block
+        // of generatePdfWithHtml2Pdf. For group exports, we only set it to null once all are done.
+        // For this specific group export, we should set it at the end of this function.
+        setExportingType(null); 
     }
   };
 
@@ -472,7 +515,6 @@ const AdminPage = () => {
                 الانتقال إلى صفحة إدخال الأضاحي
               </Link>
             </Button>
-            {/* Added button to navigate to slaughter page */}
             <Button variant="outline" className="text-xs sm:text-sm" asChild>
               <Link href="/slaughter" className="flex items-center">
                 <ClipboardList className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />
