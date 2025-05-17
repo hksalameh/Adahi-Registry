@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import { arSA } from "date-fns/locale";
 
 const SlaughterPage = () => {
+  // Ensure markAsSlaughtered is destructured from useAuth
   const { allSubmissionsForAdmin, loading: authLoading, refreshData, markAsSlaughtered, user } = useAuth();
   const { toast } = useToast();
   const [isRefreshing, setIsRefreshing] = useState(false);
