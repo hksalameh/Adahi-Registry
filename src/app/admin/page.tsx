@@ -58,6 +58,7 @@ const AdminPage = () => {
     }
   }, [authLoading, user, handleRefresh]);
 
+
   const commonExportColumns = [
     { header: "م", dataKey: "serial" },
     { header: "اسم المتبرع", dataKey: "donorName" },
@@ -68,6 +69,8 @@ const AdminPage = () => {
     { header: "ماذا يريد", dataKey: "sacrificeWishes" },
     { header: "اسم المستخدم", dataKey: "submitterUsername"},
     { header: "تم الدفع", dataKey: "paymentConfirmedText" },
+    // { header: "رقم الدفتر", dataKey: "receiptBookNumber"}, // تم الحذف بناءً على طلب سابق
+    // { header: "رقم السند", dataKey: "voucherNumber"}, // تم الحذف بناءً على طلب سابق
     { header: "عن طريق وسيط", dataKey: "throughIntermediaryText"},
     { header: "اسم الوسيط", dataKey: "intermediaryName"},
     { header: "توزع لـ", dataKey: "distributionPreferenceText" },
@@ -94,10 +97,8 @@ const AdminPage = () => {
         wantsFromSacrificeText: sub.wantsFromSacrifice ? "نعم" : "لا",
         sacrificeWishes: sub.wantsFromSacrifice ? (sub.sacrificeWishes || "-") : "-",
         paymentConfirmedText: sub.paymentConfirmed ? "نعم" : "لا",
-        // receiptBookNumber: sub.paymentConfirmed ? (sub.receiptBookNumber || "-") : "-", // تم الحذف من العرض بناء على طلب سابق
-        // voucherNumber: sub.paymentConfirmed ? (sub.voucherNumber || "-") : "-", // تم الحذف من العرض بناء على طلب سابق
         throughIntermediaryText: sub.throughIntermediary ? "نعم" : "لا",
-        intermediaryName: sub.throughIntermediary ? (sub.intermediaryName || (sub.submitterUsername === sub.intermediaryName ? "المستخدم نفسه" : (sub.intermediaryName || "-") )) : "-",
+        intermediaryName: sub.throughIntermediary ? (sub.intermediaryName || "-") : "-",
         distributionPreferenceText: getDistributionLabel(sub.distributionPreference),
         submissionDateFormatted: sub.submissionDate ? format(new Date(sub.submissionDate), "dd/MM/yyyy HH:mm", { locale: ar }) : 'N/A',
         statusText: sub.status === "entered" ? "مدخلة" : "غير مدخلة",
@@ -171,7 +172,11 @@ const AdminPage = () => {
         sheet['!cols'] = colWidths;
         sheet['!props'] = { rtl: true };
         if (sheet['!ref']) { 
-            sheet['!autofilter'] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(sheet['!ref'])) };
+            const range = XLSX.utils.decode_range(sheet['!ref']);
+            // Ensure the filter range covers only the header row
+            if (range.s.r <= headerRowIndex && range.e.r >= headerRowIndex) {
+                 sheet['!autofilter'] = { ref: XLSX.utils.encode_range({s: {r: headerRowIndex, c: range.s.c}, e: {r: headerRowIndex, c: range.e.c}}) };
+            }
         }
     }
     XLSX.writeFile(wb, `${fileName}.xlsx`);
@@ -182,20 +187,19 @@ const AdminPage = () => {
     try {
       const exportDateText = `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`;
       
-      // For html2pdf, iterate over columns directly as defined in commonExportColumns
-      // The `direction: rtl` on the parent div will handle visual R-L display.
       let tableHtml = `<table style="width: 100%; border-collapse: collapse; font-family: 'Amiri', Arial, sans-serif;">`;
       tableHtml += `<thead><tr>`;
-      columns.forEach(col => { // Use 'columns' directly, not reversedColumns
-        tableHtml += `<th style="border: 1px solid black; padding: 5px; text-align: center; background-color: #eeeeee;">${col.header}</th>`;
+      // For html2pdf, iterate over columns directly as defined in commonExportColumns for RTL display
+      columns.forEach(col => {
+        tableHtml += `<th style="border: 1px solid black; padding: 5px; text-align: center; vertical-align: middle; background-color: #eeeeee;">${col.header}</th>`;
       });
       tableHtml += `</tr></thead>`;
       tableHtml += `<tbody>`;
       data.forEach(item => {
         tableHtml += `<tr>`;
-        columns.forEach(col => { // Use 'columns' directly
+        columns.forEach(col => {
           const value = item.hasOwnProperty(col.dataKey) ? item[col.dataKey] : "";
-          tableHtml += `<td style="border: 1px solid black; padding: 5px; text-align: center;">${value}</td>`;
+          tableHtml += `<td style="border: 1px solid black; padding: 5px; text-align: center; vertical-align: middle;">${value}</td>`;
         });
         tableHtml += `</tr>`;
       });
@@ -338,7 +342,6 @@ const AdminPage = () => {
 
       allDataPrepared.forEach(subPrepared => {
           let originalUserName = subPrepared.submitterUsername || 'مستخدم_غير_معروف';
-          // Replace invalid characters for file names, but keep original for PDF title
           const userKey = originalUserName.replace(/[<>:"/\\|?* [\]]/g, '_'); 
 
           if (!submissionsByUser[userKey]) {
@@ -350,10 +353,9 @@ const AdminPage = () => {
       for (const userNameKey in submissionsByUser) {
         const userData = submissionsByUser[userNameKey];
         if (userData.data.length > 0) {
-            const safeUserNameKey = userNameKey.substring(0, 30); // Ensure filename safety
-            const pdfTitle = `تقرير أضاحي ${userData.originalUserName}`; // Use original for title
+            const safeUserNameKey = userNameKey.substring(0, 30); 
+            const pdfTitle = `تقرير أضاحي ${userData.originalUserName}`;
             generatePdfWithHtml2Pdf(pdfTitle, userData.data, commonExportColumns, `أضاحي_${safeUserNameKey}`);
-            // Adding a small delay if multiple PDFs are generated quickly, browser might block popups
             await new Promise(resolve => setTimeout(resolve, 500)); 
         }
       }
@@ -361,9 +363,6 @@ const AdminPage = () => {
       console.error("Error in by-user PDF export loop:", error);
       toast({ title: "خطأ في التصدير (مجموعة PDF)", description: "حدث خطأ أثناء محاولة تصدير الأضاحي حسب المستخدم.", variant: "destructive" });
     } 
-    // Note: setExportingType(null) is called within generatePdfWithHtml2Pdf's finally block.
-    // If generating multiple PDFs, this might turn off the spinner too early.
-    // Consider a general loading state for the entire multi-PDF export process.
   };
 
 
