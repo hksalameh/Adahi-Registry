@@ -16,8 +16,12 @@ import { format } from "date-fns";
 import { arSA } from "date-fns/locale";
 
 const SlaughterPage = () => {
-  // Ensure markAsSlaughtered is destructured from useAuth
   const { allSubmissionsForAdmin, loading: authLoading, refreshData, markAsSlaughtered, user } = useAuth();
+  // For debugging: Log the type of markAsSlaughtered immediately after destructuring
+  if (typeof window !== 'undefined') { // Ensure console.log runs only on client
+    console.log("[SlaughterPage] Initial type of markAsSlaughtered from useAuth():", typeof markAsSlaughtered, markAsSlaughtered);
+  }
+
   const { toast } = useToast();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
@@ -48,12 +52,20 @@ const SlaughterPage = () => {
   }, [allSubmissionsForAdmin]);
 
   const handleMarkAsSlaughtered = async (submission: AdahiSubmission) => {
+    // For debugging: Log before calling
+    if (typeof window !== 'undefined') {
+        console.log("[SlaughterPage] handleMarkAsSlaughtered called. Typeof markAsSlaughtered:", typeof markAsSlaughtered, markAsSlaughtered);
+    }
+    if (typeof markAsSlaughtered !== 'function') {
+        toast({ title: "خطأ: وظيفة تحديد الذبح غير متاحة.", variant: "destructive" });
+        console.error("markAsSlaughtered is not a function here. Value:", markAsSlaughtered);
+        return;
+    }
     const success = await markAsSlaughtered(submission.id, submission.donorName, submission.phoneNumber);
     if (success) {
       toast({ title: "تم تحديث حالة الذبح بنجاح" });
       // No need to call refreshData() here as markAsSlaughtered in AuthContext should update data
       // and allSubmissionsForAdmin should re-render the component.
-      // If not, then call refreshData()
     } else {
       toast({ title: "فشل تحديث حالة الذبح", variant: "destructive" });
     }
@@ -213,3 +225,5 @@ const SlaughterPage = () => {
 };
 
 export default SlaughterPage;
+
+    
