@@ -97,7 +97,7 @@ const AdminPage = () => {
         receiptBookNumber: sub.paymentConfirmed ? (sub.receiptBookNumber || "-") : "-",
         voucherNumber: sub.paymentConfirmed ? (sub.voucherNumber || "-") : "-",
         throughIntermediaryText: sub.throughIntermediary ? "نعم" : "لا",
-        intermediaryName: sub.throughIntermediary ? (sub.intermediaryName || "-") : "-",
+        intermediaryName: sub.throughIntermediary ? (sub.intermediaryName || (sub.submitterUsername === sub.intermediaryName ? "المستخدم نفسه" : (sub.intermediaryName || "-") )) : "-",
         distributionPreferenceText: getDistributionLabel(sub.distributionPreference),
         submissionDateFormatted: sub.submissionDate ? format(new Date(sub.submissionDate), "dd/MM/yyyy HH:mm", { locale: ar }) : 'N/A',
         statusText: sub.status === "entered" ? "مدخلة" : "غير مدخلة",
@@ -188,7 +188,7 @@ const AdminPage = () => {
       let tableHtml = `<table style="width: 100%; border-collapse: collapse; font-family: Amiri, Arial, sans-serif;">`;
       tableHtml += `<thead><tr>`;
       reversedColumns.forEach(col => {
-        tableHtml += `<th style="border: 1px solid black; padding: 5px; text-align: right; background-color: #eeeeee;">${col.header}</th>`;
+        tableHtml += `<th style="border: 1px solid black; padding: 5px; text-align: center; background-color: #eeeeee;">${col.header}</th>`;
       });
       tableHtml += `</tr></thead>`;
       tableHtml += `<tbody>`;
@@ -196,14 +196,14 @@ const AdminPage = () => {
         tableHtml += `<tr>`;
         reversedColumns.forEach(col => {
           const value = item.hasOwnProperty(col.dataKey) ? item[col.dataKey] : "";
-          tableHtml += `<td style="border: 1px solid black; padding: 5px; text-align: right;">${value}</td>`;
+          tableHtml += `<td style="border: 1px solid black; padding: 5px; text-align: center;">${value}</td>`;
         });
         tableHtml += `</tr>`;
       });
       tableHtml += `</tbody></table>`;
 
       const contentHtml = `
-        <div style="direction: rtl; text-align: right; font-family: Amiri, Arial, sans-serif; margin: ${PDF_MARGIN}mm;">
+        <div style="direction: rtl; text-align: center; font-family: Amiri, Arial, sans-serif; margin: ${PDF_MARGIN}mm;">
           <h2 style="text-align: center;">${title}</h2>
           <p style="text-align: center; font-size: 0.8em;">${exportDateText}</p>
           ${tableHtml}
@@ -338,44 +338,39 @@ const AdminPage = () => {
       toast({ title: "لا توجد بيانات للتصدير" });
       return;
     }
-    setExportingType('userPdf'); // Keep this to show loading on the correct button
+    setExportingType('userPdf'); 
     try {
-      const submissionsByUser: { [key: string]: any[] } = {};
+      const submissionsByUser: { [key: string]: { data: any[], originalUserName: string } } = {};
       const allDataPrepared = await prepareDataForExport(allSubmissionsForAdmin);
 
       allDataPrepared.forEach(subPrepared => {
-          let userName = subPrepared.submitterUsername || 'مستخدم_غير_معروف';
-          const userKey = userName.replace(/[<>:"/\\|?* [\]]/g, '_'); 
+          let originalUserName = subPrepared.submitterUsername || 'مستخدم_غير_معروف';
+          const userKey = originalUserName.replace(/[<>:"/\\|?* [\]]/g, '_'); 
 
           if (!submissionsByUser[userKey]) {
-              submissionsByUser[userKey] = [];
+              submissionsByUser[userKey] = { data: [], originalUserName };
           }
-          submissionsByUser[userKey].push(subPrepared);
+          submissionsByUser[userKey].data.push(subPrepared);
       });
 
-      // html2pdf.js generates one PDF at a time. We'll call it sequentially.
       for (const userNameKey in submissionsByUser) {
-        const userSubmissionsData = submissionsByUser[userNameKey];
-        if (userSubmissionsData.length > 0) {
-            const safeUserNameKey = userNameKey.substring(0, 30); 
-            // generatePdfWithHtml2Pdf will handle setting exportingType to null after each PDF.
-            // For multiple files, we might need a different loading strategy or just let them queue.
-            generatePdfWithHtml2Pdf(`تقرير أضاحي المستخدم: ${userNameKey}`, userSubmissionsData, commonExportColumns, `أضاحي_${safeUserNameKey}`);
-            // Await a short delay if browser struggles with many save dialogs, or rely on html2pdf's promise.
-            await new Promise(resolve => setTimeout(resolve, 500)); // Small delay
+        const userData = submissionsByUser[userNameKey];
+        if (userData.data.length > 0) {
+            const safeUserNameKey = userNameKey.substring(0, 30);
+            const pdfTitle = `تقرير أضاحي ${userData.originalUserName}`; // Use original username for title
+            generatePdfWithHtml2Pdf(pdfTitle, userData.data, commonExportColumns, `أضاحي_${safeUserNameKey}`);
+            await new Promise(resolve => setTimeout(resolve, 500)); 
         }
       }
-      // Toast for overall completion might be tricky if individual PDFs fail.
-      // The individual generatePdfWithHtml2Pdf calls handle their own success/error toasts.
     } catch (error) {
       console.error("Error in by-user PDF export loop:", error);
       toast({ title: "خطأ في التصدير (مجموعة PDF)", description: "حدث خطأ أثناء محاولة تصدير الأضاحي حسب المستخدم.", variant: "destructive" });
-      setExportingType(null); // Reset if loop itself errors
+    } finally {
+        // Let individual calls manage their own exportingType for the spinner
+        // or set a general loading state that is cleared once all are initiated/done.
+        // For now, we will let the individual call to generatePdfWithHtml2Pdf handle setting exportingType to null.
+        // If all exports are done, and we had a general loading, we would set it to null here.
     }
-    // Set exportingType to null only after all PDFs are initiated or if the main loop finishes.
-    // Since generatePdfWithHtml2Pdf handles its own exportingType, this might be redundant here for 'userPdf'
-    // unless the loop itself has an encompassing loading state.
-    // For now, let individual calls manage it. If it was a single combined PDF, we'd set it here.
   };
 
 
@@ -491,46 +486,44 @@ const AdminPage = () => {
         <h2 className="text-md sm:text-lg md:text-xl font-semibold text-center md:text-right">خيارات التصدير وجدول الإدخالات</h2>
         
         <div className="p-2 md:p-3 border rounded-md bg-card shadow-sm space-y-3">
-          <div className="flex justify-center">
-            <Button onClick={handleRefresh} variant="outline" disabled={exportingType !== null || authLoading || isRefreshing} className="text-xs sm:text-sm">
-              {isRefreshing ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <RefreshCw className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
-              تحديث البيانات
-            </Button>
-          </div>
-
-          <div className="flex justify-center">
-            <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
-              <Button onClick={handleExportAllPdf} variant="outline" disabled={exportingType === 'allPdf' || exportingType === 'pdf' || allSubmissionsForAdmin.length === 0} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700 text-xs sm:text-sm">
-                {exportingType === 'allPdf' || exportingType === 'pdf' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
-                الكل (PDF)
-              </Button>
-              <Button onClick={handleExportGazaPdf} variant="outline" disabled={exportingType === 'gazaPdf' || exportingType === 'pdf' || allSubmissionsForAdmin.filter(s => s.distributionPreference === 'gaza').length === 0} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700 text-xs sm:text-sm">
-                {exportingType === 'gazaPdf' || exportingType === 'pdf' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
-                غزة (PDF)
-              </Button>
-              <Button onClick={handleExportByUserPdf} variant="outline" disabled={exportingType === 'userPdf' || exportingType === 'pdf' || allSubmissionsForAdmin.length === 0} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700 text-xs sm:text-sm">
-                {exportingType === 'userPdf' || exportingType === 'pdf' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
-                حسب المستخدم (PDF)
-              </Button>
+            <div className="flex justify-center">
+                 <Button onClick={handleRefresh} variant="outline" disabled={exportingType !== null || authLoading || isRefreshing} className="text-xs sm:text-sm">
+                    {isRefreshing ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <RefreshCw className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
+                    تحديث البيانات
+                 </Button>
             </div>
-          </div>
-
-          <div className="flex justify-center">
-            <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
-              <Button onClick={handleExportAllExcel} variant="outline" disabled={exportingType === 'allExcel' || allSubmissionsForAdmin.length === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700 text-xs sm:text-sm">
-                {exportingType === 'allExcel' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Sheet className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
-                الكل (Excel)
-              </Button>
-              <Button onClick={handleExportGazaExcel} variant="outline" disabled={exportingType === 'gazaExcel' || allSubmissionsForAdmin.filter(s => s.distributionPreference === 'gaza').length === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700 text-xs sm:text-sm">
-                {exportingType === 'gazaExcel' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Sheet className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
-                غزة (Excel)
-              </Button>
-              <Button onClick={handleExportByUserExcel} variant="outline" disabled={exportingType === 'userExcel' || allSubmissionsForAdmin.length === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700 text-xs sm:text-sm">
-                {exportingType === 'userExcel' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Users className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
-                حسب المستخدم (Excel)
-              </Button>
+            <div className="flex justify-center">
+                <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
+                    <Button onClick={handleExportAllPdf} variant="outline" disabled={exportingType === 'allPdf' || exportingType === 'pdf' || allSubmissionsForAdmin.length === 0} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700 text-xs sm:text-sm">
+                        {exportingType === 'allPdf' || exportingType === 'pdf' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
+                        الكل (PDF)
+                    </Button>
+                    <Button onClick={handleExportGazaPdf} variant="outline" disabled={exportingType === 'gazaPdf' || exportingType === 'pdf' || allSubmissionsForAdmin.filter(s => s.distributionPreference === 'gaza').length === 0} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700 text-xs sm:text-sm">
+                        {exportingType === 'gazaPdf' || exportingType === 'pdf' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
+                        غزة (PDF)
+                    </Button>
+                    <Button onClick={handleExportByUserPdf} variant="outline" disabled={exportingType === 'userPdf' || exportingType === 'pdf' || allSubmissionsForAdmin.length === 0} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700 text-xs sm:text-sm">
+                        {exportingType === 'userPdf' || exportingType === 'pdf' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
+                        حسب المستخدم (PDF)
+                    </Button>
+                </div>
             </div>
-          </div>
+            <div className="flex justify-center">
+                <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
+                    <Button onClick={handleExportAllExcel} variant="outline" disabled={exportingType === 'allExcel' || allSubmissionsForAdmin.length === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700 text-xs sm:text-sm">
+                        {exportingType === 'allExcel' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Sheet className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
+                        الكل (Excel)
+                    </Button>
+                    <Button onClick={handleExportGazaExcel} variant="outline" disabled={exportingType === 'gazaExcel' || allSubmissionsForAdmin.filter(s => s.distributionPreference === 'gaza').length === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700 text-xs sm:text-sm">
+                        {exportingType === 'gazaExcel' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Sheet className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
+                        غزة (Excel)
+                    </Button>
+                    <Button onClick={handleExportByUserExcel} variant="outline" disabled={exportingType === 'userExcel' || allSubmissionsForAdmin.length === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700 text-xs sm:text-sm">
+                        {exportingType === 'userExcel' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Users className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
+                        حسب المستخدم (Excel)
+                    </Button>
+                </div>
+            </div>
         </div>
       </div>
 
