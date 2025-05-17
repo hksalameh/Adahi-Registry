@@ -3,7 +3,7 @@
 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { Settings2, TableIcon, BarChart3, HandHelping, Coins, RefreshCw, Loader2, Users, FileText, Sheet, UserPlus } from "lucide-react"; 
+import { Settings2, TableIcon, BarChart3, HandHelping, Coins, RefreshCw, Loader2, Users, FileText, Sheet, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useCallback } from "react";
 import type { AdahiSubmission, DistributionPreference } from "@/lib/types";
@@ -36,6 +36,7 @@ const AdminPage = () => {
   const [exportingType, setExportingType] = useState<string | null>(null);
   const [isRegisterDialogOpen, setIsRegisterDialogOpen] = useState(false);
 
+
   const getDistributionLabel = useCallback((value?: DistributionPreference | string) => {
     if (!value) return "غير محدد";
     return distributionOptions.find(opt => opt.value === value)?.label || String(value);
@@ -51,12 +52,9 @@ const AdminPage = () => {
   useEffect(() => {
     if (!authLoading) {
       if (user && user.isAdmin) {
-        // Ensure handleRefresh is defined before calling it or adding to dependency array
         if (typeof handleRefresh === 'function') {
             handleRefresh().finally(() => setPageLoading(false));
         } else {
-            // Fallback or error handling if handleRefresh is not yet defined
-            // This case should ideally not be reached if handleRefresh is defined with useCallback correctly
             console.warn("handleRefresh is not defined at the time of calling in useEffect");
             setPageLoading(false);
         }
@@ -64,7 +62,7 @@ const AdminPage = () => {
         setPageLoading(false);
       }
     }
-  }, [authLoading, user, handleRefresh]); 
+  }, [authLoading, user, handleRefresh]);
 
 
   const commonExportColumns = [
@@ -77,8 +75,6 @@ const AdminPage = () => {
     { header: "ماذا يريد", dataKey: "sacrificeWishes" },
     { header: "اسم المستخدم", dataKey: "submitterUsername"},
     { header: "تم الدفع", dataKey: "paymentConfirmedText" },
-    // { header: "رقم الدفتر", dataKey: "receiptBookNumber"}, // تم الحذف بناءً على طلب سابق
-    // { header: "رقم السند", dataKey: "voucherNumber"}, // تم الحذف بناءً على طلب سابق
     { header: "عن طريق وسيط", dataKey: "throughIntermediaryText"},
     { header: "اسم الوسيط", dataKey: "intermediaryName"},
     { header: "توزع لـ", dataKey: "distributionPreferenceText" },
@@ -155,10 +151,10 @@ const AdminPage = () => {
 
         worksheetData.forEach((_row, R_idx) => {
             columnsToExport.forEach((_col, C_idx) => {
-                const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx }); 
-                if (sheet[cell_ref] && sheet[cell_ref].v !== undefined && sheet[cell_ref].v !== null && sheet[cell_ref].v !== "") { 
+                const cell_ref = XLSX.utils.encode_cell({ r: R_idx + 1, c: C_idx });
+                if (sheet[cell_ref] && sheet[cell_ref].v !== undefined && sheet[cell_ref].v !== null && sheet[cell_ref].v !== "") {
                      sheet[cell_ref].s = {
-                        ...(sheet[cell_ref].s || {}), 
+                        ...(sheet[cell_ref].s || {}),
                          border: {
                             top: { style: "thin", color: { auto: 1 } },
                             bottom: { style: "thin", color: { auto: 1 } },
@@ -167,8 +163,8 @@ const AdminPage = () => {
                         },
                         alignment: { ...(sheet[cell_ref].s?.alignment || {}), horizontal: "right", vertical: "center", wrapText: true }
                     };
-                } else if (sheet[cell_ref]) { 
-                     sheet[cell_ref].s = { 
+                } else if (sheet[cell_ref]) {
+                     sheet[cell_ref].s = {
                         ...(sheet[cell_ref].s || {}),
                         alignment: { ...(sheet[cell_ref].s?.alignment || {}), horizontal: "right", vertical: "center", wrapText: true }
                      };
@@ -178,10 +174,9 @@ const AdminPage = () => {
         
         const colWidths = columnsToExport.map(column => ({ wch: Math.max(15, String(column.header).length + 5) }));
         sheet['!cols'] = colWidths;
-        sheet['!props'] = { rtl: true }; // Enable RTL for the sheet
-        if (sheet['!ref']) { 
+        sheet['!props'] = { rtl: true };
+        if (sheet['!ref']) {
             const range = XLSX.utils.decode_range(sheet['!ref']);
-            // Ensure the filter range covers only the header row
             if (range.s.r <= headerRowIndex && range.e.r >= headerRowIndex) {
                  sheet['!autofilter'] = { ref: XLSX.utils.encode_range({s: {r: headerRowIndex, c: range.s.c}, e: {r: headerRowIndex, c: range.e.c}}) };
             }
@@ -191,22 +186,22 @@ const AdminPage = () => {
   };
 
   const generatePdfWithHtml2Pdf = async (title: string, data: any[], columns: Array<{header: string, dataKey: string}>, fileName: string) => {
-    setExportingType('pdf'); // Generic PDF exporting type
+    setExportingType(fileName.includes('المستخدم') ? 'userPdf' : (fileName.includes('غزة') && !fileName.includes('ما_عدا') ? 'gazaPdf' : (fileName.includes('ما_عدا_غزة') ? 'allExceptGazaPdf' : 'allPdf')));
     try {
       const exportDateText = `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`;
       
-      let tableHtml = `<table style="width: 100%; border-collapse: collapse; font-family: 'Amiri', Arial, sans-serif; font-size: 10pt;">`;
+      let tableHtml = `<table style="width: 100%; border-collapse: collapse; font-family: 'Amiri', Arial, sans-serif; font-size: 8pt; direction: rtl;">`; // Added font-size: 8pt and direction: rtl
       tableHtml += `<thead><tr>`;
-      columns.forEach(col => {
-        tableHtml += `<th style="border: 1px solid black; padding: 8px; text-align: center; vertical-align: middle; background-color: #eeeeee; font-family: 'Amiri', Arial, sans-serif; font-size: 10pt; font-weight: bold;">${col.header}</th>`;
+      columns.forEach(col => { // Use original columns order for HTML, RTL will handle visual
+        tableHtml += `<th style="border: 1px solid black; padding: 5px; text-align: center; vertical-align: middle; background-color: #eeeeee; font-family: 'Amiri', Arial, sans-serif; font-weight: bold;">${col.header}</th>`;
       });
       tableHtml += `</tr></thead>`;
       tableHtml += `<tbody>`;
       data.forEach(item => {
         tableHtml += `<tr>`;
-        columns.forEach(col => {
+        columns.forEach(col => { // Use original columns order for HTML
           const value = item.hasOwnProperty(col.dataKey) ? item[col.dataKey] : "";
-          tableHtml += `<td style="border: 1px solid black; padding: 8px; text-align: center; vertical-align: middle; font-family: 'Amiri', Arial, sans-serif; font-size: 10pt;">${value}</td>`;
+          tableHtml += `<td style="border: 1px solid black; padding: 5px; text-align: center; vertical-align: middle; font-family: 'Amiri', Arial, sans-serif;">${value}</td>`;
         });
         tableHtml += `</tr>`;
       });
@@ -222,7 +217,7 @@ const AdminPage = () => {
 
       const element = document.createElement('div');
       element.innerHTML = contentHtml;
-      document.body.appendChild(element); // Temporarily append to body for html2pdf to process styles
+      document.body.appendChild(element);
 
       const opt = {
         margin: PDF_MARGIN,
@@ -235,7 +230,7 @@ const AdminPage = () => {
 
       await html2pdf().from(element).set(opt).save();
       toast({ title: `تم تصدير ${fileName} (PDF) بنجاح` });
-      document.body.removeChild(element); // Clean up appended element
+      document.body.removeChild(element);
 
     } catch (error) {
       console.error(`Error exporting ${fileName} to PDF:`, error);
@@ -277,6 +272,24 @@ const AdminPage = () => {
     } catch (error) {
       console.error("Error exporting Gaza to Excel:", error);
       toast({ title: "خطأ في التصدير (Excel)", description: "حدث خطأ أثناء محاولة تصدير أضاحي غزة.", variant: "destructive" });
+    }
+    setExportingType(null);
+  };
+
+  const handleExportAllExceptGazaExcel = async () => {
+    const exceptGazaSubmissions = allSubmissionsForAdmin.filter(s => s.distributionPreference !== 'gaza');
+    if (exceptGazaSubmissions.length === 0) {
+      toast({ title: "لا توجد أضاحي (ما عدا غزة) للتصدير" });
+      return;
+    }
+    setExportingType('allExceptGazaExcel');
+    try {
+      const dataToExport = await prepareDataForExport(exceptGazaSubmissions);
+      exportToExcel(dataToExport, "أضاحي_ما_عدا_غزة", "ما عدا غزة", commonExportColumns);
+      toast({ title: "تم تصدير الأضاحي (ما عدا غزة) (Excel) بنجاح" });
+    } catch (error) {
+      console.error("Error exporting all except Gaza to Excel:", error);
+      toast({ title: "خطأ في التصدير (Excel)", description: "حدث خطأ أثناء محاولة تصدير الأضاحي (ما عدا غزة).", variant: "destructive" });
     }
     setExportingType(null);
   };
@@ -333,20 +346,30 @@ const AdminPage = () => {
     const dataToExport = await prepareDataForExport(gazaSubmissionsRaw);
     await generatePdfWithHtml2Pdf("تقرير أضاحي غزة", dataToExport, commonExportColumns, "أضاحي_غزة");
   };
+  
+  const handleExportAllExceptGazaPdf = async () => {
+    const exceptGazaSubmissions = allSubmissionsForAdmin.filter(s => s.distributionPreference !== 'gaza');
+    if (exceptGazaSubmissions.length === 0) {
+      toast({ title: "لا توجد أضاحي (ما عدا غزة) للتصدير" });
+      return;
+    }
+    const dataToExport = await prepareDataForExport(exceptGazaSubmissions);
+    await generatePdfWithHtml2Pdf("تقرير الأضاحي (ما عدا غزة)", dataToExport, commonExportColumns, "أضاحي_ما_عدا_غزة");
+  };
 
   const handleExportByUserPdf = async () => {
     if (allSubmissionsForAdmin.length === 0) {
       toast({ title: "لا توجد بيانات للتصدير" });
       return;
     }
-    setExportingType('userPdf'); 
+    setExportingType('userPdf');
     try {
       const submissionsByUser: { [key: string]: { data: any[], originalUserName: string } } = {};
       const allDataPrepared = await prepareDataForExport(allSubmissionsForAdmin);
 
       allDataPrepared.forEach(subPrepared => {
           let originalUserName = subPrepared.submitterUsername || 'مستخدم_غير_معروف';
-          const userKey = originalUserName.replace(/[<>:"/\\|?* [\]]/g, '_'); 
+          const userKey = originalUserName.replace(/[<>:"/\\|?* [\]]/g, '_');
 
           if (!submissionsByUser[userKey]) {
               submissionsByUser[userKey] = { data: [], originalUserName };
@@ -357,16 +380,17 @@ const AdminPage = () => {
       for (const userNameKey in submissionsByUser) {
         const userData = submissionsByUser[userNameKey];
         if (userData.data.length > 0) {
-            const safeUserNameKey = userNameKey.substring(0, 30); 
+            const safeUserNameKey = userNameKey.substring(0, 30);
             const pdfTitle = `تقرير أضاحي ${userData.originalUserName}`;
             await generatePdfWithHtml2Pdf(pdfTitle, userData.data, commonExportColumns, `أضاحي_${safeUserNameKey}`);
         }
       }
+      toast({ title: "تم تصدير الأضاحي حسب المستخدم (ملفات PDF منفصلة) بنجاح" });
     } catch (error) {
       console.error("Error in by-user PDF export loop:", error);
       toast({ title: "خطأ في التصدير (مجموعة PDF)", description: "حدث خطأ أثناء محاولة تصدير الأضاحي حسب المستخدم.", variant: "destructive" });
     } finally {
-        setExportingType(null); // Ensure this is called even if generatePdfWithHtml2Pdf handles its own setExportingType(null)
+        setExportingType(null);
     }
   };
 
@@ -380,7 +404,7 @@ const AdminPage = () => {
     );
   }
 
-  if (!user || !user.isAdmin) { 
+  if (!user || !user.isAdmin) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <p className="text-destructive text-center">غير مصرح لك بالدخول لهذه الصفحة. يتم توجيهك...</p>
@@ -388,12 +412,11 @@ const AdminPage = () => {
     );
   }
 
-  const stats = {
-    total: allSubmissionsForAdmin.length,
-    gaza: allSubmissionsForAdmin.filter(s => s.distributionPreference === 'gaza').length,
-    ramthaAndDonor: allSubmissionsForAdmin.filter(s => s.distributionPreference === 'ramtha' || s.distributionPreference === 'donor').length,
-    fund: allSubmissionsForAdmin.filter(s => s.distributionPreference === 'fund').length,
-  };
+  const gazaSubmissionsCount = allSubmissionsForAdmin.filter(s => s.distributionPreference === 'gaza').length;
+  const ramthaAndDonorSubmissionsCount = allSubmissionsForAdmin.filter(s => s.distributionPreference === 'ramtha' || s.distributionPreference === 'donor').length;
+  const fundSubmissionsCount = allSubmissionsForAdmin.filter(s => s.distributionPreference === 'fund').length;
+  const allExceptGazaSubmissionsCount = allSubmissionsForAdmin.filter(s => s.distributionPreference !== 'gaza').length;
+
 
   return (
     <div className="space-y-6 md:space-y-8 p-1">
@@ -406,10 +429,10 @@ const AdminPage = () => {
           عرض وتعديل وحذف جميع الأضاحي المسجلة في النظام.
         </p>
         <p className="text-xs sm:text-sm text-muted-foreground pt-1">
-          إجمالي الأضاحي: {stats.total} |
-          أضاحي للرمثا والمتبرعين: {stats.ramthaAndDonor} |
-          لأهل غزة: {stats.gaza} |
-          لصندوق التضامن: {stats.fund}
+          إجمالي الأضاحي: {allSubmissionsForAdmin.length} |
+          أضاحي للرمثا والمتبرعين: {ramthaAndDonorSubmissionsCount} |
+          لأهل غزة: {gazaSubmissionsCount} |
+          لصندوق التضامن: {fundSubmissionsCount}
         </p>
       </header>
 
@@ -447,7 +470,7 @@ const AdminPage = () => {
             <TableIcon className="h-4 w-4 text-muted-foreground" data-ai-hint="table stats" />
           </CardHeader>
           <CardContent>
-            <div className="text-lg sm:text-xl md:text-2xl font-bold">{stats.total}</div>
+            <div className="text-lg sm:text-xl md:text-2xl font-bold">{allSubmissionsForAdmin.length}</div>
           </CardContent>
         </Card>
         <Card>
@@ -456,7 +479,7 @@ const AdminPage = () => {
             <HandHelping className="h-4 w-4 text-muted-foreground" data-ai-hint="charity giving" />
           </CardHeader>
           <CardContent>
-            <div className="text-lg sm:text-xl md:text-2xl font-bold">{stats.ramthaAndDonor}</div>
+            <div className="text-lg sm:text-xl md:text-2xl font-bold">{ramthaAndDonorSubmissionsCount}</div>
           </CardContent>
         </Card>
         <Card>
@@ -465,7 +488,7 @@ const AdminPage = () => {
             <BarChart3 className="h-4 w-4 text-muted-foreground" data-ai-hint="analytics chart" />
           </CardHeader>
           <CardContent>
-            <div className="text-lg sm:text-xl md:text-2xl font-bold">{stats.gaza}</div>
+            <div className="text-lg sm:text-xl md:text-2xl font-bold">{gazaSubmissionsCount}</div>
           </CardContent>
         </Card>
         <Card>
@@ -474,7 +497,7 @@ const AdminPage = () => {
             <Coins className="h-4 w-4 text-muted-foreground" data-ai-hint="donation fund" />
           </CardHeader>
           <CardContent>
-            <div className="text-lg sm:text-xl md:text-2xl font-bold">{stats.fund}</div>
+            <div className="text-lg sm:text-xl md:text-2xl font-bold">{fundSubmissionsCount}</div>
           </CardContent>
         </Card>
       </section>
@@ -489,37 +512,49 @@ const AdminPage = () => {
                     تحديث البيانات
                  </Button>
             </div>
+
             <div className="flex justify-center">
-                <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
-                    <Button onClick={handleExportAllPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700 text-xs sm:text-sm">
-                        {exportingType === 'allPdf' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
-                        الكل (PDF)
-                    </Button>
-                    <Button onClick={handleExportGazaPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.filter(s => s.distributionPreference === 'gaza').length === 0} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700 text-xs sm:text-sm">
-                        {exportingType === 'gazaPdf' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
-                        غزة (PDF)
-                    </Button>
-                    <Button onClick={handleExportByUserPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700 text-xs sm:text-sm">
-                        {exportingType === 'userPdf' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
-                        حسب المستخدم (PDF)
-                    </Button>
-                </div>
+                <p className="text-sm font-medium text-center mt-2 mb-1">تصدير PDF</p>
             </div>
+            <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
+                <Button onClick={handleExportAllPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700 text-xs sm:text-sm">
+                    {exportingType === 'allPdf' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
+                    الكل (PDF)
+                </Button>
+                <Button onClick={handleExportGazaPdf} variant="outline" disabled={exportingType !== null || gazaSubmissionsCount === 0} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700 text-xs sm:text-sm">
+                    {exportingType === 'gazaPdf' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
+                    غزة فقط (PDF)
+                </Button>
+                <Button onClick={handleExportAllExceptGazaPdf} variant="outline" disabled={exportingType !== null || allExceptGazaSubmissionsCount === 0} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700 text-xs sm:text-sm">
+                    {exportingType === 'allExceptGazaPdf' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
+                    الكل ما عدا غزة (PDF)
+                </Button>
+                <Button onClick={handleExportByUserPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700 text-xs sm:text-sm">
+                    {exportingType === 'userPdf' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
+                    حسب المستخدم (PDF)
+                </Button>
+            </div>
+
             <div className="flex justify-center">
-                <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
-                    <Button onClick={handleExportAllExcel} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700 text-xs sm:text-sm">
-                        {exportingType === 'allExcel' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Sheet className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
-                        الكل (Excel)
-                    </Button>
-                    <Button onClick={handleExportGazaExcel} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.filter(s => s.distributionPreference === 'gaza').length === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700 text-xs sm:text-sm">
-                        {exportingType === 'gazaExcel' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Sheet className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
-                        غزة (Excel)
-                    </Button>
-                    <Button onClick={handleExportByUserExcel} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700 text-xs sm:text-sm">
-                        {exportingType === 'userExcel' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Users className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
-                        حسب المستخدم (Excel)
-                    </Button>
-                </div>
+                <p className="text-sm font-medium text-center mt-2 mb-1">تصدير Excel</p>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
+                <Button onClick={handleExportAllExcel} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700 text-xs sm:text-sm">
+                    {exportingType === 'allExcel' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Sheet className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
+                    الكل (Excel)
+                </Button>
+                <Button onClick={handleExportGazaExcel} variant="outline" disabled={exportingType !== null || gazaSubmissionsCount === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700 text-xs sm:text-sm">
+                    {exportingType === 'gazaExcel' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Sheet className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
+                    غزة فقط (Excel)
+                </Button>
+                <Button onClick={handleExportAllExceptGazaExcel} variant="outline" disabled={exportingType !== null || allExceptGazaSubmissionsCount === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700 text-xs sm:text-sm">
+                    {exportingType === 'allExceptGazaExcel' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Sheet className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
+                    الكل ما عدا غزة (Excel)
+                </Button>
+                <Button onClick={handleExportByUserExcel} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700 text-xs sm:text-sm">
+                    {exportingType === 'userExcel' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Users className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
+                    حسب المستخدم (Excel)
+                </Button>
             </div>
         </div>
       </div>
@@ -530,5 +565,6 @@ const AdminPage = () => {
 }
 
 export default AdminPage;
+    
 
     
