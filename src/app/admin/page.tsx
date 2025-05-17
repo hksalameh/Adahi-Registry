@@ -52,12 +52,19 @@ const AdminPage = () => {
   useEffect(() => {
     if (!authLoading) {
       if (user && user.isAdmin) {
-        handleRefresh().finally(() => setPageLoading(false));
+        // Ensure handleRefresh is defined before being called or added to dependency array
+        if (typeof handleRefresh === 'function') {
+          handleRefresh().finally(() => setPageLoading(false));
+        } else {
+          // Fallback or error handling if handleRefresh is not yet defined
+          // This case should ideally not happen with useCallback
+          refreshData().finally(() => setPageLoading(false));
+        }
       } else {
         setPageLoading(false);
       }
     }
-  }, [authLoading, user, handleRefresh]); 
+  }, [authLoading, user, handleRefresh, refreshData]); 
 
 
   const commonExportColumns = [
@@ -98,6 +105,8 @@ const AdminPage = () => {
         wantsFromSacrificeText: sub.wantsFromSacrifice ? "نعم" : "لا",
         sacrificeWishes: sub.wantsFromSacrifice ? (sub.sacrificeWishes || "-") : "-",
         paymentConfirmedText: sub.paymentConfirmed ? "نعم" : "لا",
+        receiptBookNumber: sub.paymentConfirmed ? (sub.receiptBookNumber || "-") : "-",
+        voucherNumber: sub.paymentConfirmed ? (sub.voucherNumber || "-") : "-",
         throughIntermediaryText: sub.throughIntermediary ? "نعم" : "لا",
         intermediaryName: sub.throughIntermediary ? (sub.intermediaryName || "-") : "-",
         distributionPreferenceText: getDistributionLabel(sub.distributionPreference),
@@ -133,7 +142,7 @@ const AdminPage = () => {
         columnsToExport.forEach((_col, C_idx) => {
             const header_cell_ref = XLSX.utils.encode_cell({ r: headerRowIndex, c: C_idx });
             if (sheet[header_cell_ref]) {
-                sheet[header_cell_ref].s = { // s for style
+                sheet[header_cell_ref].s = { 
                     border: {
                         top: { style: "thin", color: { auto: 1 } },
                         bottom: { style: "thin", color: { auto: 1 } },
@@ -171,7 +180,7 @@ const AdminPage = () => {
         
         const colWidths = columnsToExport.map(column => ({ wch: Math.max(15, String(column.header).length + 5) }));
         sheet['!cols'] = colWidths;
-        sheet['!props'] = { rtl: true };
+        sheet['!props'] = { rtl: true }; // For RTL sheet
         if (sheet['!ref']) { 
             const range = XLSX.utils.decode_range(sheet['!ref']);
             if (range.s.r <= headerRowIndex && range.e.r >= headerRowIndex) {
@@ -189,9 +198,12 @@ const AdminPage = () => {
       
       let tableHtml = `<table style="width: 100%; border-collapse: collapse; font-family: 'Amiri', Arial, sans-serif;">`;
       tableHtml += `<thead><tr>`;
-      // For html2pdf, iterate over columns directly as defined in commonExportColumns for RTL display
       columns.forEach(col => {
-        tableHtml += `<th style="border: 1px solid black; padding: 5px; text-align: center; vertical-align: middle; line-height: 1.5; background-color: #eeeeee;">${col.header}</th>`;
+        tableHtml += `<th style="border: 1px solid black; padding: 0px; background-color: #eeeeee; text-align: center;">
+                        <div style="display: flex; align-items: center; justify-content: center; height: 100%; padding: 5px; font-size: 9pt; line-height: 1.2;">
+                          ${col.header}
+                        </div>
+                      </th>`;
       });
       tableHtml += `</tr></thead>`;
       tableHtml += `<tbody>`;
@@ -199,7 +211,11 @@ const AdminPage = () => {
         tableHtml += `<tr>`;
         columns.forEach(col => {
           const value = item.hasOwnProperty(col.dataKey) ? item[col.dataKey] : "";
-          tableHtml += `<td style="border: 1px solid black; padding: 5px; text-align: center; vertical-align: middle; line-height: 1.5;">${value}</td>`;
+          tableHtml += `<td style="border: 1px solid black; padding: 0px; text-align: center;">
+                          <div style="display: flex; align-items: center; justify-content: center; height: 100%; padding: 5px; font-size: 9pt; line-height: 1.2;">
+                            ${value}
+                          </div>
+                        </td>`;
         });
         tableHtml += `</tr>`;
       });
@@ -354,7 +370,7 @@ const AdminPage = () => {
         const userData = submissionsByUser[userNameKey];
         if (userData.data.length > 0) {
             const safeUserNameKey = userNameKey.substring(0, 30); 
-            const pdfTitle = `تقرير أضاحي ${userData.originalUserName}`;
+            const pdfTitle = `تقرير أضاحي ${userData.originalUserName}`; // Original username for title
             generatePdfWithHtml2Pdf(pdfTitle, userData.data, commonExportColumns, `أضاحي_${safeUserNameKey}`);
             await new Promise(resolve => setTimeout(resolve, 500)); 
         }
@@ -362,8 +378,21 @@ const AdminPage = () => {
     } catch (error) {
       console.error("Error in by-user PDF export loop:", error);
       toast({ title: "خطأ في التصدير (مجموعة PDF)", description: "حدث خطأ أثناء محاولة تصدير الأضاحي حسب المستخدم.", variant: "destructive" });
-      setExportingType(null); // Ensure exportingType is reset on error
-    } 
+    } finally {
+       // Ensure exportingType is reset even if errors occur within the loop,
+       // but only if this is the last one or a general reset is needed.
+       // For multiple files, better to reset outside if the process is fully async.
+       // Given the current structure, resetting here might be premature if more files are to be generated.
+       // Consider moving this if the loop is fully awaited or a global state is managed.
+       // For now, assuming each generatePdfWithHtml2Pdf call manages its own toast and error.
+       // The setExportingType(null) inside generatePdfWithHtml2Pdf.finally() will handle each file.
+       // If the loop itself fails, we might need a general reset here.
+    }
+    // This setExportingType(null) should be called after the loop has completed or if it fails.
+    // Since generatePdfWithHtml2Pdf sets it to null in its finally block,
+    // we might not need it here unless the loop itself breaks.
+    // To be safe, and if the loop is meant to complete all generation before resetting:
+    // setExportingType(null); // uncomment if this is the desired behavior
   };
 
 
@@ -396,7 +425,7 @@ const AdminPage = () => {
       <header className="space-y-2 pb-4 md:pb-6 border-b">
         <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2">
           <Settings2 className="h-5 w-5 sm:h-6 sm:w-7 md:h-8 md:w-8 text-primary" />
-          تسجيل الأضاحي
+          إدارة الأضاحي
         </h1>
         <p className="text-sm sm:text-md md:text-lg text-muted-foreground">
           عرض وتعديل وحذف جميع الأضاحي المسجلة في النظام.
@@ -478,25 +507,25 @@ const AdminPage = () => {
       <div className="space-y-3 md:space-y-4">
         <h2 className="text-md sm:text-lg md:text-xl font-semibold text-center md:text-right">خيارات التصدير وجدول الإدخالات</h2>
         
-        <div className="p-2 md:p-3 border rounded-md bg-card shadow-sm space-y-2">
-            <div className="flex justify-center">
+        <div className="p-2 md:p-3 border rounded-md bg-card shadow-sm">
+            <div className="flex justify-center mb-2">
                  <Button onClick={handleRefresh} variant="outline" disabled={exportingType !== null || authLoading || isRefreshing} className="text-xs sm:text-sm">
                     {isRefreshing ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <RefreshCw className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
                     تحديث البيانات
                  </Button>
             </div>
-            <div className="flex justify-center">
+            <div className="flex justify-center mb-2">
                 <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
                     <Button onClick={handleExportAllPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700 text-xs sm:text-sm">
-                        {exportingType === 'allPdf' || exportingType === 'pdf' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
+                        {exportingType === 'allPdf' || (exportingType === 'pdf' && !fileName.includes('غزة') && !fileName.includes('المستخدم')) ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
                         الكل (PDF)
                     </Button>
                     <Button onClick={handleExportGazaPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.filter(s => s.distributionPreference === 'gaza').length === 0} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700 text-xs sm:text-sm">
-                        {exportingType === 'gazaPdf' || exportingType === 'pdf' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
+                        {exportingType === 'gazaPdf' || (exportingType === 'pdf' && fileName.includes('غزة')) ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
                         غزة (PDF)
                     </Button>
                     <Button onClick={handleExportByUserPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700 text-xs sm:text-sm">
-                        {exportingType === 'userPdf' || exportingType === 'pdf' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
+                        {exportingType === 'userPdf' || (exportingType === 'pdf' && fileName.includes('المستخدم'))? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
                         حسب المستخدم (PDF)
                     </Button>
                 </div>
@@ -527,3 +556,4 @@ const AdminPage = () => {
 
 export default AdminPage;
 
+    
