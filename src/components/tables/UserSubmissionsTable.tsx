@@ -3,8 +3,10 @@
 
 import type { AdahiSubmission, DistributionPreference } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { distributionOptions } from "@/lib/types"; // Import distributionOptions
+import { Badge } from "@/components/ui/badge"; // Make sure Badge is imported
+import { distributionOptions } from "@/lib/types"; 
+// import { format } from "date-fns"; // Uncomment if you want to add date formatting
+// import { arSA } from "date-fns/locale"; // Uncomment for Arabic date formatting
 
 interface UserSubmissionsTableProps {
   submissions: AdahiSubmission[];
@@ -34,33 +36,26 @@ export default function UserSubmissionsTable({ submissions }: UserSubmissionsTab
             <TableHead>يريد من الأضحية</TableHead>
             <TableHead>تم الدفع</TableHead>
             <TableHead>توزع لـ</TableHead>
-            {/* You can add back "تاريخ التسجيل" and "الحالة" if needed */}
-            {/* <TableHead>التاريخ</TableHead> */}
-            {/* <TableHead>الحالة</TableHead> */}
+            <TableHead>الحالة</TableHead> {/* Added Status Header */}
           </TableRow>
         </TableHeader>
         <TableBody>
           {submissions.map((sub, index) => (
             <TableRow key={sub.id}>
               <TableCell>{index + 1}</TableCell>
-              <TableCell className="font-medium">{sub.donorName}</TableCell>
-              <TableCell>{sub.sacrificeFor}</TableCell>
-              <TableCell>{sub.phoneNumber}</TableCell>
-              <TableCell>{sub.wantsToAttend ? "نعم" : "لا"}</TableCell>
-              <TableCell>{sub.wantsFromSacrifice ? "نعم" : "لا"}</TableCell>
-              <TableCell>{sub.paymentConfirmed ? "نعم" : "لا"}</TableCell>
-              <TableCell>{getDistributionLabel(sub.distributionPreference)}</TableCell>
-              {/* Example for adding back date and status if desired
-              <TableCell>
-                {sub.submissionDate ? format(new Date(sub.submissionDate), "dd/MM/yyyy", { locale: arSA }) : 'N/A'}
-              </TableCell>
-              <TableCell>
+              <TableCell className="font-medium whitespace-nowrap">{sub.donorName}</TableCell>
+              <TableCell className="whitespace-nowrap">{sub.sacrificeFor}</TableCell>
+              <TableCell className="whitespace-nowrap">{sub.phoneNumber}</TableCell>
+              <TableCell className="whitespace-nowrap">{sub.wantsToAttend ? "نعم" : "لا"}</TableCell>
+              <TableCell className="whitespace-nowrap">{sub.wantsFromSacrifice ? "نعم" : "لا"}</TableCell>
+              <TableCell className="whitespace-nowrap">{sub.paymentConfirmed ? "نعم" : "لا"}</TableCell>
+              <TableCell className="whitespace-nowrap">{getDistributionLabel(sub.distributionPreference)}</TableCell>
+              <TableCell className="whitespace-nowrap"> {/* Added Status Cell */}
                 <Badge variant={sub.status === "entered" ? "default" : "secondary"}
                        className={sub.status === "entered" ? "bg-green-500 hover:bg-green-600 text-white" : "bg-yellow-400 hover:bg-yellow-500 text-black"}>
                   {sub.status === "entered" ? "مدخلة" : "غير مدخلة"}
                 </Badge>
               </TableCell>
-              */}
             </TableRow>
           ))}
         </TableBody>
