@@ -3,10 +3,8 @@
 
 import type { AdahiSubmission, DistributionPreference } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge"; // Make sure Badge is imported
-import { distributionOptions } from "@/lib/types"; 
-// import { format } from "date-fns"; // Uncomment if you want to add date formatting
-// import { arSA } from "date-fns/locale"; // Uncomment for Arabic date formatting
+import { Badge } from "@/components/ui/badge"; 
+import { distributionOptions } from "@/lib/types";
 
 interface UserSubmissionsTableProps {
   submissions: AdahiSubmission[];
@@ -28,15 +26,7 @@ export default function UserSubmissionsTable({ submissions }: UserSubmissionsTab
         <TableCaption>قائمة الأضاحي المسجلة من قبلك. مجموع الأضاحي: {submissions.length}</TableCaption>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[50px]">م</TableHead>
-            <TableHead>اسم المتبرع</TableHead>
-            <TableHead>الاضحية باسم</TableHead>
-            <TableHead>رقم التلفون</TableHead>
-            <TableHead>يريد الحضور</TableHead>
-            <TableHead>يريد من الأضحية</TableHead>
-            <TableHead>تم الدفع</TableHead>
-            <TableHead>توزع لـ</TableHead>
-            <TableHead>الحالة</TableHead> {/* Added Status Header */}
+            <TableHead className="w-[50px]">م</TableHead><TableHead>اسم المتبرع</TableHead><TableHead>الاضحية باسم</TableHead><TableHead>رقم التلفون</TableHead><TableHead>يريد الحضور</TableHead><TableHead>يريد من الأضحية</TableHead><TableHead>تم الدفع</TableHead><TableHead>توزع لـ</TableHead><TableHead>الحالة</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -50,7 +40,7 @@ export default function UserSubmissionsTable({ submissions }: UserSubmissionsTab
               <TableCell className="whitespace-nowrap">{sub.wantsFromSacrifice ? "نعم" : "لا"}</TableCell>
               <TableCell className="whitespace-nowrap">{sub.paymentConfirmed ? "نعم" : "لا"}</TableCell>
               <TableCell className="whitespace-nowrap">{getDistributionLabel(sub.distributionPreference)}</TableCell>
-              <TableCell className="whitespace-nowrap"> {/* Added Status Cell */}
+              <TableCell className="whitespace-nowrap">
                 <Badge variant={sub.status === "entered" ? "default" : "secondary"}
                        className={sub.status === "entered" ? "bg-green-500 hover:bg-green-600 text-white" : "bg-yellow-400 hover:bg-yellow-500 text-black"}>
                   {sub.status === "entered" ? "مدخلة" : "غير مدخلة"}
