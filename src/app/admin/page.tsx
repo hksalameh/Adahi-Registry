@@ -3,7 +3,7 @@
 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { Settings2, TableIcon, BarChart3, HandHelping, Coins, RefreshCw, Loader2, Users, FileText, Sheet, UserPlus } from "lucide-react";
+import { Settings2, TableIcon, BarChart3, HandHelping, Coins, RefreshCw, Loader2, Users, FileText, Sheet, UserPlus, ListChecks } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useCallback } from "react";
 import type { AdahiSubmission, DistributionPreference } from "@/lib/types";
@@ -23,6 +23,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import Link from "next/link";
 
 import html2pdf from 'html2pdf.js';
 
@@ -103,6 +104,8 @@ const AdminPage = () => {
         wantsFromSacrificeText: sub.wantsFromSacrifice ? "نعم" : "لا",
         sacrificeWishes: sub.wantsFromSacrifice ? (sub.sacrificeWishes || "-") : "-",
         paymentConfirmedText: sub.paymentConfirmed ? "نعم" : "لا",
+        // receiptBookNumber: sub.paymentConfirmed ? (sub.receiptBookNumber || "-") : "-", // Removed
+        // voucherNumber: sub.paymentConfirmed ? (sub.voucherNumber || "-") : "-", // Removed
         throughIntermediaryText: sub.throughIntermediary ? "نعم" : "لا",
         intermediaryName: sub.throughIntermediary ? (sub.intermediaryName || "-") : "-",
         distributionPreferenceText: getDistributionLabel(sub.distributionPreference),
@@ -134,6 +137,8 @@ const AdminPage = () => {
     if (wb.Sheets[sheetName]) {
         const sheet = wb.Sheets[sheetName];
         
+        sheet['!props'] = { rtl: true }; // Enable RTL for the sheet
+
         const headerRowIndex = 0;
         columnsToExport.forEach((_col, C_idx) => {
             const header_cell_ref = XLSX.utils.encode_cell({ r: headerRowIndex, c: C_idx });
@@ -165,7 +170,7 @@ const AdminPage = () => {
                         },
                         alignment: { ...(sheet[cell_ref].s?.alignment || {}), horizontal: "right", vertical: "center", wrapText: true }
                     };
-                } else if (sheet[cell_ref]) {
+                } else if (sheet[cell_ref]) { // Apply alignment even if cell is empty (for consistent look)
                      sheet[cell_ref].s = {
                         ...(sheet[cell_ref].s || {}),
                         alignment: { ...(sheet[cell_ref].s?.alignment || {}), horizontal: "right", vertical: "center", wrapText: true }
@@ -176,7 +181,7 @@ const AdminPage = () => {
         
         const colWidths = columnsToExport.map(column => ({ wch: Math.max(15, String(column.header).length + 5) }));
         sheet['!cols'] = colWidths;
-        sheet['!props'] = { rtl: true };
+        
         if (sheet['!ref']) {
             const range = XLSX.utils.decode_range(sheet['!ref']);
             if (range.s.r <= headerRowIndex && range.e.r >= headerRowIndex) {
@@ -192,10 +197,11 @@ const AdminPage = () => {
     try {
       const exportDateText = `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`;
       
+      // Use original column order for PDF HTML generation
       let tableHtml = `<table style="width: 100%; border-collapse: collapse; font-family: 'Amiri', Arial, sans-serif; font-size: 8pt; direction: rtl;">`;
       tableHtml += `<thead><tr>`;
       columns.forEach(col => {
-        tableHtml += `<th style="border: 1px solid black; padding: 5px; text-align: center; vertical-align: middle; background-color: #eeeeee; font-family: 'Amiri', Arial, sans-serif; font-weight: bold;">${col.header}</th>`;
+        tableHtml += `<th style="border: 1px solid black; padding: 5px; text-align: center; vertical-align: middle; background-color: #eeeeee; font-family: 'Amiri', Arial, sans-serif; font-weight: bold; line-height: 1.5;">${col.header}</th>`;
       });
       tableHtml += `</tr></thead>`;
       tableHtml += `<tbody>`;
@@ -203,7 +209,7 @@ const AdminPage = () => {
         tableHtml += `<tr>`;
         columns.forEach(col => { 
           const value = item.hasOwnProperty(col.dataKey) ? item[col.dataKey] : "";
-          tableHtml += `<td style="border: 1px solid black; padding: 5px; text-align: center; vertical-align: middle; font-family: 'Amiri', Arial, sans-serif;">${value}</td>`;
+          tableHtml += `<td style="border: 1px solid black; padding: 5px; text-align: center; vertical-align: middle; font-family: 'Amiri', Arial, sans-serif; line-height: 1.5;">${value}</td>`;
         });
         tableHtml += `</tr>`;
       });
@@ -371,7 +377,9 @@ const AdminPage = () => {
 
       allDataPrepared.forEach(subPrepared => {
           let originalUserName = subPrepared.submitterUsername || 'مستخدم_غير_معروف';
-          const userKey = originalUserName.replace(/[<>:"/\\|?* [\]]/g, '_');
+          // Ensure userKey for PDF is also filesystem-safe and reasonably short
+          const userKey = originalUserName.replace(/[<>:"/\\|?* [\]]/g, '_').substring(0, 30);
+
 
           if (!submissionsByUser[userKey]) {
               submissionsByUser[userKey] = { data: [], originalUserName };
@@ -382,9 +390,9 @@ const AdminPage = () => {
       for (const userNameKey in submissionsByUser) {
         const userData = submissionsByUser[userNameKey];
         if (userData.data.length > 0) {
-            const safeUserNameKey = userNameKey.substring(0, 30);
             const pdfTitle = `تقرير أضاحي ${userData.originalUserName}`;
-            await generatePdfWithHtml2Pdf(pdfTitle, userData.data, commonExportColumns, `أضاحي_${safeUserNameKey}`);
+            // Use the processed userKey for the filename to ensure it's safe
+            await generatePdfWithHtml2Pdf(pdfTitle, userData.data, commonExportColumns, `أضاحي_${userNameKey}`);
         }
       }
       toast({ title: "تم تصدير الأضاحي حسب المستخدم (ملفات PDF منفصلة) بنجاح" });
@@ -443,7 +451,7 @@ const AdminPage = () => {
           <CardHeader>
             <CardTitle className="text-md sm:text-lg">إجراءات إدارية</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-wrap gap-2">
             <Dialog open={isRegisterDialogOpen} onOpenChange={setIsRegisterDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" className="text-xs sm:text-sm">
@@ -461,6 +469,12 @@ const AdminPage = () => {
                 <RegisterForm />
               </DialogContent>
             </Dialog>
+            <Button variant="outline" className="text-xs sm:text-sm" asChild>
+              <Link href="/dashboard" className="flex items-center">
+                <ListChecks className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />
+                الانتقال إلى صفحة إدخال الأضاحي
+              </Link>
+            </Button>
           </CardContent>
         </Card>
       </section>
@@ -563,5 +577,4 @@ const AdminPage = () => {
 }
 
 export default AdminPage;
-
     
