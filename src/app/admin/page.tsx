@@ -31,7 +31,19 @@ import pdfMake from 'pdfmake/build/pdfmake';
 // Import the custom vfs_fonts.js file
 //  تأكد من أن هذا المسار صحيح وأن الملف vfs_fonts.js موجود فيه
 //  هذا الملف يجب أن يحتوي على بيانات خط Amiri (وغيره من الخطوط التي تريدها)
-import '@/lib/vfs_fonts.js'; //  <<<<----  تم تغيير هذا السطر
+import vfsFontsDataFromLib from '@/lib/vfs_fonts.js'; //  <<<<----  تم تغيير هذا السطر
+
+// Assign the imported VFS data to pdfMake.vfs
+if (vfsFontsDataFromLib) {
+  pdfMake.vfs = vfsFontsDataFromLib;
+} else {
+  console.error("Failed to load custom VFS fonts from '@/lib/vfs_fonts.js'. pdfMake.vfs might be undefined or empty.");
+  // Fallback or ensure pdfMake.vfs is at least an empty object if not populated
+  if (!pdfMake.vfs) {
+    pdfMake.vfs = {};
+  }
+}
+
 
 //  يفترض أن pdfMake.vfs قد تم تهيئته الآن بواسطة الاستيراد أعلاه لملف الخطوط المخصص.
 
@@ -640,3 +652,5 @@ const AdminPage = () => {
 }
 
 export default AdminPage;
+
+    
