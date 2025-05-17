@@ -24,28 +24,29 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-// Import pdfMake and vfs_fonts
+// Import pdfMake
 import pdfMake from 'pdfmake/build/pdfmake';
-// Use the default vfs_fonts from the pdfmake package.
-// This file is executed for its side-effect of populating pdfMake.vfs.
-import 'pdfmake/build/vfs_fonts.js'; 
 
-//  pdfMake.vfs is now populated by the import above.
+//  <<<<----  تم تغيير هذا الجزء  ---->>>>
+// Import the custom vfs_fonts.js file
+//  تأكد من أن هذا المسار صحيح وأن الملف vfs_fonts.js موجود فيه
+//  هذا الملف يجب أن يحتوي على بيانات خط Amiri (وغيره من الخطوط التي تريدها)
+import '@/lib/vfs_fonts.js'; //  <<<<----  تم تغيير هذا السطر
+
+//  يفترض أن pdfMake.vfs قد تم تهيئته الآن بواسطة الاستيراد أعلاه لملف الخطوط المخصص.
 
 // Configure Amiri font for pdfMake
 // IMPORTANT: For Amiri (or any custom font) to work correctly,
 // you need to have a vfs_fonts.js file that includes the font data,
 // and that vfs_fonts.js file needs to be imported and assigned to pdfMake.vfs.
-// The default vfs_fonts.js from pdfmake might not include Amiri.
-// For now, we are using the default vfs_fonts.js from the package.
 if (pdfMake.fonts) {
     pdfMake.fonts = {
-      ...pdfMake.fonts, // Preserve existing fonts (like Roboto from default vfs_fonts)
+      ...pdfMake.fonts, // Preserve existing fonts (like Roboto from default vfs_fonts if it was loaded)
       Amiri: { // The name 'Amiri' here must match the font name used in defaultStyle and styles
-        normal: 'Amiri-Regular.ttf', // This assumes Amiri-Regular.ttf data is in pdfMake.vfs
+        normal: 'Amiri-Regular.ttf', // This assumes Amiri-Regular.ttf data is in pdfMake.vfs (from your custom vfs_fonts.js)
         bold: 'Amiri-Bold.ttf',     // This assumes Amiri-Bold.ttf data is in pdfMake.vfs
-        italics: 'Amiri-Regular.ttf', 
-        bolditalics: 'Amiri-Bold.ttf' 
+        italics: 'Amiri-Regular.ttf', // Using regular for italics if no specific italic font
+        bolditalics: 'Amiri-Bold.ttf' // Using bold for bolditalics if no specific bold-italic font
       }
     };
 } else {
@@ -69,25 +70,36 @@ const AdminPage = () => {
   const [exportingType, setExportingType] = useState<string | null>(null);
   const [isRegisterDialogOpen, setIsRegisterDialogOpen] = useState(false);
 
-  // Check if Amiri font is *configured* in pdfMake.fonts and if its *data* is available in pdfMake.vfs
+  // Check if Amiri font is *configured* in pdfMake.fonts AND if its *data* is available in pdfMake.vfs
   const isAmiriFontConfigured = !!(
     pdfMake.fonts &&
     pdfMake.fonts.Amiri &&
-    pdfMake.fonts.Amiri.normal && 
-    pdfMake.vfs && // Check if vfs itself exists
+    pdfMake.fonts.Amiri.normal &&
+    pdfMake.vfs && // Check if vfs itself exists and is populated
     Object.keys(pdfMake.vfs).includes('Amiri-Regular.ttf') // Check if the font file data is in VFS
   );
 
   useEffect(() => {
-    if (!isAmiriFontConfigured && (exportingType?.includes('Pdf'))) {
+    // This toast will appear if Amiri is defined in pdfMake.fonts, but the actual font data for Amiri-Regular.ttf is missing from pdfMake.vfs
+    // This can happen if the custom vfs_fonts.js is missing or doesn't include Amiri-Regular.ttf correctly.
+    if (pdfMake.fonts?.Amiri && (!pdfMake.vfs || !Object.keys(pdfMake.vfs).includes('Amiri-Regular.ttf'))) {
+      toast({
+        title: "تنبيه بخصوص خط PDF (Amiri)",
+        description: "تم تعريف خط Amiri في إعدادات pdfMake، ولكن بيانات الخط ('Amiri-Regular.ttf') غير موجودة في نظام الملفات الافتراضي (vfs). قد لا تظهر النصوص العربية بشكل صحيح. تأكد أن ملف الخطوط المخصص (vfs_fonts.js) يحتوي على بيانات خط Amiri.",
+        variant: "destructive",
+        duration: 10000,
+      });
+    } else if (!pdfMake.fonts?.Amiri && (exportingType?.includes('Pdf'))) {
+      // This toast appears if Amiri is not even defined in pdfMake.fonts
       toast({
         title: "تنبيه بخصوص خط PDF",
-        description: "لم يتم تكوين خط Amiri بشكل كامل لـ pdfMake (قد يكون ملف vfs_fonts.js المخصص مفقودًا أو غير صحيح، أو أن الخط غير مضمن في ملف vfs_fonts الافتراضي). قد لا تظهر النصوص العربية بشكل صحيح في ملفات PDF. يُنصح باستخدام تصدير Excel للحصول على أفضل دعم للغة العربية.",
+        description: "لم يتم تكوين خط Amiri لـ pdfMake. قد لا تظهر النصوص العربية بشكل صحيح في ملفات PDF. يُنصح باستخدام تصدير Excel للحصول على أفضل دعم للغة العربية.",
         variant: "destructive",
         duration: 10000,
       });
     }
-  }, [isAmiriFontConfigured, toast, exportingType]);
+  }, [toast, exportingType]);
+
 
   const getDistributionLabel = useCallback((value?: DistributionPreference | string) => {
     if (!value) return "غير محدد";
@@ -106,10 +118,10 @@ const AdminPage = () => {
       if (user && user.isAdmin) {
         handleRefresh().finally(() => setPageLoading(false));
       } else {
-        setPageLoading(false); 
+        setPageLoading(false);
       }
     }
-  }, [authLoading, user, handleRefresh]); 
+  }, [authLoading, user, handleRefresh]);
 
   const commonExportColumns = [
     { header: "م", dataKey: "serial" },
@@ -147,8 +159,8 @@ const AdminPage = () => {
         wantsFromSacrificeText: sub.wantsFromSacrifice ? "نعم" : "لا",
         sacrificeWishes: sub.wantsFromSacrifice ? (sub.sacrificeWishes || "-") : "-",
         paymentConfirmedText: sub.paymentConfirmed ? "نعم" : "لا",
-        receiptBookNumber: sub.paymentConfirmed ? (sub.receiptBookNumber || "-") : "-", 
-        voucherNumber: sub.paymentConfirmed ? (sub.voucherNumber || "-") : "-", 
+        receiptBookNumber: sub.paymentConfirmed ? (sub.receiptBookNumber || "-") : "-",
+        voucherNumber: sub.paymentConfirmed ? (sub.voucherNumber || "-") : "-",
         throughIntermediaryText: sub.throughIntermediary ? "نعم" : "لا",
         intermediaryName: sub.throughIntermediary ? (sub.intermediaryName || "-") : "-",
         distributionPreferenceText: getDistributionLabel(sub.distributionPreference),
@@ -218,7 +230,7 @@ const AdminPage = () => {
         const colWidths = columns.map(column => ({ wch: Math.max(15, String(column.header).length + 5) }));
         sheet['!cols'] = colWidths;
         sheet['!props'] = { rtl: true };
-        if (sheet['!ref']) { // Check if !ref exists to avoid error on empty sheets
+        if (sheet['!ref']) { 
             sheet['!autofilter'] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(sheet['!ref'])) };
         }
     }
@@ -237,18 +249,17 @@ const AdminPage = () => {
       return;
     }
 
-    // Reverse columns for RTL display in PDF
     const pdfColumns = [...columns].reverse();
 
     const tableHeaders = pdfColumns.map(col => ({
-        text: col.header, 
+        text: col.header,
         style: 'tableHeader',
         alignment: 'right' as const,
     }));
 
     const tableBody = data.map(item =>
       pdfColumns.map(col => ({
-        text: item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : '', 
+        text: item[col.dataKey] !== undefined && item[col.dataKey] !== null ? String(item[col.dataKey]) : '',
         alignment: 'right' as const,
       }))
     );
@@ -258,14 +269,14 @@ const AdminPage = () => {
     const docDefinition: any = {
       pageSize: 'A4',
       pageOrientation: 'landscape',
-      pageMargins: [PDF_MARGIN, PDF_MARGIN + 20, PDF_MARGIN, PDF_MARGIN + 20], // Adjusted top and bottom margin
+      pageMargins: [PDF_MARGIN, PDF_MARGIN + 20, PDF_MARGIN, PDF_MARGIN + 20],
       content: [
         { text: title, style: 'header', alignment: 'center' as const, margin: [0, 0, 0, 10] },
         { text: exportDateText, style: 'subheader', alignment: 'center' as const, margin: [0, 0, 0, 20] },
         {
           table: {
             headerRows: 1,
-            widths: pdfColumns.map(() => '*' as const), // Equal column widths
+            widths: pdfColumns.map(() => '*' as const),
             body: [tableHeaders, ...tableBody],
           },
           layout: {
@@ -280,26 +291,26 @@ const AdminPage = () => {
         }
       ],
       defaultStyle: {
-        font: 'Amiri', 
+        font: 'Amiri',
         fontSize: 10,
-        alignment: 'right' as const 
+        alignment: 'right' as const
       },
       styles: {
         header: {
           fontSize: 18,
           alignment: 'center' as const,
-          font: 'Amiri' 
+          font: 'Amiri'
         },
         subheader: {
           fontSize: 12,
           alignment: 'center' as const,
-          font: 'Amiri' 
+          font: 'Amiri'
         },
         tableHeader: {
-          fontSize: 8, // Smaller font for column headers
+          fontSize: 8,
           color: 'black',
           alignment: 'right' as const,
-          font: 'Amiri' 
+          font: 'Amiri'
         }
       },
       footer: function(currentPage: number, pageCount: number) {
@@ -308,7 +319,7 @@ const AdminPage = () => {
           text: pageNumText,
           alignment: 'center' as const,
           style: { font: 'Amiri', fontSize: 8 },
-          margin: [0, 10, 0, 0] 
+          margin: [0, 10, 0, 0]
         };
       }
     };
@@ -368,7 +379,6 @@ const AdminPage = () => {
 
       allDataPrepared.forEach(subPrepared => {
           let userName = subPrepared.submitterUsername || 'مستخدم_غير_معروف';
-          // Sanitize username for sheet name (max 31 chars, no invalid chars)
           const userKey = userName.replace(/[<>:"/\\|?* [\]]/g, '_').substring(0, 31);
 
 
@@ -398,7 +408,6 @@ const AdminPage = () => {
       return;
     }
     if (!isAmiriFontConfigured) {
-      // Toast is already handled by the useEffect or the generatePdfMakeDocument function
       return;
     }
     setExportingType('allPdf');
@@ -458,8 +467,7 @@ const AdminPage = () => {
       for (const userNameKey in submissionsByUser) {
         const userSubmissionsData = submissionsByUser[userNameKey];
         if (userSubmissionsData.length > 0) {
-            // Sanitize filename (though userKey is already somewhat sanitized)
-            const safeUserNameKey = userNameKey.substring(0, 30); // Keep filenames reasonable
+            const safeUserNameKey = userNameKey.substring(0, 30);
             generatePdfMakeDocument(`تقرير أضاحي المستخدم: ${userNameKey}`, userSubmissionsData, commonExportColumns, `أضاحي_${safeUserNameKey}`);
         }
       }
@@ -481,8 +489,6 @@ const AdminPage = () => {
   }
 
   if (!user || !user.isAdmin) {
-    // This case should ideally be handled by AdminLayout, redirecting the user.
-    // Showing a fallback message here.
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <p className="text-destructive text-center">غير مصرح لك بالدخول لهذه الصفحة. يتم توجيهك...</p>
@@ -592,36 +598,38 @@ const AdminPage = () => {
             </Button>
           </div>
 
-          {/* PDF Export Buttons */}
-          <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
-            <Button onClick={handleExportAllPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0 || !isAmiriFontConfigured} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700 text-xs sm:text-sm">
-              {exportingType === 'allPdf' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
-              الكل (PDF)
-            </Button>
-            <Button onClick={handleExportGazaPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.filter(s => s.distributionPreference === 'gaza').length === 0 || !isAmiriFontConfigured} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700 text-xs sm:text-sm">
-              {exportingType === 'gazaPdf' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
-              غزة (PDF)
-            </Button>
-            <Button onClick={handleExportByUserPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0 || !isAmiriFontConfigured} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700 text-xs sm:text-sm">
-              {exportingType === 'userPdf' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
-              حسب المستخدم (PDF)
-            </Button>
+          <div className="flex justify-center">
+            <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
+              <Button onClick={handleExportAllPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0 || !isAmiriFontConfigured} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700 text-xs sm:text-sm">
+                {exportingType === 'allPdf' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
+                الكل (PDF)
+              </Button>
+              <Button onClick={handleExportGazaPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.filter(s => s.distributionPreference === 'gaza').length === 0 || !isAmiriFontConfigured} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700 text-xs sm:text-sm">
+                {exportingType === 'gazaPdf' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
+                غزة (PDF)
+              </Button>
+              <Button onClick={handleExportByUserPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0 || !isAmiriFontConfigured} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700 text-xs sm:text-sm">
+                {exportingType === 'userPdf' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
+                حسب المستخدم (PDF)
+              </Button>
+            </div>
           </div>
 
-          {/* Excel Export Buttons */}
-          <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
-            <Button onClick={handleExportAllExcel} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700 text-xs sm:text-sm">
-              {exportingType === 'allExcel' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Sheet className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
-              الكل (Excel)
-            </Button>
-            <Button onClick={handleExportGazaExcel} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.filter(s => s.distributionPreference === 'gaza').length === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700 text-xs sm:text-sm">
-              {exportingType === 'gazaExcel' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Sheet className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
-              غزة (Excel)
-            </Button>
-            <Button onClick={handleExportByUserExcel} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700 text-xs sm:text-sm">
-              {exportingType === 'userExcel' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Users className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
-              حسب المستخدم (Excel)
-            </Button>
+          <div className="flex justify-center">
+            <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
+              <Button onClick={handleExportAllExcel} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700 text-xs sm:text-sm">
+                {exportingType === 'allExcel' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Sheet className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
+                الكل (Excel)
+              </Button>
+              <Button onClick={handleExportGazaExcel} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.filter(s => s.distributionPreference === 'gaza').length === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700 text-xs sm:text-sm">
+                {exportingType === 'gazaExcel' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Sheet className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
+                غزة (Excel)
+              </Button>
+              <Button onClick={handleExportByUserExcel} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700 text-xs sm:text-sm">
+                {exportingType === 'userExcel' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Users className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
+                حسب المستخدم (Excel)
+              </Button>
+            </div>
           </div>
         </div>
       </div>
