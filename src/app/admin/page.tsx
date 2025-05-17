@@ -3,7 +3,7 @@
 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { Settings2, TableIcon, BarChart3, HandHelping, Coins, RefreshCw, Loader2, Users, FileText, Sheet, UserPlus } from "lucide-react";
+import { Settings2, TableIcon, BarChart3, HandHelping, Coins, RefreshCw, Loader2, Users, FileText, Sheet, UserPlus } from "lucide-react"; 
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useCallback } from "react";
 import type { AdahiSubmission, DistributionPreference } from "@/lib/types";
@@ -51,12 +51,20 @@ const AdminPage = () => {
   useEffect(() => {
     if (!authLoading) {
       if (user && user.isAdmin) {
-        handleRefresh().finally(() => setPageLoading(false));
+        // Ensure handleRefresh is defined before calling it or adding to dependency array
+        if (typeof handleRefresh === 'function') {
+            handleRefresh().finally(() => setPageLoading(false));
+        } else {
+            // Fallback or error handling if handleRefresh is not yet defined
+            // This case should ideally not be reached if handleRefresh is defined with useCallback correctly
+            console.warn("handleRefresh is not defined at the time of calling in useEffect");
+            setPageLoading(false);
+        }
       } else {
         setPageLoading(false);
       }
     }
-  }, [authLoading, user, handleRefresh]);
+  }, [authLoading, user, handleRefresh]); 
 
 
   const commonExportColumns = [
@@ -170,7 +178,7 @@ const AdminPage = () => {
         
         const colWidths = columnsToExport.map(column => ({ wch: Math.max(15, String(column.header).length + 5) }));
         sheet['!cols'] = colWidths;
-        sheet['!props'] = { rtl: true };
+        sheet['!props'] = { rtl: true }; // Enable RTL for the sheet
         if (sheet['!ref']) { 
             const range = XLSX.utils.decode_range(sheet['!ref']);
             // Ensure the filter range covers only the header row
@@ -187,11 +195,12 @@ const AdminPage = () => {
     try {
       const exportDateText = `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`;
       
+      // Create HTML for PDF content
       let tableHtml = `<table style="width: 100%; border-collapse: collapse; font-family: 'Amiri', Arial, sans-serif;">`;
       tableHtml += `<thead><tr>`;
       // For html2pdf, iterate over columns directly as defined in commonExportColumns for RTL display
       columns.forEach(col => {
-        tableHtml += `<th style="border: 1px solid black; padding: 5px; text-align: center; vertical-align: middle; background-color: #eeeeee;">${col.header}</th>`;
+        tableHtml += `<th style="border: 1px solid black; padding: 5px; text-align: center; vertical-align: middle; line-height: 1.5; background-color: #eeeeee;">${col.header}</th>`;
       });
       tableHtml += `</tr></thead>`;
       tableHtml += `<tbody>`;
@@ -199,7 +208,7 @@ const AdminPage = () => {
         tableHtml += `<tr>`;
         columns.forEach(col => {
           const value = item.hasOwnProperty(col.dataKey) ? item[col.dataKey] : "";
-          tableHtml += `<td style="border: 1px solid black; padding: 5px; text-align: center; vertical-align: middle;">${value}</td>`;
+          tableHtml += `<td style="border: 1px solid black; padding: 5px; text-align: center; vertical-align: middle; line-height: 1.5;">${value}</td>`;
         });
         tableHtml += `</tr>`;
       });
@@ -221,7 +230,7 @@ const AdminPage = () => {
         filename: `${fileName}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, logging: true, dpi: 192, letterRendering: true },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }, // Changed to landscape for wider tables
         pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
       };
 
@@ -289,6 +298,7 @@ const AdminPage = () => {
 
       allDataPrepared.forEach(subPrepared => {
           let userName = subPrepared.submitterUsername || 'مستخدم_غير_معروف';
+          // Sanitize username for sheet name (max 31 chars, no invalid chars)
           const userKey = userName.replace(/[<>:"/\\|?* [\]]/g, '_').substring(0, 31);
 
           if (!submissionsByUser[userKey]) {
@@ -335,13 +345,14 @@ const AdminPage = () => {
       toast({ title: "لا توجد بيانات للتصدير" });
       return;
     }
-    setExportingType('userPdf'); 
+    setExportingType('userPdf'); // Set exporting type to disable buttons
     try {
       const submissionsByUser: { [key: string]: { data: any[], originalUserName: string } } = {};
       const allDataPrepared = await prepareDataForExport(allSubmissionsForAdmin);
 
       allDataPrepared.forEach(subPrepared => {
           let originalUserName = subPrepared.submitterUsername || 'مستخدم_غير_معروف';
+          // Sanitize username for file name (remove invalid chars)
           const userKey = originalUserName.replace(/[<>:"/\\|?* [\]]/g, '_'); 
 
           if (!submissionsByUser[userKey]) {
@@ -350,19 +361,24 @@ const AdminPage = () => {
           submissionsByUser[userKey].data.push(subPrepared);
       });
 
+      // Sequentially generate and save PDFs to avoid browser blocking multiple downloads at once
       for (const userNameKey in submissionsByUser) {
         const userData = submissionsByUser[userNameKey];
         if (userData.data.length > 0) {
-            const safeUserNameKey = userNameKey.substring(0, 30); 
+            // Ensure filename is safe and not too long
+            const safeUserNameKey = userNameKey.substring(0, 30); // Limit length
             const pdfTitle = `تقرير أضاحي ${userData.originalUserName}`;
             generatePdfWithHtml2Pdf(pdfTitle, userData.data, commonExportColumns, `أضاحي_${safeUserNameKey}`);
+            // Add a small delay to allow browser to process download, might not be needed with html2pdf's save()
             await new Promise(resolve => setTimeout(resolve, 500)); 
         }
       }
+      // toast({ title: "تم تصدير الأضاحي حسب المستخدم (ملفات PDF منفصلة) بنجاح" }); // Toast moved to generatePdfWithHtml2Pdf
     } catch (error) {
       console.error("Error in by-user PDF export loop:", error);
       toast({ title: "خطأ في التصدير (مجموعة PDF)", description: "حدث خطأ أثناء محاولة تصدير الأضاحي حسب المستخدم.", variant: "destructive" });
     } 
+    // setExportingType(null) is handled in generatePdfWithHtml2Pdf's finally block
   };
 
 
@@ -375,7 +391,7 @@ const AdminPage = () => {
     );
   }
 
-  if (!user || !user.isAdmin) { 
+  if (!user || !user.isAdmin) { // Should be caught by AdminLayout, but as a fallback
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <p className="text-destructive text-center">غير مصرح لك بالدخول لهذه الصفحة. يتم توجيهك...</p>
