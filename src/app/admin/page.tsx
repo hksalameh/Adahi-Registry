@@ -3,7 +3,8 @@
 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { Settings2, TableIcon, BarChart3, HandHelping, Coins, RefreshCw, Loader2, Users, FileText, Sheet, UserPlus, ListChecks } from "lucide-react";
+// Updated icon imports to include ClipboardList
+import { Settings2, TableIcon, BarChart3, HandHelping, Coins, RefreshCw, Loader2, Users, FileText, Sheet, UserPlus, ListChecks, ClipboardList } from "lucide-react"; 
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useCallback } from "react";
 import type { AdahiSubmission, DistributionPreference } from "@/lib/types";
@@ -78,6 +79,7 @@ const AdminPage = () => {
     { header: "اسم الوسيط", dataKey: "intermediaryName"},
     { header: "توزع لـ", dataKey: "distributionPreferenceText" },
   ];
+  
 
   const prepareDataForExport = useCallback(async (submissions: AdahiSubmission[]): Promise<any[]> => {
     const prepared = [];
@@ -104,8 +106,6 @@ const AdminPage = () => {
         wantsFromSacrificeText: sub.wantsFromSacrifice ? "نعم" : "لا",
         sacrificeWishes: sub.wantsFromSacrifice ? (sub.sacrificeWishes || "-") : "-",
         paymentConfirmedText: sub.paymentConfirmed ? "نعم" : "لا",
-        // receiptBookNumber: sub.paymentConfirmed ? (sub.receiptBookNumber || "-") : "-", // Removed
-        // voucherNumber: sub.paymentConfirmed ? (sub.voucherNumber || "-") : "-", // Removed
         throughIntermediaryText: sub.throughIntermediary ? "نعم" : "لا",
         intermediaryName: sub.throughIntermediary ? (sub.intermediaryName || "-") : "-",
         distributionPreferenceText: getDistributionLabel(sub.distributionPreference),
@@ -137,7 +137,7 @@ const AdminPage = () => {
     if (wb.Sheets[sheetName]) {
         const sheet = wb.Sheets[sheetName];
         
-        sheet['!props'] = { rtl: true }; // Enable RTL for the sheet
+        sheet['!props'] = { rtl: true }; 
 
         const headerRowIndex = 0;
         columnsToExport.forEach((_col, C_idx) => {
@@ -170,7 +170,7 @@ const AdminPage = () => {
                         },
                         alignment: { ...(sheet[cell_ref].s?.alignment || {}), horizontal: "right", vertical: "center", wrapText: true }
                     };
-                } else if (sheet[cell_ref]) { // Apply alignment even if cell is empty (for consistent look)
+                } else if (sheet[cell_ref]) { 
                      sheet[cell_ref].s = {
                         ...(sheet[cell_ref].s || {}),
                         alignment: { ...(sheet[cell_ref].s?.alignment || {}), horizontal: "right", vertical: "center", wrapText: true }
@@ -191,17 +191,16 @@ const AdminPage = () => {
     }
     XLSX.writeFile(wb, `${fileName}.xlsx`);
   };
-
+  
   const generatePdfWithHtml2Pdf = async (title: string, data: any[], columns: Array<{header: string, dataKey: string}>, fileName: string) => {
     setExportingType(fileName.includes('المستخدم') ? 'userPdf' : (fileName.includes('غزة') && !fileName.includes('ما_عدا') ? 'gazaPdf' : (fileName.includes('ما_عدا_غزة') ? 'allExceptGazaPdf' : 'allPdf')));
     try {
       const exportDateText = `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`;
       
-      // Use original column order for PDF HTML generation
       let tableHtml = `<table style="width: 100%; border-collapse: collapse; font-family: 'Amiri', Arial, sans-serif; font-size: 8pt; direction: rtl;">`;
       tableHtml += `<thead><tr>`;
       columns.forEach(col => {
-        tableHtml += `<th style="border: 1px solid black; padding: 5px; text-align: center; vertical-align: middle; background-color: #eeeeee; font-family: 'Amiri', Arial, sans-serif; font-weight: bold; line-height: 1.5;">${col.header}</th>`;
+        tableHtml += `<th style="border: 1px solid black; padding: 5px; text-align: center; vertical-align: middle; line-height: 1.5; background-color: #eeeeee; font-family: 'Amiri', Arial, sans-serif; font-weight: bold;">${col.header}</th>`;
       });
       tableHtml += `</tr></thead>`;
       tableHtml += `<tbody>`;
@@ -209,7 +208,7 @@ const AdminPage = () => {
         tableHtml += `<tr>`;
         columns.forEach(col => { 
           const value = item.hasOwnProperty(col.dataKey) ? item[col.dataKey] : "";
-          tableHtml += `<td style="border: 1px solid black; padding: 5px; text-align: center; vertical-align: middle; font-family: 'Amiri', Arial, sans-serif; line-height: 1.5;">${value}</td>`;
+          tableHtml += `<td style="border: 1px solid black; padding: 5px; text-align: center; vertical-align: middle; line-height: 1.5; font-family: 'Amiri', Arial, sans-serif;">${value}</td>`;
         });
         tableHtml += `</tr>`;
       });
@@ -377,7 +376,6 @@ const AdminPage = () => {
 
       allDataPrepared.forEach(subPrepared => {
           let originalUserName = subPrepared.submitterUsername || 'مستخدم_غير_معروف';
-          // Ensure userKey for PDF is also filesystem-safe and reasonably short
           const userKey = originalUserName.replace(/[<>:"/\\|?* [\]]/g, '_').substring(0, 30);
 
 
@@ -391,7 +389,6 @@ const AdminPage = () => {
         const userData = submissionsByUser[userNameKey];
         if (userData.data.length > 0) {
             const pdfTitle = `تقرير أضاحي ${userData.originalUserName}`;
-            // Use the processed userKey for the filename to ensure it's safe
             await generatePdfWithHtml2Pdf(pdfTitle, userData.data, commonExportColumns, `أضاحي_${userNameKey}`);
         }
       }
@@ -473,6 +470,13 @@ const AdminPage = () => {
               <Link href="/dashboard" className="flex items-center">
                 <ListChecks className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />
                 الانتقال إلى صفحة إدخال الأضاحي
+              </Link>
+            </Button>
+            {/* Added button to navigate to slaughter page */}
+            <Button variant="outline" className="text-xs sm:text-sm" asChild>
+              <Link href="/slaughter" className="flex items-center">
+                <ClipboardList className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />
+                إدارة ذبح الأضاحي
               </Link>
             </Button>
           </CardContent>
@@ -577,4 +581,6 @@ const AdminPage = () => {
 }
 
 export default AdminPage;
+    
+
     
