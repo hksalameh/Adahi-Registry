@@ -4,12 +4,11 @@ import withPWAInit from 'next-pwa';
 
 const withPWA = withPWAInit({
   dest: 'public',
-  register: false, // تم تعطيل التسجيل مؤقتًا للتشخيص
+  register: true, // تأكد من أن هذا true لتسجيل الـ Service Worker
   skipWaiting: true,
-  //  هام: تم تغيير 'disable' إلى 'false' مؤقتًا لاختبار PWA في وضع التطوير.
-  //  يجب إعادته إلى 'process.env.NODE_ENV === 'development'' قبل النشر النهائي.
-  disable: false, 
-  // يمكنك إضافة المزيد من إعدادات PWA هنا إذا لزم الأمر
+  //  هام: تم إعادته إلى الإعداد القياسي.
+  //  سيتم تعطيل PWA في وضع التطوير، وتفعيله في وضع الإنتاج.
+  disable: process.env.NODE_ENV === 'development', 
 });
 
 const nextConfig: NextConfig = {
@@ -46,7 +45,7 @@ const nextConfig: NextConfig = {
     allowedDevOrigins: [
       "https://3000-firebase-studio-1747137389331.cluster-jbb3mjctu5cbgsi6hwq6u4btwe.cloudworkstations.dev",
       "https://6000-firebase-studio-1747137389331.cluster-jbb3mjctu5cbgsi6hwq6u4btwe.cloudworkstations.dev",
-      "https://9003-firebase-studio-1747137389331.cluster-jbb3mjctu5cbgsi6hwq6u4btwe.cloudworkstations.dev", // Added this line for port 9003
+      "https://9003-firebase-studio-1747137389331.cluster-jbb3mjctu5cbgsi6hwq6u4btwe.cloudworkstations.dev",
       "https://firebase-studio-1747137389331.cluster-jbb3mjctu5cbgsi6hwq6u4btwe.cloudworkstations.dev",
     ],
   },
