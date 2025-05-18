@@ -6,7 +6,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import Header from "@/components/core/Header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useToast } from "@/hooks/use-toast"; // Correct import for useToast
+import { useToast } from "@/hooks/use-toast"; 
 
 export default function AdminLayout({
   children,
@@ -16,29 +16,29 @@ export default function AdminLayout({
   const { user, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const { toast } = useToast(); // Correctly initialize toast
+  const { toast } = useToast(); 
 
   useEffect(() => {
-    console.log("[AdminLayout Effect] Checkpoint. Loading:", loading, "User:", JSON.stringify(user), "Pathname:", pathname);
+    // console.log("[AdminLayout Effect] Checkpoint. Loading:", loading, "User:", JSON.stringify(user), "Pathname:", pathname);
     if (!loading) {
-      console.log("[AdminLayout Effect] Auth loading complete.");
+      // console.log("[AdminLayout Effect] Auth loading complete.");
       if (!user) {
-        console.log("[AdminLayout Effect] No user found, redirecting to login.");
+        // console.log("[AdminLayout Effect] No user found, redirecting to login.");
         router.push(`/auth/login?redirect=${pathname}`);
       } else if (!user.isAdmin) {
-        console.log(`[AdminLayout Effect] User found (ID: ${user.id}, Username: ${user.username}) but is NOT admin (isAdmin: ${user.isAdmin}). Redirecting to dashboard.`);
-        toast({ title: "غير مصرح به", description: "ليس لديك صلاحيات المدير.", variant: "destructive" });
+        // console.log(`[AdminLayout Effect] User found (ID: ${user.id}, Username: ${user.username}) but is NOT admin (isAdmin: ${user.isAdmin}). Redirecting to dashboard.`);
+        toast({ title: "وصول مقيد", description: "هذه المنطقة مخصصة للمدير فقط. يتم توجيهك إلى لوحة التحكم الخاصة بك.", variant: "destructive" });
         router.push("/dashboard");
       } else {
-        console.log(`[AdminLayout Effect] User (ID: ${user.id}, Username: ${user.username}) IS ADMIN. Allowing access to admin page.`);
+        // console.log(`[AdminLayout Effect] User (ID: ${user.id}, Username: ${user.username}) IS ADMIN. Allowing access to admin page.`);
       }
     } else {
-      console.log("[AdminLayout Effect] Still loading auth state...");
+      // console.log("[AdminLayout Effect] Still loading auth state...");
     }
   }, [user, loading, router, pathname, toast]);
 
   if (loading) {
-    console.log("[AdminLayout Render] Auth is loading, showing skeleton.");
+    // console.log("[AdminLayout Render] Auth is loading, showing skeleton.");
     return (
       <div className="flex flex-col min-h-screen bg-secondary/50">
         <Header />
@@ -56,7 +56,7 @@ export default function AdminLayout({
   }
 
   if (!user) {
-    console.log("[AdminLayout Render] No user (after loading finished), showing login-redirect skeleton (useEffect should handle redirect).");
+    // console.log("[AdminLayout Render] No user (after loading finished), showing login-redirect skeleton (useEffect should handle redirect).");
     return (
       <div className="flex flex-col min-h-screen bg-secondary/50">
         <Header />
@@ -70,7 +70,7 @@ export default function AdminLayout({
   }
 
   if (!user.isAdmin) {
-    console.log(`[AdminLayout Render] User (ID: ${user.id}, Username: ${user.username}) is NOT admin (isAdmin: ${user.isAdmin}), showing dashboard-redirect skeleton (useEffect should handle redirect).`);
+    // console.log(`[AdminLayout Render] User (ID: ${user.id}, Username: ${user.username}) is NOT admin (isAdmin: ${user.isAdmin}), showing dashboard-redirect skeleton (useEffect should handle redirect).`);
     return (
       <div className="flex flex-col min-h-screen bg-secondary/50">
         <Header />
@@ -83,7 +83,7 @@ export default function AdminLayout({
     );
   }
 
-  console.log(`[AdminLayout Render] User (ID: ${user.id}, Username: ${user.username}) IS ADMIN. Rendering admin content.`);
+  // console.log(`[AdminLayout Render] User (ID: ${user.id}, Username: ${user.username}) IS ADMIN. Rendering admin content.`);
   return (
     <div className="flex flex-col min-h-screen bg-secondary/50">
       <Header />

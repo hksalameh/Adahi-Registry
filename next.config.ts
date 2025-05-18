@@ -6,7 +6,9 @@ const withPWA = withPWAInit({
   dest: 'public',
   register: true,
   skipWaiting: true,
-  disable: process.env.NODE_ENV === 'development',
+  //  هام: تم تغيير 'disable' إلى 'false' مؤقتًا لاختبار PWA في وضع التطوير.
+  //  يجب إعادته إلى 'process.env.NODE_ENV === 'development'' قبل النشر النهائي.
+  disable: false, 
   // يمكنك إضافة المزيد من إعدادات PWA هنا إذا لزم الأمر
 });
 

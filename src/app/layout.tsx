@@ -10,7 +10,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 export const metadata: Metadata = {
   title: "تسجيل الأضاحي | Adahi Registration",
   description: "Manage Adahi submissions efficiently.",
-  manifest: "/manifest.json", // إضافة رابط لملف المانيفست
+  manifest: "/manifest.json", //  إضافة رابط لملف المانيفست
 };
 
 export default function RootLayout({
@@ -24,6 +24,8 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <meta name="theme-color" content="#4CAF50" />
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" /> 
+        {/*  You can use a specific apple-touch-icon.png (e.g., 180x180) if you have one in public/ */}
+        {/* <link rel="apple-touch-icon" href="/apple-touch-icon.png" /> */}
       </head>
       <body className={`${inter.variable} font-sans antialiased flex flex-col min-h-screen`}>
         <AuthProvider>
