@@ -4,7 +4,7 @@ import withPWAInit from 'next-pwa';
 
 const withPWA = withPWAInit({
   dest: 'public',
-  register: true,
+  register: false, // تم تعطيل التسجيل مؤقتًا للتشخيص
   skipWaiting: true,
   //  هام: تم تغيير 'disable' إلى 'false' مؤقتًا لاختبار PWA في وضع التطوير.
   //  يجب إعادته إلى 'process.env.NODE_ENV === 'development'' قبل النشر النهائي.
@@ -52,3 +52,4 @@ const nextConfig: NextConfig = {
 };
 
 export default withPWA(nextConfig);
+    
