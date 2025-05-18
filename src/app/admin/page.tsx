@@ -76,7 +76,7 @@ const AdminPage = () => {
     // the useEffect listening to allSubmissionsForAdmin will handle the notification.
     setIsRefreshing(false);
     toast({ title: "تم تحديث البيانات" });
-  }, [refreshData, toast, allSubmissionsForAdmin]); // Added allSubmissionsForAdmin to dependencies
+  }, [refreshData, toast]); // Added allSubmissionsForAdmin to dependencies
 
   useEffect(() => {
     if (!authLoading) {
