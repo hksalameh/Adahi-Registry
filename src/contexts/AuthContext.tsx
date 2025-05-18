@@ -62,7 +62,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const pathname = usePathname();
 
   const fetchUserById = useCallback(async (userId: string): Promise<AppUser | null> => {
-    console.log(`[AuthContext fetchUserById] Fetching user by ID: ${userId}`);
     if (!db) {
       console.error("[AuthContext fetchUserById] Firestore DB is not initialized.");
       return null;
@@ -72,7 +71,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const userDocSnap = await getDoc(userDocRef);
       if (userDocSnap.exists()) {
         const userData = userDocSnap.data();
-        console.log(`[AuthContext fetchUserById] User document for ID: ${userId} exists: true, data:`, userData);
         return {
           id: userDocSnap.id,
           email: userData.email || "",
@@ -80,23 +78,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           isAdmin: userData.isAdmin === true || userId === ADMIN_UID,
         } as AppUser;
       } else {
-        console.warn(`[AuthContext fetchUserById] User document for ID: ${userId} exists: false`);
         if (userId === ADMIN_UID) {
-          console.log("[AuthContext fetchUserById] User is ADMIN_UID, returning default admin profile.");
           return {
             id: ADMIN_UID,
-            email: "admin@example.com", // Placeholder, will be overwritten by FirebaseUser.email if available
-            username: process.env.NEXT_PUBLIC_ADMIN_USERNAME || "Admin",
+            email: "admin@example.com", // Placeholder, will be overwritten if FirebaseUser exists
+            username: "Admin", // Default Admin username
             isAdmin: true,
           };
         }
+        console.warn(`[AuthContext fetchUserById] User document for ID: ${userId} does not exist.`);
         return null;
       }
     } catch (error) {
       console.error(`[AuthContext fetchUserById] Error fetching user by ID ${userId}:`, error);
       return null;
     }
-  }, []);
+  }, []); // No dependencies that change often
 
   const fetchUserByUsername = useCallback(async (username: string): Promise<AppUser | null> => {
     if (!db) {
@@ -129,20 +126,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       toast({ variant: "destructive", title: "خطأ", description: "فشل في جلب بيانات المستخدم." });
       return null;
     }
-  }, [toast]);
+  }, [toast]); // toast is a stable dependency
 
   const refreshData = useCallback(async (currentUserForRefresh?: AppUser | null) => {
     const effectiveUser = currentUserForRefresh || user;
-    console.log(`[AuthContext refreshData] Called. Effective user ID: ${effectiveUser?.id}, isAdmin: ${effectiveUser?.isAdmin}`);
     if (!db || !effectiveUser) {
-      console.log("[AuthContext refreshData] DB not initialized or no effective user. Clearing submissions.");
       setSubmissions([]);
       setAllSubmissions([]);
       return;
     }
     try {
       if (effectiveUser.isAdmin) {
-        console.log("[AuthContext refreshData] Fetching admin submissions.");
         const adminQuery = query(collection(db, "submissions"), orderBy("submissionDate", "desc"));
         const adminSnapshot = await getDocs(adminQuery);
         const adminSubsPromises = adminSnapshot.docs.map(async (docSnapshot) => {
@@ -164,10 +158,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
         const resolvedAdminSubs = await Promise.all(adminSubsPromises);
         setAllSubmissions(resolvedAdminSubs);
-        console.log(`[AuthContext refreshData] Fetched ${resolvedAdminSubs.length} admin submissions.`);
       }
 
-      console.log(`[AuthContext refreshData] Fetching submissions for user ID: ${effectiveUser.id}`);
       const userQuery = query(collection(db, "submissions"), where("userId", "==", effectiveUser.id), orderBy("submissionDate", "desc"));
       const userSnapshot = await getDocs(userQuery);
       const userSubs = userSnapshot.docs.map(docSnapshot => {
@@ -180,58 +172,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } as AdahiSubmission;
       });
       setSubmissions(userSubs);
-      console.log(`[AuthContext refreshData] Fetched ${userSubs.length} submissions for user ${effectiveUser.id}.`);
-
     } catch (error: any) {
       console.error("[AuthContext refreshData] Error refreshing data:", error);
       toast({ variant: "destructive", title: "خطأ", description: `فشل في تحديث البيانات: ${error.message}` });
     }
-  }, [user, toast, fetchUserById]); // Added fetchUserById to dependency array
+  }, [user, toast, fetchUserById]);
 
   useEffect(() => {
     let isMounted = true;
     if (!auth || !db) {
       if (isMounted) {
-        console.log("[AuthContext useEffect] Firebase not initialized. Setting loading to false.");
         setLoading(false);
       }
       return;
     }
 
-    console.log("[AuthContext useEffect] Setting up onAuthStateChanged listener.");
     const unsubscribeAuthStateChanged = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (!isMounted) {
-        console.log("[AuthContext onAuthStateChanged] Component unmounted. Aborting.");
         return;
       }
-      console.log("[AuthContext onAuthStateChanged] Triggered. FirebaseUser UID:", firebaseUser ? firebaseUser.uid : 'null');
       try {
         if (firebaseUser) {
-          console.log(`[AuthContext onAuthStateChanged] Before fetchUserById for UID: ${firebaseUser.uid}`);
           let appUser = await fetchUserById(firebaseUser.uid);
-          console.log(`[AuthContext onAuthStateChanged] After fetchUserById. appUser:`, appUser);
-
           if (appUser) {
             const finalAppUser: AppUser = {
               ...appUser,
               isAdmin: firebaseUser.uid === ADMIN_UID || appUser.isAdmin,
-              username: (firebaseUser.uid === ADMIN_UID && !appUser.username) ? (process.env.NEXT_PUBLIC_ADMIN_USERNAME || "Admin") : (appUser.username || "مستخدم"),
+              username: (firebaseUser.uid === ADMIN_UID && !appUser.username) ? "Admin" : (appUser.username || "مستخدم"),
               email: firebaseUser.email || appUser.email,
             };
-            console.log(`[AuthContext onAuthStateChanged] finalAppUser:`, finalAppUser);
             if (isMounted) {
-              console.log(`[AuthContext onAuthStateChanged] Calling setUser with:`, finalAppUser);
               setUser(finalAppUser);
-              console.log("[AuthContext onAuthStateChanged] Calling refreshData...");
               await refreshData(finalAppUser);
             }
           } else {
-            // This case should ideally not happen if fetchUserById handles ADMIN_UID correctly
-            console.warn(`[AuthContext onAuthStateChanged] appUser is null for firebaseUser UID: ${firebaseUser.uid}. Setting user to null.`);
-            if (isMounted) setUser(null);
+             if (isMounted) {
+                setUser(null); // Or handle as appropriate if admin user is not found
+                setSubmissions([]);
+                setAllSubmissions([]);
+             }
           }
         } else {
-          console.log("[AuthContext onAuthStateChanged] No firebaseUser. Setting user to null and clearing submissions.");
           if (isMounted) {
             setUser(null);
             setSubmissions([]);
@@ -247,7 +228,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       } finally {
         if (isMounted) {
-          console.log("[AuthContext onAuthStateChanged] Setting loading to false in finally.");
           setLoading(false);
         }
       }
@@ -255,16 +235,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     return () => {
       isMounted = false;
-      console.log("[AuthContext useEffect] Cleaning up onAuthStateChanged listener.");
       unsubscribeAuthStateChanged();
     };
   }, [fetchUserById, refreshData]); // refreshData and fetchUserById are stable due to useCallback
 
   const login = async (identifier: string, pass: string): Promise<AppUser | null> => {
-    console.log(`[AuthContext login] Attempting login for identifier: ${identifier}`);
     if (!auth || !db) {
       toast({ variant: "destructive", title: "خطأ في التهيئة", description: "نظام المصادقة غير جاهز." });
-      setLoading(false); // Ensure loading is set to false
+      setLoading(false);
       return null;
     }
     
@@ -284,26 +262,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           title: "خطأ في تسجيل الدخول",
           description: "اسم المستخدم غير موجود أو لم يتم العثور على بريد إلكتروني مطابق. يرجى مراعاة حالة الأحرف.",
         });
-        setLoading(false); // Ensure loading is set to false
+        setLoading(false);
         return null;
       }
     } else {
       emailToLogin = identifier;
     }
     
-    setLoading(true); // Set loading true before async operation
+    setLoading(true);
     try {
-      console.log(`[AuthContext login] Signing in with email: ${emailToLogin}`);
       const userCredential = await signInWithEmailAndPassword(auth, emailToLogin, pass);
       const firebaseUser = userCredential.user;
-      // onAuthStateChanged will fetch user doc and set user state
-      // But to return the user immediately for redirection logic:
       let appUser = await fetchUserById(firebaseUser.uid);
+
       if (!appUser && firebaseUser.uid !== ADMIN_UID) {
-          // This should not happen if user exists in auth but not users collection, unless it's the admin without a users doc.
-          console.error(`[AuthContext login] User ${firebaseUser.uid} authenticated but no profile found in Firestore and not ADMIN_UID.`);
+          console.error(`[AuthContext login] User ${firebaseUser.uid} authenticated but no profile found and not ADMIN_UID.`);
           toast({ variant: "destructive", title: "خطأ في الحساب", description: "تمت المصادقة ولكن ملف تعريف المستخدم غير موجود." });
-          await signOut(auth); // Log out the partially logged-in user
+          await signOut(auth);
           setLoading(false);
           return null;
       }
@@ -311,15 +286,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const finalAppUser: AppUser = appUser ? {
         ...appUser,
         isAdmin: firebaseUser.uid === ADMIN_UID || appUser.isAdmin,
-        username: (firebaseUser.uid === ADMIN_UID && !appUser.username) ? (process.env.NEXT_PUBLIC_ADMIN_USERNAME || "Admin") : (appUser.username || "مستخدم"),
+        username: (firebaseUser.uid === ADMIN_UID && !appUser.username) ? "Admin" : (appUser.username || "مستخدم"),
         email: firebaseUser.email || appUser.email,
-      } : { // Fallback for ADMIN_UID if no users doc (should be handled by fetchUserById)
+      } : { 
         id: ADMIN_UID,
-        email: firebaseUser.email || "admin@example.com", // Use email from firebaseUser if available
-        username: process.env.NEXT_PUBLIC_ADMIN_USERNAME || "Admin",
+        email: firebaseUser.email || "admin@example.com",
+        username: "Admin",
         isAdmin: true,
       };
-      console.log(`[AuthContext login] Login successful. finalAppUser:`, finalAppUser);
       // setLoading(false) will be handled by onAuthStateChanged
       return finalAppUser;
     } catch (error: any) {
@@ -327,21 +301,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       let errorMessage = "فشل تسجيل الدخول. ";
       if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-email') {
         errorMessage = "البيانات المدخلة غير صحيحة. يرجى التحقق من اسم المستخدم/البريد الإلكتروني وكلمة المرور.";
-      } else if (error.code === 'auth/network-request-failed') {
-        errorMessage += "مشكلة في الاتصال بالشبكة.";
       } else {
         errorMessage += error.message || "الرجاء التحقق من بيانات الاعتماد أو الاتصال بالمسؤول.";
       }
       toast({ variant: "destructive", title: "خطأ في تسجيل الدخول", description: errorMessage });
-      setLoading(false); // Ensure loading is set to false on error
+      setLoading(false);
       return null;
     }
-    // No finally setLoading(false) here, as onAuthStateChanged should handle it upon successful login.
-    // However, if login fails before onAuthStateChanged triggers (e.g. wrong password), we need to set it.
   };
 
   const register = async (username: string, email: string, pass: string): Promise<AppUser | null> => {
-    console.log(`[AuthContext register] Attempting to register username: ${username}, email: ${email}`);
     if (!auth || !db) {
       toast({ variant: "destructive", title: "خطأ في التهيئة", description: "نظام التسجيل غير جاهز." });
       setLoading(false);
@@ -381,7 +350,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         createdAt: serverTimestamp(),
       };
       await setDoc(doc(db, "users", firebaseUser.uid), newUserFirestoreData);
-      console.log(`[AuthContext register] User ${username} registered successfully. Firestore doc created.`);
       
       const appUser: AppUser = {
         id: firebaseUser.uid,
@@ -399,10 +367,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         errorMessage += "هذا البريد الإلكتروني مسجل بالفعل.";
       } else if (error.code === 'auth/weak-password') {
         errorMessage += "كلمة المرور ضعيفة جداً (يجب أن تكون 6 أحرف على الأقل).";
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage += "البريد الإلكتروني غير صالح.";
-      } else if (error.code === 'auth/network-request-failed') {
-        errorMessage += "مشكلة في الاتصال بالشبكة.";
       } else {
         errorMessage += error.message || "حدث خطأ ما.";
       }
@@ -410,27 +374,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
       return null;
     }
-    // No finally setLoading(false) here, as onAuthStateChanged should handle it upon successful registration.
   };
 
   const logout = async () => {
-    console.log("[AuthContext logout] Attempting logout.");
     if (!auth) {
       toast({ variant: "destructive", title: "خطأ", description: "نظام تسجيل الخروج غير مهيأ." });
       return;
     }
-    setLoading(true); // Set loading true before async operation
+    setLoading(true);
     try {
       await signOut(auth);
       // onAuthStateChanged will handle setUser(null), submissions, and ultimately setLoading(false)
-      // No need to explicitly push router here, as HomePage logic or layout logic should handle redirection based on user state.
-      console.log("[AuthContext logout] Sign out successful. User state will be updated by onAuthStateChanged.");
     } catch (error: any) {
       console.error("[AuthContext logout] Sign out error:", error);
       toast({ variant: "destructive", title: "خطأ في تسجيل الخروج", description: error.message || "فشل تسجيل الخروج." });
-      setLoading(false); // Ensure loading is false if signOut itself errors
+      setLoading(false);
     }
-    // onAuthStateChanged will call setLoading(false) in its finally block.
   };
 
   const addSubmission = async (submissionData: Omit<AdahiSubmission, "id" | "submissionDate" | "status" | "userId" | "userEmail" | "lastUpdatedBy" | "lastUpdatedByEmail" | "lastUpdated" | "submitterUsername" | "isSlaughtered" | "slaughterDate">): Promise<AdahiSubmission | null> => {
@@ -454,7 +413,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         slaughterDate: null,
       };
       const docRef = await addDoc(collection(db, "submissions"), newSubmissionData);
-      await refreshData();
+      await refreshData(); // Refresh data after adding
       const clientSideRepresentation: AdahiSubmission = {
         ...newSubmissionData,
         id: docRef.id,
@@ -484,7 +443,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         lastUpdatedBy: user.id,
         lastUpdatedByEmail: user.email,
       });
-      await refreshData();
+      await refreshData(); // Refresh data after updating status
       return true;
     } catch (error: any) {
       console.error("[AuthContext updateSubmissionStatus] Error updating status:", error);
@@ -525,7 +484,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           slaughterDate: updatedDataFirebase.slaughterDate instanceof Timestamp ? updatedDataFirebase.slaughterDate.toDate().toISOString() : (updatedDataFirebase.slaughterDate ? new Date(updatedDataFirebase.slaughterDate).toISOString() : undefined),
           submitterUsername,
         } as AdahiSubmission;
-        await refreshData();
+        await refreshData(); // Refresh data after updating
         return result;
       }
       return null;
@@ -544,7 +503,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const submissionDocRef = doc(db, "submissions", submissionId);
       await deleteDoc(submissionDocRef);
-      await refreshData();
+      await refreshData(); // Refresh data after deleting
       return true;
     } catch (error: any) {
       console.error("[AuthContext deleteSubmission] Error deleting submission:", error);
@@ -580,12 +539,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (typeof window !== "undefined") {
         window.open(whatsappUrl, '_blank');
         setTimeout(() => {
-          if (typeof window !== "undefined") window.open(smsUri, '_blank');
+          if (typeof window !== "undefined") { // Check window again inside setTimeout
+            window.open(smsUri, '_blank');
+          }
         }, 1000);
       }
 
       toast({ title: "تم تسجيل الذبح بنجاح", description: `سيتم محاولة فتح WhatsApp وتطبيق الرسائل لإشعار ${donorName}.` });
-      await refreshData();
+      await refreshData(); // Refresh data after marking as slaughtered
       return true;
     } catch (error: any) {
       console.error("[AuthContext markAsSlaughtered] Error marking as slaughtered:", error);
