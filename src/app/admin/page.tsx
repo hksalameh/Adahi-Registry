@@ -76,14 +76,14 @@ const AdminPage = () => {
     // the useEffect listening to allSubmissionsForAdmin will handle the notification.
     setIsRefreshing(false);
     toast({ title: "تم تحديث البيانات" });
-  }, [refreshData, toast, allSubmissionsForAdmin]); // Added allSubmissionsForAdmin to dependencies
+  }, [refreshData, toast]); // Added allSubmissionsForAdmin to dependencies
 
   useEffect(() => {
     if (!authLoading) {
       if (user && user.isAdmin) {
         if (typeof handleRefresh === 'function') {
             // Initial fetch logic
-            if (allSubmissionsForAdmin.length === 0) { // Fetch if initially empty
+            if (allSubmissionsForAdmin.length === 0 && pageLoading) { // Fetch if initially empty and page is still loading
                 handleRefresh().finally(() => setPageLoading(false));
             } else {
                 setPageLoading(false);

@@ -1,24 +1,30 @@
-
 "use client";
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation'; // <-- التعديل الأول: إضافة هذا السطر
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth'; // Import useAuth
 
 export default function HomePage() {
   const router = useRouter();
   const { user, loading } = useAuth(); // Get user and loading state
+  const pathname = usePathname(); // <-- التعديل الثاني: إضافة هذا السطر
 
   useEffect(() => {
     if (!loading) { // Only redirect when loading is finished
       if (user) {
-        router.replace(user.isAdmin ? '/admin' : '/dashboard');
+        const targetPath = user.isAdmin ? '/admin' : '/dashboard';
+        if (pathname !== targetPath) { // Only redirect if not already on the target path
+          router.replace(targetPath);
+        }
       } else {
-        router.replace('/auth/login');
+        if (pathname !== '/auth/login') { // Only redirect if not already on login
+          router.replace('/auth/login');
+        }
       }
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, pathname]); // <-- التعديل الثالث: تعديل هذا البلوك وإضافة pathname
 
   return (
     <div className="flex flex-col min-h-screen items-center justify-center p-6 bg-background">
