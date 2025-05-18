@@ -83,7 +83,7 @@ const AdminPage = () => {
       if (user && user.isAdmin) {
         if (typeof handleRefresh === 'function') {
             // Initial fetch logic
-            if (allSubmissionsForAdmin.length === 0) { // Fetch if initially empty
+            if (allSubmissionsForAdmin.length === 0 && pageLoading) { // Fetch if initially empty and page is still loading
                 handleRefresh().finally(() => setPageLoading(false));
             } else {
                 setPageLoading(false);
