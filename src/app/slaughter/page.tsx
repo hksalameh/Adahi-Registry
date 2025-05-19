@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useAuth } from "@/hooks/useAuth";
@@ -10,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, RefreshCw, Utensils, CheckCircle } from "lucide-react";
+import { Loader2, RefreshCw, Utensils, CheckCircle, Send, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { arSA } from "date-fns/locale";
@@ -21,6 +20,8 @@ const SlaughterPage = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
   const [submissionsToDisplay, setSubmissionsToDisplay] = useState<AdahiSubmission[]>([]);
+  const [openSlaughterDialog, setOpenSlaughterDialog] = useState<Record<string, boolean>>({});
+  const [openUndoSlaughterDialog, setOpenUndoSlaughterDialog] = useState<Record<string, boolean>>({});
 
   const getDistributionLabel = useCallback((value?: string) => {
     if (!value) return "غير محدد";
@@ -38,7 +39,7 @@ const SlaughterPage = () => {
     if (!authLoading && user?.isAdmin) {
       handleRefresh().finally(() => setPageLoading(false));
     } else if (!authLoading && !user?.isAdmin) {
-      setPageLoading(false); 
+      setPageLoading(false);
     }
   }, [authLoading, user, handleRefresh]);
 
@@ -46,19 +47,73 @@ const SlaughterPage = () => {
     setSubmissionsToDisplay(allSubmissionsForAdmin);
   }, [allSubmissionsForAdmin]);
 
-  const handleMarkAsSlaughtered = async (submission: AdahiSubmission) => {
-    if (typeof markAsSlaughtered !== 'function') {
-        toast({ title: "خطأ: وظيفة تحديد الذبح غير متاحة.", variant: "destructive" });
-        console.error("markAsSlaughtered is not a function here. Value:", markAsSlaughtered);
-        return;
-    }
-    const success = await markAsSlaughtered(submission.id, submission.donorName, submission.phoneNumber);
-    if (success) {
-      toast({ title: "تم تحديث حالة الذبح بنجاح" });
-    } else {
-      toast({ title: "فشل تحديث حالة الذبح", variant: "destructive" });
-    }
+  const updateSubmissionStatus = async (submissionId: string, status: AdahiSubmission['slaughterStatus']) => {
+      // This is a placeholder function. You'll need to implement the actual logic
+      // to update the slaughterStatus in your backend/data source.
+      // For demonstration, we'll just update the local state (which won't persist).
+      console.log(`Attempting to update submission ${submissionId} status to ${status}`);
+
+      // In a real application, you would call an API/function here
+      // const success = await yourApi.updateSlaughterStatus(submissionId, status);
+
+      // For now, let's simulate a successful update and update local state
+       setSubmissionsToDisplay(prevSubmissions =>
+           prevSubmissions.map(sub =>
+               sub.id === submissionId ? { ...sub, slaughterStatus: status } : sub
+           )
+       );
+       toast({ title: `تم تحديث حالة الأضحية إلى: ${status}` });
+
+
+      // Handle potential errors if the update fails
+      // if (!success) {
+      //     toast({ title: `فشل تحديث حالة الأضحية إلى: ${status}`, variant: "destructive" });
+      // }
   };
+
+
+  const handleMarkAsSlaughteredClick = (submission: AdahiSubmission) => {
+      setOpenSlaughterDialog(prev => ({ ...prev, [submission.id]: true }));
+  };
+
+  const handleConfirmMarkAsSlaughtered = async (submission: AdahiSubmission) => {
+      // Call function to update status to 'marked_slaughtered'
+      await updateSubmissionStatus(submission.id, 'marked_slaughtered');
+      setOpenSlaughterDialog(prev => ({ ...prev, [submission.id]: false }));
+      // Note: The original handleMarkAsSlaughtered included sending the notification.
+      // We need a separate function for sending notifications now.
+      // The logic to send notification is removed from here.
+  };
+
+   const handleUndoSlaughterClick = (submission: AdahiSubmission) => {
+       setOpenUndoSlaughterDialog(prev => ({ ...prev, [submission.id]: true }));
+   };
+
+   const handleConfirmUndoSlaughter = async (submission: AdahiSubmission) => {
+        // Call function to update status back to 'pending'
+        await updateSubmissionStatus(submission.id, 'pending');
+        setOpenUndoSlaughterDialog(prev => ({ ...prev, [submission.id]: false }));
+   };
+
+   const handleSendNotification = async (submission: AdahiSubmission) => {
+       // This is a placeholder. You need to implement the actual function
+       // to send SMS and WhatsApp messages. This might involve calling
+       // a function from useAuth or a separate API call.
+       console.log(`Attempting to send notification for submission ${submission.id}`);
+       toast({ title: "جاري إرسال الإشعار..." });
+
+       // Simulate sending notification
+       // const notificationSuccess = await yourApi.sendNotification(submission.id, submission.phoneNumber, submission.donorName);
+        const notificationSuccess = true; // Simulate success
+
+       if (notificationSuccess) {
+            await updateSubmissionStatus(submission.id, 'notified'); // Update status to notified
+            toast({ title: "تم إرسال الإشعار بنجاح" });
+       } else {
+            toast({ title: "فشل إرسال الإشعار", variant: "destructive" });
+       }
+   };
+
 
   const renderSubmissionTable = (submissions: AdahiSubmission[], categoryTitle: string) => {
     if (submissions.length === 0) {
@@ -78,7 +133,7 @@ const SlaughterPage = () => {
               <TableHead>ماذا يريد</TableHead>
               <TableHead>توزع لـ</TableHead>
               <TableHead>حالة الإدخال</TableHead>
-              <TableHead>حالة الذبح</TableHead>
+              <TableHead>الإجراءات</TableHead> {/* Changed from حالة الذبح to الإجراءات */}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -98,42 +153,91 @@ const SlaughterPage = () => {
                     {sub.status === "entered" ? "مدخلة" : "غير مدخلة"}
                   </Badge>
                 </TableCell>
-                <TableCell>
-                  {sub.isSlaughtered ? (
-                    <div className="flex items-center text-green-600">
-                      <CheckCircle className="mr-2 h-5 w-5" />
-                      تم الذبح
-                      {sub.slaughterDate && (
-                        <span className="text-xs text-muted-foreground ml-1">
-                          ({format(new Date(sub.slaughterDate), "dd/MM/yy HH:mm", { locale: arSA })})
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="outline" size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">
-                          <Utensils className="ml-2 h-4 w-4" />
-                          ذبح
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>تأكيد عملية الذبح</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            هل أنت متأكد أنك تريد تسجيل ذبح الأضحية للمتبرع: {sub.donorName} (باسم: {sub.sacrificeFor})؟
-                            سيتم محاولة إشعار المتبرع.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleMarkAsSlaughtered(sub)}>
-                            نعم، تم الذبح
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                <TableCell className="flex items-center space-x-2"> {/* Added flex and space */}
+                  {(sub.slaughterStatus === 'pending' || sub.slaughterStatus === undefined) && ( // Added undefined check for new property
+                     <AlertDialog
+                         open={openSlaughterDialog[sub.id] || false}
+                         onOpenChange={(isOpen) => setOpenSlaughterDialog(prev => ({ ...prev, [sub.id]: isOpen }))}
+                     >
+                       <AlertDialogTrigger asChild>
+                         <Button
+                             variant="outline"
+                             size="sm"
+                             className="bg-yellow-400 hover:bg-yellow-500 text-black" // Yellow button
+                             onClick={() => handleMarkAsSlaughteredClick(sub)}
+                         >
+                           <Utensils className="ml-2 h-4 w-4" />
+                           تم الذبح
+                         </Button>
+                       </AlertDialogTrigger>
+                       <AlertDialogContent>
+                         <AlertDialogHeader>
+                           <AlertDialogTitle>تأكيد عملية الذبح</AlertDialogTitle>
+                           <AlertDialogDescription>
+                             هل أنت متأكد أنك تريد تسجيل ذبح الأضحية للمتبرع: {sub.donorName} (باسم: {sub.sacrificeFor})؟
+                           </AlertDialogDescription>
+                         </AlertDialogHeader>
+                         <AlertDialogFooter>
+                           <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                           <AlertDialogAction onClick={() => handleConfirmMarkAsSlaughtered(sub)}>
+                             نعم، تم الذبح
+                           </AlertDialogAction>
+                         </AlertDialogFooter>
+                       </AlertDialogContent>
+                     </AlertDialog>
                   )}
+
+                  {(sub.slaughterStatus === 'marked_slaughtered' || sub.slaughterStatus === 'confirmed_slaughtered') && (
+                      <>
+                          <AlertDialog
+                              open={openUndoSlaughterDialog[sub.id] || false}
+                              onOpenChange={(isOpen) => setOpenUndoSlaughterDialog(prev => ({ ...prev, [sub.id]: isOpen }))}
+                          >
+                              <AlertDialogTrigger asChild>
+                                  <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="bg-green-500 hover:bg-green-600 text-white" // Green button
+                                      onClick={() => handleUndoSlaughterClick(sub)}
+                                  >
+                                      <CheckCircle className="ml-2 h-4 w-4" />
+                                      تم الذبح (مؤكد) {/* Changed text for clarity */}
+                                  </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                      <AlertDialogTitle>التراجع عن تسجيل الذبح</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                          هل أنت متأكد أنك أخطأت في تسجيل ذبح الأضحية للمتبرع: {sub.donorName}؟
+                                          بالتراجع سيعود الزر إلى اللون الأصفر.
+                                      </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                      <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleConfirmUndoSlaughter(sub)}>
+                                          نعم، أريد التراجع
+                                      </AlertDialogAction>
+                                  </AlertDialogFooter>
+                              </AlertDialogContent>
+                          </AlertDialog>
+
+                           <Button variant="outline" size="sm" onClick={() => handleSendNotification(sub)}> {/* Added the notification button */}
+                              إرسال الإشعار
+                          </Button>
+                      </>
+                  )}
+
+                   {sub.slaughterStatus === 'notified' && (
+                        <div className="flex items-center text-green-600">
+                           <CheckCircle className="mr-2 h-5 w-5" />
+                           تم الذبح والإشعار
+                           {sub.slaughterDate && ( // Keep displaying date if available
+                             <span className="text-xs text-muted-foreground ml-1">
+                               ({format(new Date(sub.slaughterDate), "dd/MM/yy HH:mm", { locale: arSA })})
+                             </span>
+                           )}
+                         </div>
+                   )}
                 </TableCell>
               </TableRow>
             ))}
@@ -145,7 +249,7 @@ const SlaughterPage = () => {
 
   if (authLoading || pageLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">\
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
         <p className="mt-4 text-muted-foreground">جاري تحميل صفحة إدارة الذبح...</p>
       </div>

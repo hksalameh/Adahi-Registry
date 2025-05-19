@@ -47,7 +47,8 @@ interface AuthContextType {
   fetchUserById: (userId: string) => Promise<AppUser | null>;
   fetchUserByUsername: (username: string) => Promise<AppUser | null>;
   refreshData: (currentUserForRefresh?: AppUser | null) => Promise<void>;
-  markAsSlaughtered: (submissionId: string, donorName: string, phoneNumber: string) => Promise<boolean>;
+ markAsSlaughtered: (submissionId: string) => Promise<boolean>; // Modified
+ sendSlaughterNotification: (submissionId: string, donorName: string, phoneNumber: string) => Promise<boolean>; // Added
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -549,10 +550,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [toast]);
 
-  const markAsSlaughtered = async (submissionId: string, donorName: string, phoneNumber: string): Promise<boolean> => {
+ const markAsSlaughtered = async (submissionId: string): Promise<boolean> => { // Modified signature
     if (!db || !user || !user.isAdmin) {
-      toast({ variant: "destructive", title: "غير مصرح به", description: "ليس لديك صلاحية لتحديث حالة الذبح." });
-      return false;
+ return false; // Unauthorized
     }
     try {
       const submissionDocRef = doc(db, "submissions", submissionId);
@@ -563,6 +563,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         lastUpdatedBy: user.id,
         lastUpdatedByEmail: user.email,
       });
+      toast({ title: "تم تسجيل الذبح بنجاح" }); // Toast for status update only
+      await refreshData();
+ return true;
+    } catch (error: any) {
+      console.error("[AuthContext markAsSlaughtered] Error marking as slaughtered:", error);
+      toast({ variant: "destructive", title: "خطأ", description: `فشل تحديث حالة الذبح: ${error.message}` });
+      return false;
+    }
+  };
+
+  const sendSlaughterNotification = async (submissionId: string, donorName: string, phoneNumber: string): Promise<boolean> => {
+    if (!db || !user || !user.isAdmin) {
+      toast({ variant: "destructive", title: "غير مصرح به", description: "ليس لديك صلاحية لإرسال الإشعارات." });
+      return false;
+    }
+    try {
+      const submissionDocRef = doc(db, "submissions", submissionId); // Get doc ref to potentially update notification status later
 
       const message = `السيد/السيدة ${donorName} تقبل الله طاعتكم وكل عام وانتم بالف خير تم ذبح اضحيتك ربنا يتقبل منكم`;
       let formattedPhoneNumber = phoneNumber.startsWith("0") ? phoneNumber.substring(1) : phoneNumber;
@@ -582,16 +599,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }, 1000);
       }
 
-      toast({ title: "تم تسجيل الذبح بنجاح", description: `سيتم محاولة فتح WhatsApp وتطبيق الرسائل لإشعار ${donorName}.` });
-      await refreshData(); 
+      // Optionally update the submission status to 'notified' after attempting to send
+      await updateDoc(submissionDocRef, {
+        slaughterStatus: 'notified', // Assuming you have a slaughterStatus field now
+        lastUpdated: serverTimestamp(),
+        lastUpdatedBy: user.id,
+        lastUpdatedByEmail: user.email,
+      });
+
+      toast({ title: "تم محاولة إرسال الإشعار", description: `تم محاولة فتح WhatsApp وتطبيق الرسائل لإشعار ${donorName}. يرجى التأكد من إرسال الرسائل يدوياً إذا لم يتم فتح التطبيقات.` });
+      await refreshData();
       return true;
     } catch (error: any) {
-      console.error("[AuthContext markAsSlaughtered] Error marking as slaughtered:", error);
-      toast({ variant: "destructive", title: "خطأ", description: `فشل تحديث حالة الذبح: ${error.message}` });
+      console.error("[AuthContext sendSlaughterNotification] Error sending notification:", error);
+      toast({ variant: "destructive", title: "خطأ في الإشعار", description: `فشل في محاولة إرسال الإشعار: ${error.message}` });
       return false;
     }
   };
-
+  
 
   return (
     <AuthContext.Provider value={{
@@ -609,7 +634,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       fetchUserById,
       fetchUserByUsername,
       refreshData,
-      markAsSlaughtered
+ markAsSlaughtered, // Modified to only update status
+ sendSlaughterNotification // Added new function
     }}>
       {children}
     </AuthContext.Provider>

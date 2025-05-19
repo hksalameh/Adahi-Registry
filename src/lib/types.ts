@@ -34,6 +34,7 @@ export interface AdahiSubmission {
   lastUpdatedByEmail?: string; // Email of the user who last updated
   isSlaughtered?: boolean; // To track slaughter status
   slaughterDate?: string; // To store the date of slaughter
+  slaughterStatus?: 'pending' | 'marked_slaughtered' | 'confirmed_slaughtered' | 'notified'; // To track the detailed slaughter and notification status
 }
 
 export const distributionOptions: { value: DistributionPreference; label: string }[] = [
