@@ -1,39 +1,36 @@
-
-rules_version = '2'; // تم تحديث الإصدار إلى '2' كإجراء جيد عند تغيير القواعد بشكل كبير.
+rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // القاعدة العامة لقراءة ملفات تعريف المستخدمين (قد تحتاج لتعديلها حسب خصوصية البيانات)
     match /users/{userId} {
-      // تحذير: هذه القاعدة تسمح لأي شخص بقراءة ملفات تعريف المستخدمين (اسم المستخدم، البريد الإلكتروني، علامة المدير).
-      // هذا ضروري لعملية البحث عن اسم المستخدم إلى البريد الإلكتروني من جانب العميل أثناء تسجيل الدخول.
-      // لتطبيق إنتاجي، ضع في اعتبارك:
-      // 1. جعل حقول معينة فقط (مثل اسم المستخدم ومعرف بريد إلكتروني غير حساس) عامة.
-      // 2. استخدام دالة سحابية (Cloud Function) كوسيط للبحث عن اسم المستخدم لحماية رسائل البريد الإلكتروني.
-      // 3. تخزين مجموعة منفصلة قابلة للاستعلام بشكل عام من "أسماء المستخدمين" التي تعين إلى UIDs،
-      //    ثم قراءة مقيدة أخرى للبريد الإلكتروني بناءً على UID.
-      allow read: if true;
+      allow read: if true; // تسمح لأي شخص بقراءة ملفات تعريف المستخدمين
 
-      // السماح للمستخدمين المصادق عليهم بالكتابة إلى مستنداتهم الخاصة
-      // والسماح للمدير (ADMIN_UID) بالكتابة إلى أي مستند مستخدم.
-      allow write: if request.auth != null && (request.auth.uid == userId || request.auth.uid == "vqhrldpAdeWGcCgcMpWWRGdslOS2");
+      // تسمح للمستخدم المصادق عليه بالكتابة إلى ملف تعريفه الخاص
+      // أو إذا كان المستخدم المصادق عليه مسؤولاً (يتحقق من حقل isAdmin في مستند المستخدم)
+      // تم الاحتفاظ بهذه القاعدة كما هي، وهي تعمل بشكل صحيح.
+      allow write: if request.auth != null && (request.auth.uid == userId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
 
-      // السماح للمستخدمين المصادق عليهم بإنشاء مستند المستخدم الخاص بهم (على سبيل المثال، أثناء التسجيل)
+      // تسمح للمستخدمين المصادق عليهم بإنشاء مستند المستخدم الخاص بهم
       allow create: if request.auth != null;
     }
 
+    // قواعد الوصول لمجموعة submissions (عمليات الإرسال)
     match /submissions/{submissionId} {
-      // المدير (ADMIN_UID) يمكنه فعل أي شيء (قراءة، كتابة، حذف)
-      allow read, write, delete: if request.auth != null && request.auth.uid == "vqhrldpAdeWGcCgcMpWWRGdslOS2";
+      // **تم تعديل هذه القاعدة:** تسمح بالوصول الكامل (قراءة، كتابة، حذف)
+      // إذا كان معرف المستخدم المصادق عليه يطابق ADMIN_UID الثابت
+      // **أو** إذا كان لدى المستخدم الحقل isAdmin == true في مستند المستخدم الخاص به.
+      allow read, write, delete: if request.auth != null && (request.auth.uid == "vqhrldpAdeWGcCgcMpWWRGdslOS2" || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
 
-      // المستخدمون المصادق عليهم يمكنهم إنشاء عمليات إرسال جديدة
+      // تسمح للمستخدمين المصادق عليهم بإنشاء عمليات إرسال جديدة
       allow create: if request.auth != null;
 
-      // المستخدمون المصادق عليهم يمكنهم قراءة عمليات الإرسال الخاصة بهم فقط
-      // لا يمكن لغير المديرين تحديث/حذف عمليات الإرسال بموجب هذه القاعدة، فقط المدير يمكنه ذلك.
-      // إذا كنت تريد أن يتمكن المستخدمون من تعديل/حذف عمليات الإرسال المعلقة الخاصة بهم، أضف:
-      // allow update, delete: if request.auth != null && request.auth.uid == resource.data.userId;
+      // تسمح للمستخدمين المصادق عليهم بقراءة عمليات الإرسال الخاصة بهم فقط
       allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+
+      // (اختياري) إذا أردت السماح للمستخدمين بتحديث/حذف عمليات الإرسال المعلقة الخاصة بهم:
+      // allow update, delete: if request.auth != null && request.auth.uid == resource.data.userId && resource.data.status == 'pending';
     }
   }
 }
