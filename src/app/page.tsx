@@ -1,24 +1,50 @@
 
 "use client";
 
-// This is a diagnostic page.
-// It does NOT include any authentication logic or redirects.
-// Its only purpose is to see if a very basic Next.js page can render.
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
+import { Loader2 } from "lucide-react";
 
 export default function HomePage() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    console.log(`[HomePage] useEffect triggered: loading=${loading}, user exists: ${!!user}, user isAdmin: ${user?.isAdmin}`);
+
+    if (!loading) {
+      if (!user) {
+        console.log("[HomePage] User not found and not loading, redirecting to /auth/login");
+        router.push("/auth/login");
+      } else if (user.isAdmin) {
+        console.log("[HomePage] Admin user found, redirecting to /admin");
+        router.push("/admin");
+      } else {
+        console.log("[HomePage] Non-admin user found, redirecting to /dashboard");
+        router.push("/dashboard");
+      }
+    } else {
+      console.log("[HomePage] Still loading authentication state...");
+    }
+  }, [user, loading, router]);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="mt-4 text-lg text-muted-foreground">
+          جاري التحقق من المصادقة والتوجيه...
+        </p>
+      </div>
+    );
+  }
+
+  // هذا الجزء سيظهر فقط للحظات قصيرة جدًا إذا لم يتم التوجيه فورًا بعد انتهاء التحميل
+  // أو إذا كان هناك تأخير في التوجيه.
   return (
-    <div style={{ padding: '20px', fontFamily: 'sans-serif', textAlign: 'center', direction: 'rtl' }}>
-      <h1>صفحة اختبار بسيطة جدًا</h1>
-      <p style={{color: 'blue', fontSize: '18px'}}>إذا رأيت هذه الرسالة، فهذا يعني أن Next.js قادر على عرض هذه الصفحة البسيطة.</p>
-      <p>هذا يعني أن المشكلة الأساسية التي تمنع التطبيق من العمل بشكل كامل تكمن في:</p>
-      <ul>
-        <li>المنطق الموجود في `AuthContext` (ربما لا يزال لا يضبط حالة التحميل بشكل صحيح).</li>
-        <li>أو، أن الصفحات التي يتم التوجيه إليها (مثل `/dashboard` أو `/admin`) بها خطأ يمنع تحميلها (مما قد يكون سبب خطأ `502` الذي رأيناه سابقًا).</li>
-      </ul>
-      <p>الرجاء التحقق من وحدة التحكم (Console) في المتصفح بحثًا عن أي أخطاء أخرى، وإعادة تشغيل خادم التطوير.</p>
-      <p style={{marginTop: '20px', border: '1px solid red', padding: '10px'}}>
-        <strong>ملاحظة:</strong> هذه الصفحة لا تقوم بأي عمليات مصادقة أو توجيه. هي فقط للعرض.
-      </p>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
+      <p className="text-lg text-muted-foreground">يتم تجهيز الصفحة...</p>
     </div>
   );
 }
