@@ -4,9 +4,9 @@
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 // Updated icon imports to include ClipboardList and other relevant icons
-import { Settings2, TableIcon, BarChart3, HandHelping, Coins, RefreshCw, Loader2, Users, FileText, Sheet, UserPlus, ListChecks, ClipboardList } from "lucide-react"; 
+import { Settings2, TableIcon, BarChart3, Coins, RefreshCw, Loader2, Users, FileText, Sheet, UserPlus, ListChecks, ClipboardList, HandHelping } from "lucide-react"; 
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect, useCallback, useRef } from "react"; // Added useRef
+import { useState, useEffect, useCallback, useRef } from "react"; 
 import type { AdahiSubmission, DistributionPreference } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import AdminSubmissionsTable from "@/components/tables/AdminSubmissionsTable";
@@ -25,7 +25,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import Link from "next/link";
-
 import html2pdf from 'html2pdf.js';
 
 const PDF_MARGIN = 10; // Margin in mm for html2pdf
@@ -44,7 +43,7 @@ const AdminPage = () => {
     const currentSubmissionIds = new Set(allSubmissionsForAdmin.map(s => s.id));
     let newSubmissionsCount = 0;
 
-    if (prevSubmissionIdsRef.current.size > 0) { // Only check for new if there was a previous state
+    if (prevSubmissionIdsRef.current.size > 0) { 
       currentSubmissionIds.forEach(id => {
         if (!prevSubmissionIdsRef.current.has(id)) {
           newSubmissionsCount++;
@@ -61,7 +60,6 @@ const AdminPage = () => {
     prevSubmissionIdsRef.current = currentSubmissionIds;
   }, [allSubmissionsForAdmin, toast]);
 
-
   const getDistributionLabel = useCallback((value?: DistributionPreference | string) => {
     if (!value) return "غير محدد";
     return distributionOptions.find(opt => opt.value === value)?.label || String(value);
@@ -69,37 +67,24 @@ const AdminPage = () => {
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    // Store current IDs before refresh to compare after refresh
-    const idsBeforeRefresh = new Set(allSubmissionsForAdmin.map(s => s.id));
     await refreshData();
-    // After refresh, allSubmissionsForAdmin will be updated,
-    // the useEffect listening to allSubmissionsForAdmin will handle the notification.
     setIsRefreshing(false);
     toast({ title: "تم تحديث البيانات" });
-  }, [refreshData, toast]); // Added allSubmissionsForAdmin to dependencies
+  }, [refreshData, toast, setIsRefreshing]); 
 
   useEffect(() => {
     if (!authLoading) {
       if (user && user.isAdmin) {
-        if (typeof handleRefresh === 'function') {
-            // Initial fetch logic
-            if (allSubmissionsForAdmin.length === 0 && pageLoading) { // Fetch if initially empty and page is still loading
-                handleRefresh().finally(() => setPageLoading(false));
-            } else {
-                setPageLoading(false);
-                 // Set initial prevSubmissionIdsRef on first load with data
-                if (prevSubmissionIdsRef.current.size === 0) {
-                    prevSubmissionIdsRef.current = new Set(allSubmissionsForAdmin.map(s => s.id));
-                }
-            }
-        } else {
-            setPageLoading(false);
+        setPageLoading(false);
+        // Set initial prevSubmissionIdsRef on first load with data
+        if (prevSubmissionIdsRef.current.size === 0 && allSubmissionsForAdmin.length > 0) {
+          prevSubmissionIdsRef.current = new Set(allSubmissionsForAdmin.map(s => s.id));
         }
       } else {
         setPageLoading(false);
       }
     }
-  }, [authLoading, user, handleRefresh, allSubmissionsForAdmin]);
+  }, [authLoading, user, allSubmissionsForAdmin]);
 
 
   const commonExportColumns = [
@@ -238,14 +223,14 @@ const AdminPage = () => {
       
       let tableHtml = `<table style="width: 100%; border-collapse: collapse; font-family: 'Amiri', Arial, sans-serif; font-size: 8pt; direction: rtl;">`;
       tableHtml += `<thead><tr>`;
-      columns.forEach(col => { // Use the passed 'columns' which might be reversed
+      columns.forEach(col => { 
         tableHtml += `<th style="border: 1px solid black; padding: 5px; text-align: center; vertical-align: middle; line-height: 1.5; background-color: #eeeeee; font-family: 'Amiri', Arial, sans-serif; font-weight: bold;">${col.header}</th>`;
       });
       tableHtml += `</tr></thead>`;
       tableHtml += `<tbody>`;
       data.forEach(item => {
         tableHtml += `<tr>`;
-        columns.forEach(col => { // Use the passed 'columns' for data mapping
+        columns.forEach(col => { 
           const value = item.hasOwnProperty(col.dataKey) ? item[col.dataKey] : "";
           tableHtml += `<td style="border: 1px solid black; padding: 5px; text-align: center; vertical-align: middle; line-height: 1.5; font-family: 'Amiri', Arial, sans-serif;">${value}</td>`;
         });
@@ -285,7 +270,6 @@ const AdminPage = () => {
       setExportingType(null);
     }
   };
-
 
   const handleExportAllExcel = async () => {
     if (allSubmissionsForAdmin.length === 0) {
@@ -428,7 +412,6 @@ const AdminPage = () => {
         const userData = submissionsByUser[userNameKey];
         if (userData.data.length > 0) {
             const pdfTitle = `تقرير أضاحي ${userData.originalUserName}`;
-            // Pass commonExportColumns for PDF generation as well
             await generatePdfWithHtml2Pdf(pdfTitle, userData.data, commonExportColumns, `أضاحي_${userNameKey}`);
         }
       }
@@ -437,13 +420,9 @@ const AdminPage = () => {
       console.error("Error in by-user PDF export loop:", error);
       toast({ title: "خطأ في التصدير (مجموعة PDF)", description: "حدث خطأ أثناء محاولة تصدير الأضاحي حسب المستخدم.", variant: "destructive" });
     } finally {
-        // Moved setExportingType(null) inside the finally block
-        // of generatePdfWithHtml2Pdf. For group exports, we only set it to null once all are done.
-        // For this specific group export, we should set it at the end of this function.
         setExportingType(null); 
     }
   };
-
 
   if (authLoading || pageLoading) {
     return (
@@ -466,7 +445,6 @@ const AdminPage = () => {
   const ramthaAndDonorSubmissionsCount = allSubmissionsForAdmin.filter(s => s.distributionPreference === 'ramtha' || s.distributionPreference === 'donor').length;
   const fundSubmissionsCount = allSubmissionsForAdmin.filter(s => s.distributionPreference === 'fund').length;
   const allExceptGazaSubmissionsCount = allSubmissionsForAdmin.filter(s => s.distributionPreference !== 'gaza').length;
-
 
   return (
     <div className="space-y-6 md:space-y-8 p-1">
@@ -574,8 +552,6 @@ const AdminPage = () => {
                     تحديث البيانات
                  </Button>
             </div>
-
-            {/* PDF Export Buttons Row */}
             <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
                 <Button onClick={handleExportAllPdf} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0} className="bg-red-50 hover:bg-red-100 border-red-300 text-red-700 text-xs sm:text-sm">
                     {exportingType === 'allPdf' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <FileText className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
@@ -594,8 +570,6 @@ const AdminPage = () => {
                     حسب المستخدم (PDF)
                 </Button>
             </div>
-
-            {/* Excel Export Buttons Row */}
             <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
                 <Button onClick={handleExportAllExcel} variant="outline" disabled={exportingType !== null || allSubmissionsForAdmin.length === 0} className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700 text-xs sm:text-sm">
                     {exportingType === 'allExcel' ? <Loader2 className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Sheet className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />}
@@ -623,6 +597,4 @@ const AdminPage = () => {
 }
 
 export default AdminPage;
-    
-
     
