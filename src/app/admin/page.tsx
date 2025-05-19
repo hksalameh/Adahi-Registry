@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -11,7 +10,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import AdminSubmissionsTable from "@/components/tables/AdminSubmissionsTable";
 import { distributionOptions } from "@/lib/types";
 import * as XLSX from 'xlsx';
-import { saveAs } from 'file-saver';
+// import { saveAs } from 'file-saver'; // saveAs is not directly used, XLSX.writeFile handles it.
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
 import RegisterForm from "@/components/auth/RegisterForm";
@@ -69,37 +68,14 @@ const AdminPage = () => {
     await refreshData();
     setIsRefreshing(false);
     toast({ title: "تم تحديث البيانات" });
-<<<<<<< HEAD
   }, [refreshData, toast, setIsRefreshing]); 
-=======
-  }, [refreshData, toast]); // Added allSubmissionsForAdmin to dependencies
->>>>>>> 685cb51d01b84724c2878bc58f28e8d28c142e1a
 
   useEffect(() => {
     if (!authLoading) {
-      if (user && user.isAdmin) {
-<<<<<<< HEAD
-        setPageLoading(false);
-        if (prevSubmissionIdsRef.current.size === 0 && allSubmissionsForAdmin.length > 0) {
-          prevSubmissionIdsRef.current = new Set(allSubmissionsForAdmin.map(s => s.id));
-=======
-        if (typeof handleRefresh === 'function') {
-            // Initial fetch logic
-            if (allSubmissionsForAdmin.length === 0 && pageLoading) { // Fetch if initially empty and page is still loading
-                handleRefresh().finally(() => setPageLoading(false));
-            } else {
-                setPageLoading(false);
-                 // Set initial prevSubmissionIdsRef on first load with data
-                if (prevSubmissionIdsRef.current.size === 0) {
-                    prevSubmissionIdsRef.current = new Set(allSubmissionsForAdmin.map(s => s.id));
-                }
-            }
-        } else {
-            setPageLoading(false);
->>>>>>> 685cb51d01b84724c2878bc58f28e8d28c142e1a
-        }
-      } else {
-        setPageLoading(false);
+      setPageLoading(false); // Set page loading to false once auth is resolved
+      // If the user is an admin and we have submissions, and the ref hasn't been initialized
+      if (user && user.isAdmin && prevSubmissionIdsRef.current.size === 0 && allSubmissionsForAdmin.length > 0) {
+        prevSubmissionIdsRef.current = new Set(allSubmissionsForAdmin.map(s => s.id));
       }
     }
   }, [authLoading, user, allSubmissionsForAdmin]);
@@ -126,7 +102,7 @@ const AdminPage = () => {
     for (let i = 0; i < submissions.length; i++) {
       const sub = submissions[i];
       let submitterUsername = sub.submitterUsername || sub.userEmail || "غير معروف";
-      if (!sub.submitterUsername && sub.userId) {
+      if (!sub.submitterUsername && sub.userId && typeof fetchUserById === 'function') { // Added typeof check for fetchUserById
         try {
             const submitterProfile = await fetchUserById(sub.userId);
             if (submitterProfile && submitterProfile.username) {
@@ -465,6 +441,7 @@ const AdminPage = () => {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <p className="text-destructive text-center">غير مصرح لك بالدخول لهذه الصفحة. يتم توجيهك...</p>
+        {/* ملاحظة: إذا كنت تريد إعادة توجيه فعلية، ستحتاج إلى استخدام useRouter من next/navigation */}
       </div>
     );
   }
