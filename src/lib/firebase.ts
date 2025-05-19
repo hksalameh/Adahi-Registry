@@ -34,7 +34,7 @@ for (const key of requiredConfigKeys) {
 }
 
 if (configError) {
-  const errorMessage = `Firebase تهيئة فشلت: متغيرات بيئة مفقودة: ${missingKeys.join(', ')}. تحقق من .env.local وأعد تشغيل الخادم.`;
+  const errorMessage = `Firebase تهيئة فشلت بسبب نقص في متغيرات البيئة المطلوبة: ${missingKeys.join(', ')}. يرجى التحقق من ملف .env.local والتأكد من تعيين جميع متغيرات NEXT_PUBLIC_FIREBASE_ بشكل صحيح، ثم أعد تشغيل خادم التطوير.`;
   console.error(errorMessage);
 } else {
   const tempConfig: {[key: string]: string | undefined} = {};
@@ -78,8 +78,8 @@ if (!configError && internalFirebaseConfig) {
           console.error("Error getting Firebase services (auth, firestore):", serviceError);
       }
   }
-} else if (!internalFirebaseConfig) { 
-  console.error("Firebase app could not be initialized because internalFirebaseConfig is null.");
+} else if (!internalFirebaseConfig) { //  Only log this if configError was already true or internalFirebaseConfig is null
+  console.error("Firebase app could not be initialized because internalFirebaseConfig is null. This usually means environment variables are not set correctly or the server was not restarted after setting them.");
 }
 
 export const app = appInstance;

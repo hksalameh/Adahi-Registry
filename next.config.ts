@@ -4,12 +4,15 @@ import withPWAInit from 'next-pwa';
 
 const withPWA = withPWAInit({
   dest: 'public',
-  register: true, 
+  register: true, // تأكد من أن هذا true لتسجيل الـ Service Worker
   skipWaiting: true,
+  //  هام: تم إعادته إلى الإعداد القياسي.
+  //  سيتم تعطيل PWA في وضع التطوير، وتفعيله في وضع الإنتاج.
   disable: process.env.NODE_ENV === 'development', 
 });
 
 const nextConfig: NextConfig = {
+  /* config options here */
   typescript: {
     ignoreBuildErrors: true,
   },

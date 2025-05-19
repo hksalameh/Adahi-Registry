@@ -3,7 +3,6 @@
 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-// Updated icon imports to include ClipboardList and other relevant icons
 import { Settings2, TableIcon, BarChart3, Coins, RefreshCw, Loader2, Users, FileText, Sheet, UserPlus, ListChecks, ClipboardList, HandHelping } from "lucide-react"; 
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useCallback, useRef } from "react"; 
@@ -76,7 +75,6 @@ const AdminPage = () => {
     if (!authLoading) {
       if (user && user.isAdmin) {
         setPageLoading(false);
-        // Set initial prevSubmissionIdsRef on first load with data
         if (prevSubmissionIdsRef.current.size === 0 && allSubmissionsForAdmin.length > 0) {
           prevSubmissionIdsRef.current = new Set(allSubmissionsForAdmin.map(s => s.id));
         }
@@ -214,12 +212,13 @@ const AdminPage = () => {
     XLSX.writeFile(wb, `${fileName}.xlsx`);
   };
   
-  const generatePdfWithHtml2Pdf = async (title: string, data: any[], columns: Array<{header: string, dataKey: string}>, fileName: string) => {
-    const currentExportType = fileName.includes('المستخدم') ? 'userPdf' : (fileName.includes('غزة') && !fileName.includes('ما_عدا') ? 'gazaPdf' : (fileName.includes('ما_عدا_غزة') ? 'allExceptGazaPdf' : 'allPdf'));
+  const generatePdfWithHtml2Pdf = async (title: string, data: any[], columns: Array<{header: string, dataKey: string}>, fileName: string, currentUserName?: string) => {
+    const currentExportType = currentUserName ? 'userPdf' : (fileName.includes('غزة') && !fileName.includes('ما_عدا') ? 'gazaPdf' : (fileName.includes('ما_عدا_غزة') ? 'allExceptGazaPdf' : 'allPdf'));
     setExportingType(currentExportType);
     
     try {
       const exportDateText = `تاريخ التصدير: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ar })}`;
+      const reportTitle = currentUserName ? `تقرير أضاحي ${currentUserName}` : title;
       
       let tableHtml = `<table style="width: 100%; border-collapse: collapse; font-family: 'Amiri', Arial, sans-serif; font-size: 8pt; direction: rtl;">`;
       tableHtml += `<thead><tr>`;
@@ -240,7 +239,7 @@ const AdminPage = () => {
 
       const contentHtml = `
         <div style="direction: rtl; text-align: center; font-family: 'Amiri', Arial, sans-serif; margin: ${PDF_MARGIN}mm;">
-          <h2 style="text-align: center; font-size: 16pt; font-family: 'Amiri', Arial, sans-serif; font-weight: bold;">${title}</h2>
+          <h2 style="text-align: center; font-size: 16pt; font-family: 'Amiri', Arial, sans-serif; font-weight: bold;">${reportTitle}</h2>
           <p style="text-align: center; font-size: 12pt; font-family: 'Amiri', Arial, sans-serif;">${exportDateText}</p>
           ${tableHtml}
         </div>
@@ -399,6 +398,7 @@ const AdminPage = () => {
 
       allDataPrepared.forEach(subPrepared => {
           let originalUserName = subPrepared.submitterUsername || 'مستخدم_غير_معروف';
+          //  اسم المستخدم ليكون اسمًا آمنًا للملف
           const userKey = originalUserName.replace(/[<>:"/\\|?* [\]]/g, '_').substring(0, 30);
 
 
@@ -411,8 +411,8 @@ const AdminPage = () => {
       for (const userNameKey in submissionsByUser) {
         const userData = submissionsByUser[userNameKey];
         if (userData.data.length > 0) {
-            const pdfTitle = `تقرير أضاحي ${userData.originalUserName}`;
-            await generatePdfWithHtml2Pdf(pdfTitle, userData.data, commonExportColumns, `أضاحي_${userNameKey}`);
+            // استخدام اسم المستخدم الأصلي في عنوان PDF
+            await generatePdfWithHtml2Pdf(`تقرير أضاحي ${userData.originalUserName}`, userData.data, commonExportColumns, `أضاحي_${userNameKey}`, userData.originalUserName);
         }
       }
       toast({ title: "تم تصدير الأضاحي حسب المستخدم (ملفات PDF منفصلة) بنجاح" });
@@ -423,6 +423,14 @@ const AdminPage = () => {
         setExportingType(null); 
     }
   };
+
+
+  const handleRegisterFormSubmit = () => {
+    setIsRegisterDialogOpen(false); // Close the dialog after successful registration
+    // Optionally, refresh admin data if new users affect any admin views immediately
+    // refreshData(); 
+  };
+
 
   if (authLoading || pageLoading) {
     return (
@@ -484,7 +492,8 @@ const AdminPage = () => {
                     أدخل بيانات المستخدم الجديد. سيتمكن المستخدم من تسجيل الدخول بهذه البيانات.
                   </DialogDescription>
                 </DialogHeader>
-                <RegisterForm />
+                {/* Pass isAdminCreator and onFormSubmit to RegisterForm */}
+                <RegisterForm isAdminCreator={true} onFormSubmit={handleRegisterFormSubmit} />
               </DialogContent>
             </Dialog>
             <Button variant="outline" className="text-xs sm:text-sm" asChild>
@@ -597,4 +606,3 @@ const AdminPage = () => {
 }
 
 export default AdminPage;
-    
