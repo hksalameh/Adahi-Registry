@@ -69,14 +69,34 @@ const AdminPage = () => {
     await refreshData();
     setIsRefreshing(false);
     toast({ title: "تم تحديث البيانات" });
+<<<<<<< HEAD
   }, [refreshData, toast, setIsRefreshing]); 
+=======
+  }, [refreshData, toast]); // Added allSubmissionsForAdmin to dependencies
+>>>>>>> 685cb51d01b84724c2878bc58f28e8d28c142e1a
 
   useEffect(() => {
     if (!authLoading) {
       if (user && user.isAdmin) {
+<<<<<<< HEAD
         setPageLoading(false);
         if (prevSubmissionIdsRef.current.size === 0 && allSubmissionsForAdmin.length > 0) {
           prevSubmissionIdsRef.current = new Set(allSubmissionsForAdmin.map(s => s.id));
+=======
+        if (typeof handleRefresh === 'function') {
+            // Initial fetch logic
+            if (allSubmissionsForAdmin.length === 0 && pageLoading) { // Fetch if initially empty and page is still loading
+                handleRefresh().finally(() => setPageLoading(false));
+            } else {
+                setPageLoading(false);
+                 // Set initial prevSubmissionIdsRef on first load with data
+                if (prevSubmissionIdsRef.current.size === 0) {
+                    prevSubmissionIdsRef.current = new Set(allSubmissionsForAdmin.map(s => s.id));
+                }
+            }
+        } else {
+            setPageLoading(false);
+>>>>>>> 685cb51d01b84724c2878bc58f28e8d28c142e1a
         }
       } else {
         setPageLoading(false);
