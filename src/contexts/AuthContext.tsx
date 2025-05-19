@@ -574,6 +574,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const sendSlaughterNotification = async (submissionId: string, donorName: string, phoneNumber: string): Promise<boolean> => {
+    console.log("[AuthContext] sendSlaughterNotification called for submission:", submissionId);
     if (!db || !user || !user.isAdmin) {
       toast({ variant: "destructive", title: "غير مصرح به", description: "ليس لديك صلاحية لإرسال الإشعارات." });
       return false;

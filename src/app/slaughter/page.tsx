@@ -10,13 +10,13 @@ import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, RefreshCw, Utensils, CheckCircle, Send, XCircle } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast, useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { arSA } from "date-fns/locale";
 
 const SlaughterPage = () => {
-  const { allSubmissionsForAdmin, loading: authLoading, refreshData, markAsSlaughtered, user } = useAuth();
-  const { toast } = useToast();
+  const { allSubmissionsForAdmin, loading: authLoading, refreshData, markAsSlaughtered, user, sendSlaughterNotification } = useAuth();
+  const { toast } = useToast(); // Keep toast hook here
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
   const [submissionsToDisplay, setSubmissionsToDisplay] = useState<AdahiSubmission[]>([]);
@@ -96,15 +96,14 @@ const SlaughterPage = () => {
    };
 
    const handleSendNotification = async (submission: AdahiSubmission) => {
-       // This is a placeholder. You need to implement the actual function
-       // to send SMS and WhatsApp messages. This might involve calling
-       // a function from useAuth or a separate API call.
+       console.log("[SlaughterPage] handleSendNotification called for submission:", submission.id);
        console.log(`Attempting to send notification for submission ${submission.id}`);
        toast({ title: "جاري إرسال الإشعار..." });
 
-       // Simulate sending notification
-       // const notificationSuccess = await yourApi.sendNotification(submission.id, submission.phoneNumber, submission.donorName);
-        const notificationSuccess = true; // Simulate success
+       // Call the actual notification function from useAuth
+       const notificationSuccess = await sendSlaughterNotification(submission.id, submission.donorName, submission.phoneNumber);
+
+       // The toast inside sendSlaughterNotification handles the outcome
 
        if (notificationSuccess) {
             await updateSubmissionStatus(submission.id, 'notified'); // Update status to notified
@@ -113,6 +112,7 @@ const SlaughterPage = () => {
             toast({ title: "فشل إرسال الإشعار", variant: "destructive" });
        }
    };
+
 
 
   const renderSubmissionTable = (submissions: AdahiSubmission[], categoryTitle: string) => {
