@@ -2,7 +2,7 @@
 "use client";
 
 import { useAuth } from "@/hooks/useAuth";
-import { useState, useEffect, useCallback, useMemo } from "react"; // useMemo is still used at the top level of the component
+import { useState, useEffect, useCallback } from "react"; 
 import type { AdahiSubmission } from "@/lib/types";
 import { distributionOptions } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,14 +11,14 @@ import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, RefreshCw, Utensils, CheckCircle, Send, XCircle } from "lucide-react";
-import { toast as showToast, useToast } from "@/hooks/use-toast"; // Renamed toast to showToast to avoid conflict
+import { useToast } from "@/hooks/use-toast"; 
 import { format } from "date-fns";
 import { arSA } from "date-fns/locale";
-import { cn } from "@/lib/utils"; // Import cn utility
+import { cn } from "@/lib/utils"; 
 
 const SlaughterPage = () => {
-  const { allSubmissionsForAdmin, loading: authLoading, refreshData, markAsSlaughtered, user, sendSlaughterNotification, updateSubmission: updateSubmissionStatusInAuth } = useAuth(); // Added updateSubmission
-  const { toast } = useToast(); // This is fine, it's from useToast hook
+  const { allSubmissionsForAdmin, loading: authLoading, refreshData, user, sendSlaughterNotification, updateSubmission: updateSubmissionStatusInAuth } = useAuth(); 
+  const { toast } = useToast(); 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
   const [submissionsToDisplay, setSubmissionsToDisplay] = useState<AdahiSubmission[]>([]);
@@ -46,16 +46,14 @@ const SlaughterPage = () => {
   }, [authLoading, user, handleRefresh]);
 
   useEffect(() => {
-    // Sort submissions: not slaughtered first, then by original order (or date)
     const sortedSubmissions = [...allSubmissionsForAdmin].sort((a, b) => {
       const aIsDone = a.slaughterStatus === 'notified' || a.slaughterStatus === 'confirmed_slaughtered' || a.isSlaughtered;
       const bIsDone = b.slaughterStatus === 'notified' || b.slaughterStatus === 'confirmed_slaughtered' || b.isSlaughtered;
-      if (aIsDone && !bIsDone) return 1; // a (done) comes after b (not done)
-      if (!aIsDone && bIsDone) return -1; // a (not done) comes before b (done)
-      // If both are done or both are not done, maintain original order (or sort by date if needed)
+      if (aIsDone && !bIsDone) return 1; 
+      if (!aIsDone && bIsDone) return -1; 
       const dateA = a.submissionDate ? new Date(a.submissionDate).getTime() : 0;
       const dateB = b.submissionDate ? new Date(b.submissionDate).getTime() : 0;
-      return dateB - dateA; // Default to descending by submission date if slaughter status is same
+      return dateB - dateA; 
     });
     setSubmissionsToDisplay(sortedSubmissions);
   }, [allSubmissionsForAdmin]);
@@ -66,10 +64,10 @@ const SlaughterPage = () => {
       const updatePayload: Partial<AdahiSubmission> = { slaughterStatus: newStatus };
       if (isSlaughteredFlag !== undefined) {
         updatePayload.isSlaughtered = isSlaughteredFlag;
-        if (isSlaughteredFlag && newStatus !== 'pending') { // Only set slaughterDate if being marked as slaughtered
+        if (isSlaughteredFlag && newStatus !== 'pending') { 
             updatePayload.slaughterDate = new Date().toISOString();
-        } else if (!isSlaughteredFlag && newStatus === 'pending') { // Clear slaughterDate if undoing
-            updatePayload.slaughterDate = undefined; // Or null, depending on how Firestore handles it
+        } else if (!isSlaughteredFlag && newStatus === 'pending') { 
+            updatePayload.slaughterDate = undefined; 
         }
       }
 
@@ -77,7 +75,7 @@ const SlaughterPage = () => {
 
        if (success) {
            toast({ title: `تم تحديث حالة الأضحية بنجاح` });
-           await refreshData(); // Refresh to get the latest data and re-sort
+           await refreshData(); 
        } else {
            toast({ title: `فشل تحديث حالة الأضحية`, variant: "destructive" });
        }
@@ -89,7 +87,7 @@ const SlaughterPage = () => {
   };
 
   const handleConfirmMarkAsSlaughtered = async (submission: AdahiSubmission) => {
-      await updateSubmissionSlaughterStatus(submission.id, 'confirmed_slaughtered', true); // Using confirmed_slaughtered and setting isSlaughtered to true
+      await updateSubmissionSlaughterStatus(submission.id, 'confirmed_slaughtered', true); 
       setOpenSlaughterDialog(prev => ({ ...prev, [submission.id]: false }));
   };
 
@@ -98,7 +96,7 @@ const SlaughterPage = () => {
    };
 
    const handleConfirmUndoSlaughter = async (submission: AdahiSubmission) => {
-        await updateSubmissionSlaughterStatus(submission.id, 'pending', false); // Back to pending, isSlaughtered to false
+        await updateSubmissionSlaughterStatus(submission.id, 'pending', false); 
         setOpenUndoSlaughterDialog(prev => ({ ...prev, [submission.id]: false }));
    };
 
@@ -109,8 +107,6 @@ const SlaughterPage = () => {
        const notificationSuccess = await sendSlaughterNotification(submission.id, submission.donorName, submission.phoneNumber);
 
        if (notificationSuccess) {
-            // The sendSlaughterNotification in AuthContext now updates to 'notified'
-            // So, we just need to refresh data here.
             await refreshData();
             toast({ title: "تم محاولة إرسال الإشعار بنجاح" });
        } else {
@@ -118,15 +114,10 @@ const SlaughterPage = () => {
        }
    };
 
-  // renderSubmissionTable now takes the already sorted (via submissionsToDisplay) and filtered list
   const renderSubmissionTable = (currentSubmissions: AdahiSubmission[], _categoryTitle: string) => {
     if (currentSubmissions.length === 0) {
       return <p className="text-muted-foreground text-center py-4">لا توجد أضاحي في هذه الفئة.</p>;
     }
-
-    // The `useMemo` for sorting was removed from here as `currentSubmissions`
-    // (which comes from `ramthaAndDonorSubmissions`, etc.) should already be sorted
-    // due to `submissionsToDisplay` being sorted by the useEffect.
 
     return (
       <div className="overflow-x-auto">
@@ -146,14 +137,15 @@ const SlaughterPage = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {currentSubmissions.map((sub, index) => { // Use currentSubmissions directly
+            {currentSubmissions.map((sub, index) => { 
               const isActuallySlaughtered = sub.isSlaughtered || sub.slaughterStatus === 'confirmed_slaughtered' || sub.slaughterStatus === 'notified';
               return (
               <TableRow 
                 key={sub.id}
                 className={cn(
-                    isActuallySlaughtered ? "bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-800/40" : "",
-                    sub.paymentConfirmed && !isActuallySlaughtered ? "bg-yellow-100 dark:bg-yellow-900/30 hover:bg-yellow-200 dark:hover:bg-yellow-800/40" : ""
+                    isActuallySlaughtered ? "bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-800/40" :
+                    sub.wantsToAttend ? "bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-800/40" :
+                    (sub.paymentConfirmed ? "bg-yellow-100 dark:bg-yellow-900/30 hover:bg-yellow-200 dark:hover:bg-yellow-800/40" : "")
                 )}
               >
                 <TableCell>{index + 1}</TableCell>
@@ -341,6 +333,6 @@ const SlaughterPage = () => {
 };
 
 export default SlaughterPage;
-
+    
 
     
