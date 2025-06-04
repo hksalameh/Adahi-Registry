@@ -2,7 +2,7 @@
 "use client";
 
 import { useAuth } from "@/hooks/useAuth";
-import { useState, useEffect, useCallback, useMemo } from "react"; // Added useMemo
+import { useState, useEffect, useCallback, useMemo } from "react"; // useMemo is still used at the top level of the component
 import type { AdahiSubmission } from "@/lib/types";
 import { distributionOptions } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,7 +53,6 @@ const SlaughterPage = () => {
       if (aIsDone && !bIsDone) return 1; // a (done) comes after b (not done)
       if (!aIsDone && bIsDone) return -1; // a (not done) comes before b (done)
       // If both are done or both are not done, maintain original order (or sort by date if needed)
-      // For now, we rely on Firestore's initial orderBy, or you can add secondary sort here
       const dateA = a.submissionDate ? new Date(a.submissionDate).getTime() : 0;
       const dateB = b.submissionDate ? new Date(b.submissionDate).getTime() : 0;
       return dateB - dateA; // Default to descending by submission date if slaughter status is same
@@ -119,25 +118,15 @@ const SlaughterPage = () => {
        }
    };
 
-  const renderSubmissionTable = (submissions: AdahiSubmission[], _categoryTitle: string) => {
-    if (submissions.length === 0) {
+  // renderSubmissionTable now takes the already sorted (via submissionsToDisplay) and filtered list
+  const renderSubmissionTable = (currentSubmissions: AdahiSubmission[], _categoryTitle: string) => {
+    if (currentSubmissions.length === 0) {
       return <p className="text-muted-foreground text-center py-4">لا توجد أضاحي في هذه الفئة.</p>;
     }
 
-    const sortedSubmissions = useMemo(() => {
-        return [...submissions].sort((a, b) => {
-            const aIsDone = a.slaughterStatus === 'notified' || a.slaughterStatus === 'confirmed_slaughtered' || a.isSlaughtered;
-            const bIsDone = b.slaughterStatus === 'notified' || b.slaughterStatus === 'confirmed_slaughtered' || b.isSlaughtered;
-
-            if (aIsDone && !bIsDone) return 1;
-            if (!aIsDone && bIsDone) return -1;
-            
-            const dateA = a.submissionDate ? new Date(a.submissionDate).getTime() : 0;
-            const dateB = b.submissionDate ? new Date(b.submissionDate).getTime() : 0;
-            return dateB - dateA; // Keep most recent non-slaughtered at top
-        });
-    }, [submissions]);
-
+    // The `useMemo` for sorting was removed from here as `currentSubmissions`
+    // (which comes from `ramthaAndDonorSubmissions`, etc.) should already be sorted
+    // due to `submissionsToDisplay` being sorted by the useEffect.
 
     return (
       <div className="overflow-x-auto">
@@ -157,7 +146,7 @@ const SlaughterPage = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedSubmissions.map((sub, index) => {
+            {currentSubmissions.map((sub, index) => { // Use currentSubmissions directly
               const isActuallySlaughtered = sub.isSlaughtered || sub.slaughterStatus === 'confirmed_slaughtered' || sub.slaughterStatus === 'notified';
               return (
               <TableRow 
@@ -352,3 +341,6 @@ const SlaughterPage = () => {
 };
 
 export default SlaughterPage;
+
+
+    
