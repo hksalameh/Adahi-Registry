@@ -17,6 +17,7 @@ import AdahiSubmissionForm from "@/components/forms/AdahiSubmissionForm";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { distributionOptions } from "@/lib/types";
+import { cn } from "@/lib/utils"; // Import cn utility
 
 
 interface AdminSubmissionsTableProps {
@@ -56,7 +57,7 @@ const formatDateTime = (dateString: string | undefined | null): string => {
 
 
 export default function AdminSubmissionsTable({ submissions, onDataChange }: AdminSubmissionsTableProps) {
-  const { updateSubmissionStatus, deleteSubmission } = useAuth(); // Removed refreshData from here
+  const { updateSubmissionStatus, deleteSubmission } = useAuth();
   const { toast } = useToast();
   const [editingSubmission, setEditingSubmission] = useState<AdahiSubmission | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<string | null>(null);
@@ -68,7 +69,7 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
     const success = await updateSubmissionStatus(id, newStatus);
     if (success) {
       toast({ title: "تم تحديث الحالة بنجاح." });
-      onDataChange(); // Call onDataChange passed from parent to trigger refresh
+      onDataChange(); 
     } else {
       toast({ title: "فشل تحديث الحالة.", variant: "destructive" });
     }
@@ -80,7 +81,7 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
     const success = await deleteSubmission(id);
     if (success) {
       toast({ title: "تم حذف السجل بنجاح." });
-      onDataChange(); // Call onDataChange passed from parent to trigger refresh
+      onDataChange(); 
     } else {
       toast({ title: "فشل حذف السجل.", variant: "destructive" });
     }
@@ -98,7 +99,7 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
 
   const closeEditDialog = () => {
     setEditingSubmission(null);
-    onDataChange(); // Call onDataChange passed from parent to trigger refresh
+    onDataChange(); 
   }
 
   return (
@@ -127,7 +128,12 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
         </TableHeader>
         <TableBody>
           {submissions.map((sub) => (
-            <TableRow key={sub.id}>
+            <TableRow 
+              key={sub.id}
+              className={cn(
+                sub.paymentConfirmed ? "bg-yellow-100 dark:bg-yellow-900/30 hover:bg-yellow-200 dark:hover:bg-yellow-800/40" : ""
+              )}
+            >
               <TableCell className="whitespace-nowrap">{sub.submitterUsername || sub.userEmail || sub.userId || "غير متوفر"}</TableCell>
               <TableCell className="font-medium whitespace-nowrap">{sub.donorName}</TableCell>
               <TableCell className="whitespace-nowrap">{sub.sacrificeFor}</TableCell>
@@ -135,7 +141,15 @@ export default function AdminSubmissionsTable({ submissions, onDataChange }: Adm
               <TableCell className="whitespace-nowrap">{sub.wantsToAttend ? "نعم" : "لا"}</TableCell>
               <TableCell className="whitespace-nowrap">{sub.wantsFromSacrifice ? "نعم" : "لا"}</TableCell>
               <TableCell className="whitespace-nowrap">{sub.wantsFromSacrifice ? (sub.sacrificeWishes || "-") : "-"}</TableCell>
-              <TableCell className="whitespace-nowrap">{sub.paymentConfirmed ? "نعم" : "لا"}</TableCell>
+              <TableCell className="whitespace-nowrap">
+                 <Badge variant={sub.paymentConfirmed ? "default" : "secondary"}
+                       className={cn(
+                        sub.paymentConfirmed ? "bg-green-500 hover:bg-green-600 text-white" : "bg-red-500 hover:bg-red-600 text-white"
+                       )}
+                >
+                  {sub.paymentConfirmed ? "نعم" : "لا"}
+                </Badge>
+              </TableCell>
               <TableCell className="whitespace-nowrap">{sub.paymentConfirmed ? (sub.receiptBookNumber || "-") : "-"}</TableCell>
               <TableCell className="whitespace-nowrap">{sub.paymentConfirmed ? (sub.voucherNumber || "-") : "-"}</TableCell>
               <TableCell className="whitespace-nowrap">{sub.throughIntermediary ? "نعم" : "لا"}</TableCell>

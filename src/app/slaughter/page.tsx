@@ -1,7 +1,8 @@
+
 "use client";
 
 import { useAuth } from "@/hooks/useAuth";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react"; // Added useMemo
 import type { AdahiSubmission } from "@/lib/types";
 import { distributionOptions } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,13 +11,14 @@ import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, RefreshCw, Utensils, CheckCircle, Send, XCircle } from "lucide-react";
-import { toast, useToast } from "@/hooks/use-toast";
+import { toast as showToast, useToast } from "@/hooks/use-toast"; // Renamed toast to showToast to avoid conflict
 import { format } from "date-fns";
 import { arSA } from "date-fns/locale";
+import { cn } from "@/lib/utils"; // Import cn utility
 
 const SlaughterPage = () => {
-  const { allSubmissionsForAdmin, loading: authLoading, refreshData, markAsSlaughtered, user, sendSlaughterNotification } = useAuth();
-  const { toast } = useToast(); // Keep toast hook here
+  const { allSubmissionsForAdmin, loading: authLoading, refreshData, markAsSlaughtered, user, sendSlaughterNotification, updateSubmission: updateSubmissionStatusInAuth } = useAuth(); // Added updateSubmission
+  const { toast } = useToast(); // This is fine, it's from useToast hook
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
   const [submissionsToDisplay, setSubmissionsToDisplay] = useState<AdahiSubmission[]>([]);
@@ -44,31 +46,42 @@ const SlaughterPage = () => {
   }, [authLoading, user, handleRefresh]);
 
   useEffect(() => {
-    setSubmissionsToDisplay(allSubmissionsForAdmin);
+    // Sort submissions: not slaughtered first, then by original order (or date)
+    const sortedSubmissions = [...allSubmissionsForAdmin].sort((a, b) => {
+      const aIsDone = a.slaughterStatus === 'notified' || a.slaughterStatus === 'confirmed_slaughtered' || a.isSlaughtered;
+      const bIsDone = b.slaughterStatus === 'notified' || b.slaughterStatus === 'confirmed_slaughtered' || b.isSlaughtered;
+      if (aIsDone && !bIsDone) return 1; // a (done) comes after b (not done)
+      if (!aIsDone && bIsDone) return -1; // a (not done) comes before b (done)
+      // If both are done or both are not done, maintain original order (or sort by date if needed)
+      // For now, we rely on Firestore's initial orderBy, or you can add secondary sort here
+      const dateA = a.submissionDate ? new Date(a.submissionDate).getTime() : 0;
+      const dateB = b.submissionDate ? new Date(b.submissionDate).getTime() : 0;
+      return dateB - dateA; // Default to descending by submission date if slaughter status is same
+    });
+    setSubmissionsToDisplay(sortedSubmissions);
   }, [allSubmissionsForAdmin]);
 
-  const updateSubmissionStatus = async (submissionId: string, status: AdahiSubmission['slaughterStatus']) => {
-      // This is a placeholder function. You'll need to implement the actual logic
-      // to update the slaughterStatus in your backend/data source.
-      // For demonstration, we'll just update the local state (which won't persist).
-      console.log(`Attempting to update submission ${submissionId} status to ${status}`);
+  const updateSubmissionSlaughterStatus = async (submissionId: string, newStatus: AdahiSubmission['slaughterStatus'], isSlaughteredFlag?: boolean) => {
+      console.log(`Attempting to update submission ${submissionId} status to ${newStatus}, isSlaughtered: ${isSlaughteredFlag}`);
+      
+      const updatePayload: Partial<AdahiSubmission> = { slaughterStatus: newStatus };
+      if (isSlaughteredFlag !== undefined) {
+        updatePayload.isSlaughtered = isSlaughteredFlag;
+        if (isSlaughteredFlag && newStatus !== 'pending') { // Only set slaughterDate if being marked as slaughtered
+            updatePayload.slaughterDate = new Date().toISOString();
+        } else if (!isSlaughteredFlag && newStatus === 'pending') { // Clear slaughterDate if undoing
+            updatePayload.slaughterDate = undefined; // Or null, depending on how Firestore handles it
+        }
+      }
 
-      // In a real application, you would call an API/function here
-      // const success = await yourApi.updateSlaughterStatus(submissionId, status);
+      const success = await updateSubmissionStatusInAuth(submissionId, updatePayload);
 
-      // For now, let's simulate a successful update and update local state
-       setSubmissionsToDisplay(prevSubmissions =>
-           prevSubmissions.map(sub =>
-               sub.id === submissionId ? { ...sub, slaughterStatus: status } : sub
-           )
-       );
-       toast({ title: `تم تحديث حالة الأضحية إلى: ${status}` });
-
-
-      // Handle potential errors if the update fails
-      // if (!success) {
-      //     toast({ title: `فشل تحديث حالة الأضحية إلى: ${status}`, variant: "destructive" });
-      // }
+       if (success) {
+           toast({ title: `تم تحديث حالة الأضحية بنجاح` });
+           await refreshData(); // Refresh to get the latest data and re-sort
+       } else {
+           toast({ title: `فشل تحديث حالة الأضحية`, variant: "destructive" });
+       }
   };
 
 
@@ -77,12 +90,8 @@ const SlaughterPage = () => {
   };
 
   const handleConfirmMarkAsSlaughtered = async (submission: AdahiSubmission) => {
-      // Call function to update status to 'marked_slaughtered'
-      await updateSubmissionStatus(submission.id, 'marked_slaughtered');
+      await updateSubmissionSlaughterStatus(submission.id, 'confirmed_slaughtered', true); // Using confirmed_slaughtered and setting isSlaughtered to true
       setOpenSlaughterDialog(prev => ({ ...prev, [submission.id]: false }));
-      // Note: The original handleMarkAsSlaughtered included sending the notification.
-      // We need a separate function for sending notifications now.
-      // The logic to send notification is removed from here.
   };
 
    const handleUndoSlaughterClick = (submission: AdahiSubmission) => {
@@ -90,35 +99,46 @@ const SlaughterPage = () => {
    };
 
    const handleConfirmUndoSlaughter = async (submission: AdahiSubmission) => {
-        // Call function to update status back to 'pending'
-        await updateSubmissionStatus(submission.id, 'pending');
+        await updateSubmissionSlaughterStatus(submission.id, 'pending', false); // Back to pending, isSlaughtered to false
         setOpenUndoSlaughterDialog(prev => ({ ...prev, [submission.id]: false }));
    };
 
    const handleSendNotification = async (submission: AdahiSubmission) => {
        console.log("[SlaughterPage] handleSendNotification called for submission:", submission.id);
-       console.log(`Attempting to send notification for submission ${submission.id}`);
        toast({ title: "جاري إرسال الإشعار..." });
 
-       // Call the actual notification function from useAuth
        const notificationSuccess = await sendSlaughterNotification(submission.id, submission.donorName, submission.phoneNumber);
 
-       // The toast inside sendSlaughterNotification handles the outcome
-
        if (notificationSuccess) {
-            await updateSubmissionStatus(submission.id, 'notified'); // Update status to notified
-            toast({ title: "تم إرسال الإشعار بنجاح" });
+            // The sendSlaughterNotification in AuthContext now updates to 'notified'
+            // So, we just need to refresh data here.
+            await refreshData();
+            toast({ title: "تم محاولة إرسال الإشعار بنجاح" });
        } else {
-            toast({ title: "فشل إرسال الإشعار", variant: "destructive" });
+            toast({ title: "فشل محاولة إرسال الإشعار", variant: "destructive" });
        }
    };
 
-
-
-  const renderSubmissionTable = (submissions: AdahiSubmission[], categoryTitle: string) => {
+  const renderSubmissionTable = (submissions: AdahiSubmission[], _categoryTitle: string) => {
     if (submissions.length === 0) {
       return <p className="text-muted-foreground text-center py-4">لا توجد أضاحي في هذه الفئة.</p>;
     }
+
+    const sortedSubmissions = useMemo(() => {
+        return [...submissions].sort((a, b) => {
+            const aIsDone = a.slaughterStatus === 'notified' || a.slaughterStatus === 'confirmed_slaughtered' || a.isSlaughtered;
+            const bIsDone = b.slaughterStatus === 'notified' || b.slaughterStatus === 'confirmed_slaughtered' || b.isSlaughtered;
+
+            if (aIsDone && !bIsDone) return 1;
+            if (!aIsDone && bIsDone) return -1;
+            
+            const dateA = a.submissionDate ? new Date(a.submissionDate).getTime() : 0;
+            const dateB = b.submissionDate ? new Date(b.submissionDate).getTime() : 0;
+            return dateB - dateA; // Keep most recent non-slaughtered at top
+        });
+    }, [submissions]);
+
+
     return (
       <div className="overflow-x-auto">
         <Table>
@@ -133,12 +153,20 @@ const SlaughterPage = () => {
               <TableHead>ماذا يريد</TableHead>
               <TableHead>توزع لـ</TableHead>
               <TableHead>حالة الإدخال</TableHead>
-              <TableHead>الإجراءات</TableHead> {/* Changed from حالة الذبح to الإجراءات */}
+              <TableHead>الإجراءات</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {submissions.map((sub, index) => (
-              <TableRow key={sub.id}>
+            {sortedSubmissions.map((sub, index) => {
+              const isActuallySlaughtered = sub.isSlaughtered || sub.slaughterStatus === 'confirmed_slaughtered' || sub.slaughterStatus === 'notified';
+              return (
+              <TableRow 
+                key={sub.id}
+                className={cn(
+                    isActuallySlaughtered ? "bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-800/40" : "",
+                    sub.paymentConfirmed && !isActuallySlaughtered ? "bg-yellow-100 dark:bg-yellow-900/30 hover:bg-yellow-200 dark:hover:bg-yellow-800/40" : ""
+                )}
+              >
                 <TableCell>{index + 1}</TableCell>
                 <TableCell>{sub.donorName}</TableCell>
                 <TableCell>{sub.sacrificeFor}</TableCell>
@@ -153,8 +181,8 @@ const SlaughterPage = () => {
                     {sub.status === "entered" ? "مدخلة" : "غير مدخلة"}
                   </Badge>
                 </TableCell>
-                <TableCell className="flex items-center space-x-2"> {/* Added flex and space */}
-                  {(sub.slaughterStatus === 'pending' || sub.slaughterStatus === undefined) && ( // Added undefined check for new property
+                <TableCell className="flex items-center space-x-1 rtl:space-x-reverse">
+                  {(sub.slaughterStatus === 'pending' || !sub.slaughterStatus) && (
                      <AlertDialog
                          open={openSlaughterDialog[sub.id] || false}
                          onOpenChange={(isOpen) => setOpenSlaughterDialog(prev => ({ ...prev, [sub.id]: isOpen }))}
@@ -163,10 +191,10 @@ const SlaughterPage = () => {
                          <Button
                              variant="outline"
                              size="sm"
-                             className="bg-yellow-400 hover:bg-yellow-500 text-black" // Yellow button
+                             className="bg-yellow-400 hover:bg-yellow-500 text-black px-2 py-1 text-xs"
                              onClick={() => handleMarkAsSlaughteredClick(sub)}
                          >
-                           <Utensils className="ml-2 h-4 w-4" />
+                           <Utensils className="ml-1 h-3 w-3" />
                            تم الذبح
                          </Button>
                        </AlertDialogTrigger>
@@ -187,7 +215,7 @@ const SlaughterPage = () => {
                      </AlertDialog>
                   )}
 
-                  {(sub.slaughterStatus === 'marked_slaughtered' || sub.slaughterStatus === 'confirmed_slaughtered') && (
+                  {(sub.slaughterStatus === 'confirmed_slaughtered') && (
                       <>
                           <AlertDialog
                               open={openUndoSlaughterDialog[sub.id] || false}
@@ -197,11 +225,11 @@ const SlaughterPage = () => {
                                   <Button
                                       variant="outline"
                                       size="sm"
-                                      className="bg-green-500 hover:bg-green-600 text-white" // Green button
+                                      className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 text-xs"
                                       onClick={() => handleUndoSlaughterClick(sub)}
                                   >
-                                      <CheckCircle className="ml-2 h-4 w-4" />
-                                      تم الذبح (مؤكد) {/* Changed text for clarity */}
+                                      <CheckCircle className="ml-1 h-3 w-3" />
+                                      تم الذبح
                                   </Button>
                               </AlertDialogTrigger>
                               <AlertDialogContent>
@@ -221,26 +249,32 @@ const SlaughterPage = () => {
                               </AlertDialogContent>
                           </AlertDialog>
 
-                           <Button variant="outline" size="sm" onClick={() => handleSendNotification(sub)}> {/* Added the notification button */}
-                              إرسال الإشعار
+                           <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => handleSendNotification(sub)}
+                                className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 text-xs"
+                            >
+                              <Send className="ml-1 h-3 w-3" />
+                              إرسال إشعار
                           </Button>
                       </>
                   )}
 
                    {sub.slaughterStatus === 'notified' && (
-                        <div className="flex items-center text-green-600">
-                           <CheckCircle className="mr-2 h-5 w-5" />
-                           تم الذبح والإشعار
-                           {sub.slaughterDate && ( // Keep displaying date if available
+                        <div className="flex items-center text-green-700 font-semibold text-xs whitespace-nowrap">
+                           <CheckCircle className="mr-1 h-4 w-4" />
+                           تم وأُشعر
+                           {sub.slaughterDate && (
                              <span className="text-xs text-muted-foreground ml-1">
-                               ({format(new Date(sub.slaughterDate), "dd/MM/yy HH:mm", { locale: arSA })})
+                               ({format(new Date(sub.slaughterDate), "dd/MM HH:mm", { locale: arSA })})
                              </span>
                            )}
                          </div>
                    )}
                 </TableCell>
               </TableRow>
-            ))}
+            )})}
           </TableBody>
         </Table>
       </div>

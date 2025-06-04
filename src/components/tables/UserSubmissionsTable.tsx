@@ -5,6 +5,7 @@ import type { AdahiSubmission, DistributionPreference } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge"; 
 import { distributionOptions } from "@/lib/types";
+import { cn } from "@/lib/utils"; // Import cn utility
 
 interface UserSubmissionsTableProps {
   submissions: AdahiSubmission[];
@@ -31,14 +32,27 @@ export default function UserSubmissionsTable({ submissions }: UserSubmissionsTab
         </TableHeader>
         <TableBody>
           {submissions.map((sub, index) => (
-            <TableRow key={sub.id}>
+            <TableRow 
+              key={sub.id}
+              className={cn(
+                sub.paymentConfirmed ? "bg-yellow-100 dark:bg-yellow-900/30 hover:bg-yellow-200 dark:hover:bg-yellow-800/40" : ""
+              )}
+            >
               <TableCell>{index + 1}</TableCell>
               <TableCell className="font-medium whitespace-nowrap">{sub.donorName}</TableCell>
               <TableCell className="whitespace-nowrap">{sub.sacrificeFor}</TableCell>
               <TableCell className="whitespace-nowrap">{sub.phoneNumber}</TableCell>
               <TableCell className="whitespace-nowrap">{sub.wantsToAttend ? "نعم" : "لا"}</TableCell>
               <TableCell className="whitespace-nowrap">{sub.wantsFromSacrifice ? "نعم" : "لا"}</TableCell>
-              <TableCell className="whitespace-nowrap">{sub.paymentConfirmed ? "نعم" : "لا"}</TableCell>
+              <TableCell className="whitespace-nowrap">
+                <Badge variant={sub.paymentConfirmed ? "default" : "secondary"}
+                       className={cn(
+                        sub.paymentConfirmed ? "bg-green-500 hover:bg-green-600 text-white" : "bg-red-500 hover:bg-red-600 text-white"
+                       )}
+                >
+                  {sub.paymentConfirmed ? "نعم" : "لا"}
+                </Badge>
+              </TableCell>
               <TableCell className="whitespace-nowrap">{getDistributionLabel(sub.distributionPreference)}</TableCell>
               <TableCell className="whitespace-nowrap">
                 <Badge variant={sub.status === "entered" ? "default" : "secondary"}
@@ -53,3 +67,4 @@ export default function UserSubmissionsTable({ submissions }: UserSubmissionsTab
     </div>
   );
 }
+
