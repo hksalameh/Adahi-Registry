@@ -11,7 +11,6 @@ const firebaseConfig = {
   appId: "1:157383113576:web:e1de3febcdcc284368f4dd"
 };
 
-// تشغيل الفيربيس ومنع التكرار
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
