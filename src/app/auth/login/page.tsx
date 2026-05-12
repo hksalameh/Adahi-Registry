@@ -43,7 +43,7 @@ export default function LoginPage() {
           </div>
 
           <div className="text-center mb-4">
-            <p className="text-lg font-semibold text-foreground">اضاحي 2025</p>
+            <p className="text-lg font-semibold text-foreground">اضاحي 2026</p>
           </div>
 
           <div className="text-center space-y-2">
