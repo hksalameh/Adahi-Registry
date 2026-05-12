@@ -34,7 +34,7 @@ export default function RootLayout({
           </div>
           <Toaster />
           <footer className="py-4 text-center text-sm text-muted-foreground border-t">
-            حقوق الطبع © Haitham Salameh 2025
+            حقوق الطبع © Haitham Salameh 2026
           </footer>
         </AuthProvider>
       </body>
