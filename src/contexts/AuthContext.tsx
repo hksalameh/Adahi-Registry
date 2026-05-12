@@ -573,11 +573,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-const sendSlaughterNotification = async (submissionId: string, donorName: string, phoneNumber: string): Promise<boolean> => {
-    if (!db || !user || !user.isAdmin) {
-      toast({ variant: "destructive", title: "غير مصرح به", description: "ليس لديك صلاحية لإرسال الإشعارات." });
-      return false;
-    }
+const sendSlaughterNotification = async (submissionId: string, donorName: string, phoneNumber: string, method: 'whatsapp' | 'sms'): Promise<boolean> => {
+    if (!db || !user || !user.isAdmin) return false;
+
     try {
       const submissionDocRef = doc(db, "submissions", submissionId);
       const message = `السيد/السيدة ${donorName} تقبل الله طاعتكم وكل عام وانتم بالف خير تم ذبح اضحيتك ربنا يتقبل منكم`;
@@ -586,42 +584,31 @@ const sendSlaughterNotification = async (submissionId: string, donorName: string
       if (!formattedPhoneNumber.startsWith("962")) {
         formattedPhoneNumber = `962${formattedPhoneNumber}`;
       }
-      
-      const whatsappUrl = `https://wa.me/${formattedPhoneNumber}?text=${encodeURIComponent(message)}`;
-      const isIphone = typeof navigator !== "undefined" && /iPhone/i.test(navigator.userAgent);
-      const smsUri = `sms:+${formattedPhoneNumber}${isIphone ? '&' : '?'}body=${encodeURIComponent(message)}`;
-      
-      if (typeof window !== "undefined") {
-        // 1. اختيار الوسيلة
-        const sendViaWhatsApp = confirm("اختيار وسيلة الإرسال:\n\n(موافق = واتساب | إلغاء = رسالة نصية SMS)");
 
-        if (sendViaWhatsApp) {
-          window.open(whatsappUrl, '_blank');
-        } else {
-          window.location.href = smsUri;
-        }
+      if (method === 'whatsapp') {
+        const whatsappUrl = `https://wa.me/${formattedPhoneNumber}?text=${encodeURIComponent(message)}`;
+        window.open(whatsappUrl, '_blank');
+      } else {
+        const isIphone = typeof navigator !== "undefined" && /iPhone/i.test(navigator.userAgent);
+        const smsUri = `sms:+${formattedPhoneNumber}${isIphone ? '&' : '?'}body=${encodeURIComponent(message)}`;
+        window.location.href = smsUri;
+      }
 
-        // 2. الانتظار حتى يعود المستخدم وسؤاله عن النتيجة (هذا هو الجزء المنطقي)
-        // سيظهر هذا السؤال بمجرد عودة الموظف للمتصفح
-        const isSent = confirm("هل قمت بإرسال الرسالة بنجاح؟\n\n(اضغط موافق فقط إذا تأكدت من الإرسال لتغيير حالة الأضحية)");
-
+      // سؤال التأكيد بعد الإرسال (للتأكد من تغيير حالة الأضحية)
+      setTimeout(async () => {
+        const isSent = confirm("هل تم الإرسال بنجاح لتغيير حالة الأضحية؟");
         if (isSent) {
           await updateDoc(submissionDocRef, {
             slaughterStatus: 'notified',
             lastUpdated: serverTimestamp(),
           });
-          toast({ title: "تم التحديث", description: "تم تغيير الحالة إلى 'تم وأُشعر'" });
           await refreshData();
-          return true;
-        } else {
-          toast({ title: "تنبيه", description: "بقي الإشعار في حالة 'قيد الإرسال' ولم تتغير الحالة" });
-          return false;
+          toast({ title: "تم الإشعار بنجاح" });
         }
-      }
-      return false;
-    } catch (error: any) {
-      console.error("Error sending notification:", error);
-      toast({ variant: "destructive", title: "خطأ", description: "فشل في العملية" });
+      }, 1500);
+
+      return true;
+    } catch (error) {
       return false;
     }
   };
