@@ -516,11 +516,52 @@ const AdminPage = () => {
           <CardContent className="flex flex-wrap gap-2">
             <Dialog open={isRegisterDialogOpen} onOpenChange={setIsRegisterDialogOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline" className="text-xs sm:text-sm">
-                  <UserPlus className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />
-                  إنشاء حساب مستخدم جديد
+                <Button variant="outline" className="text-xs sm:text-sm bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100">
+                  <UserCog className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />
+                  إدارة المستخدمين
                 </Button>
               </DialogTrigger>
+              <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto" dir="rtl">
+                <DialogHeader>
+                  <DialogTitle>{showUserList ? "قائمة المستخدمين" : "إنشاء حساب جديد"}</DialogTitle>
+                  <DialogDescription>
+                    {showUserList ? "يمكنك تعديل صلاحيات أو حذف المستخدمين من هنا." : "أدخل بيانات المستخدم الجديد للوصول للنظام."}
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="flex justify-center gap-4 mb-4 border-b pb-2">
+                  <Button variant={showUserList ? "default" : "ghost"} size="sm" onClick={() => setShowUserList(true)}>قائمة المستخدمين</Button>
+                  <Button variant={!showUserList ? "default" : "ghost"} size="sm" onClick={() => setShowUserList(false)}>إضافة مستخدم</Button>
+                </div>
+
+                {showUserList ? (
+                  <div className="space-y-4">
+                    {loadingUsers ? <div className="text-center p-4 text-xs">جاري التحميل...</div> : (
+                      <div className="divide-y">
+                        {usersList.map((u) => (
+                          <div key={u.id} className="py-3 flex items-center justify-between gap-4">
+                            <div className="text-right">
+                              <p className="font-bold text-sm">{u.username || "بدون اسم"}</p>
+                              <p className="text-xs text-muted-foreground">{u.email}</p>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button size="icon" variant="ghost" title={u.isAdmin ? "سحب صلاحية الأدمن" : "جعل أدمن"} onClick={() => toggleAdminStatus(u.id, u.isAdmin)}>
+                                {u.isAdmin ? <ShieldCheck className="h-4 w-4 text-green-600" /> : <ShieldAlert className="h-4 w-4 text-gray-400" />}
+                              </Button>
+                              <Button size="icon" variant="ghost" className="text-red-500" onClick={() => handleDeleteUser(u.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <RegisterForm isAdminCreator={true} onFormSubmit={handleRegisterFormSubmit} />
+                )}
+              </DialogContent>
+            </Dialog>
               <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                   <DialogTitle>إنشاء حساب مستخدم جديد</DialogTitle>
