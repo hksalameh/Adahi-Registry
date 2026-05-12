@@ -67,7 +67,7 @@ const SlaughterPage = () => {
         if (isSlaughteredFlag && newStatus !== 'pending') { 
             updatePayload.slaughterDate = new Date().toISOString();
         } else if (!isSlaughteredFlag && newStatus === 'pending') { 
-            updatePayload.slaughterDate = undefined; 
+            updatePayload.slaughterDate = null; 
         }
       }
 
