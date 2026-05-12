@@ -24,7 +24,7 @@ export default function DashboardPage() {
     <div className="space-y-6 md:space-y-8 p-2 sm:p-4">
       <header className="space-y-1 md:space-y-2 pb-3 md:pb-4 border-b text-center">
         <h1 className="text-lg sm:text-xl md:text-2xl font-bold tracking-tight text-primary">مركز الرمثا للخدمات المجتمعية</h1>
-        <h2 className="text-base sm:text-lg md:text-xl font-semibold text-muted-foreground">اضاحي 2025</h2>
+        <h2 className="text-base sm:text-lg md:text-xl font-semibold text-muted-foreground">اضاحي 2026</h2>
         <p className="text-xs sm:text-sm md:text-base text-muted-foreground pt-1">
           من خلال هذه الصفحة يمكنك إضافة أضحية جديدة أو الاطلاع على الأضاحي التي قمت بتسجيلها.
         </p>
