@@ -573,47 +573,55 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const sendSlaughterNotification = async (submissionId: string, donorName: string, phoneNumber: string): Promise<boolean> => {
-    console.log("[AuthContext] sendSlaughterNotification called for submission:", submissionId);
+const sendSlaughterNotification = async (submissionId: string, donorName: string, phoneNumber: string): Promise<boolean> => {
     if (!db || !user || !user.isAdmin) {
       toast({ variant: "destructive", title: "غير مصرح به", description: "ليس لديك صلاحية لإرسال الإشعارات." });
       return false;
     }
     try {
-      const submissionDocRef = doc(db, "submissions", submissionId); // Get doc ref to potentially update notification status later
-
+      const submissionDocRef = doc(db, "submissions", submissionId);
       const message = `السيد/السيدة ${donorName} تقبل الله طاعتكم وكل عام وانتم بالف خير تم ذبح اضحيتك ربنا يتقبل منكم`;
+      
       let formattedPhoneNumber = phoneNumber.startsWith("0") ? phoneNumber.substring(1) : phoneNumber;
       if (!formattedPhoneNumber.startsWith("962")) {
         formattedPhoneNumber = `962${formattedPhoneNumber}`;
       }
       
       const whatsappUrl = `https://wa.me/${formattedPhoneNumber}?text=${encodeURIComponent(message)}`;
-      const smsUri = `sms:${formattedPhoneNumber}?body=${encodeURIComponent(message)}`;
+      const isIphone = typeof navigator !== "undefined" && /iPhone/i.test(navigator.userAgent);
+      const smsUri = `sms:+${formattedPhoneNumber}${isIphone ? '&' : '?'}body=${encodeURIComponent(message)}`;
       
       if (typeof window !== "undefined") {
-        window.open(whatsappUrl, '_blank');
-        setTimeout(() => {
-          if (typeof window !== "undefined") { 
-            window.open(smsUri, '_blank');
-          }
-        }, 1000);
+        // 1. اختيار الوسيلة
+        const sendViaWhatsApp = confirm("اختيار وسيلة الإرسال:\n\n(موافق = واتساب | إلغاء = رسالة نصية SMS)");
+
+        if (sendViaWhatsApp) {
+          window.open(whatsappUrl, '_blank');
+        } else {
+          window.location.href = smsUri;
+        }
+
+        // 2. الانتظار حتى يعود المستخدم وسؤاله عن النتيجة (هذا هو الجزء المنطقي)
+        // سيظهر هذا السؤال بمجرد عودة الموظف للمتصفح
+        const isSent = confirm("هل قمت بإرسال الرسالة بنجاح؟\n\n(اضغط موافق فقط إذا تأكدت من الإرسال لتغيير حالة الأضحية)");
+
+        if (isSent) {
+          await updateDoc(submissionDocRef, {
+            slaughterStatus: 'notified',
+            lastUpdated: serverTimestamp(),
+          });
+          toast({ title: "تم التحديث", description: "تم تغيير الحالة إلى 'تم وأُشعر'" });
+          await refreshData();
+          return true;
+        } else {
+          toast({ title: "تنبيه", description: "بقي الإشعار في حالة 'قيد الإرسال' ولم تتغير الحالة" });
+          return false;
+        }
       }
-
-      // Optionally update the submission status to 'notified' after attempting to send
-      await updateDoc(submissionDocRef, {
-        slaughterStatus: 'notified', // Assuming you have a slaughterStatus field now
-        lastUpdated: serverTimestamp(),
-        lastUpdatedBy: user.id,
-        lastUpdatedByEmail: user.email,
-      });
-
-      toast({ title: "تم محاولة إرسال الإشعار", description: `تم محاولة فتح WhatsApp وتطبيق الرسائل لإشعار ${donorName}. يرجى التأكد من إرسال الرسائل يدوياً إذا لم يتم فتح التطبيقات.` });
-      await refreshData();
-      return true;
+      return false;
     } catch (error: any) {
-      console.error("[AuthContext sendSlaughterNotification] Error sending notification:", error);
-      toast({ variant: "destructive", title: "خطأ في الإشعار", description: `فشل في محاولة إرسال الإشعار: ${error.message}` });
+      console.error("Error sending notification:", error);
+      toast({ variant: "destructive", title: "خطأ", description: "فشل في العملية" });
       return false;
     }
   };
