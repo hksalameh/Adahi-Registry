@@ -24,7 +24,7 @@ export default function LoginPage() {
           <div className="flex items-start justify-between mb-3">
             <div className="flex-shrink-0">
               <Image 
-                src="https://www.islamicc.org/img/logo344.png" 
+                src="logo.png" 
                 alt="شعار جمعية المركز الاسلامي الخيرية"
                 width={80}
                 height={80}
