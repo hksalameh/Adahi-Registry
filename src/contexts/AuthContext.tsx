@@ -30,7 +30,7 @@ import {
 } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 
-const ADMIN_UID = "vqhrldpAdeWGcCgcMpWWRGdslOS2";
+const ADMIN_UID = "kb8ltRhBOoaT5RXVYZAnW4vqtj03";
 
 interface AuthContextType {
   user: AppUser | null;
