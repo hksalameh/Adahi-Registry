@@ -36,7 +36,44 @@ const AdminPage = () => {
   const [pageLoading, setPageLoading] = useState(true);
   const [exportingType, setExportingType] = useState<string | null>(null);
   const [isRegisterDialogOpen, setIsRegisterDialogOpen] = useState(false);
-  
+  const [usersList, setUsersList] = useState<any[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [showUserList, setShowUserList] = useState(false);
+
+  const fetchUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const querySnapshot = await getDocs(collection(db, "users"));
+      const users = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setUsersList(users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    }
+    setLoadingUsers(false);
+  };
+
+  const toggleAdminStatus = async (userId: string, currentStatus: boolean) => {
+    if (confirm("هل تريد تغيير صلاحيات هذا المستخدم؟")) {
+      await updateDoc(doc(db, "users", userId), { isAdmin: !currentStatus, role: !currentStatus ? 'admin' : 'user' });
+      fetchUsers();
+      toast({ title: "تم تحديث الصلاحيات" });
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (confirm("سيتم حذف صلاحية الدخول لهذا المستخدم، هل أنت متأكد؟")) {
+      await deleteDoc(doc(db, "users", userId));
+      fetchUsers();
+      toast({ title: "تم حذف المستخدم من القائمة" });
+    }
+  };
+
+  useEffect(() => {
+    if (isRegisterDialogOpen) {
+      fetchUsers();
+      setShowUserList(true);
+    }
+  }, [isRegisterDialogOpen]);
   const prevSubmissionIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
