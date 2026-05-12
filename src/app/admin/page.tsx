@@ -1,5 +1,7 @@
 "use client";
-
+import { db } from "@/lib/firebase";
+import { collection, getDocs, doc, deleteDoc, updateDoc } from "firebase/firestore";
+import { UserCog, Trash2, ShieldCheck, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { Settings2, TableIcon, BarChart3, Coins, RefreshCw, Loader2, Users, FileText, Sheet, UserPlus, ListChecks, ClipboardList, HandHelping } from "lucide-react"; 
