@@ -31,7 +31,6 @@ const SlaughterPage = () => {
   const [openSlaughterDialog, setOpenSlaughterDialog] = useState<Record<string, boolean>>({});
   const [openUndoSlaughterDialog, setOpenUndoSlaughterDialog] = useState<Record<string, boolean>>({});
   
-  // الحالة الجديدة لفتح بطاقة تفاصيل المتبرع من الأسفل
   const [selectedSubForDrawer, setSelectedSubForDrawer] = useState<AdahiSubmission | null>(null);
 
   const getDistributionLabel = useCallback((value?: string) => {
@@ -87,7 +86,6 @@ const SlaughterPage = () => {
            toast({ title: `فشل تحديث حالة الأضحية`, variant: "destructive" });
        }
   };
-
 
   const handleMarkAsSlaughteredClick = (submission: AdahiSubmission) => {
       setOpenSlaughterDialog(prev => ({ ...prev, [submission.id]: true }));
@@ -265,7 +263,6 @@ const SlaughterPage = () => {
       <Card><CardHeader><CardTitle>أضاحي لأهل غزة</CardTitle></CardHeader><CardContent>{renderSubmissionTable(gazaSubmissions)}</CardContent></Card>
       <Card><CardHeader><CardTitle>أضاحي لصندوق التكافل والتضامن</CardTitle></CardHeader><CardContent>{renderSubmissionTable(fundSubmissions)}</CardContent></Card>
 
-      {/* بطاقة التفاصيل السريعة للمسلخ (Bottom Sheet) */}
       <Dialog open={!!selectedSubForDrawer} onOpenChange={() => setSelectedSubForDrawer(null)}>
         <DialogContent className="sm:max-w-[450px] border-t-8 border-t-green-500 rounded-t-3xl fixed bottom-0 top-auto translate-y-0 duration-300 bg-white p-6" dir="rtl">
           <DialogHeader className="text-right">
@@ -303,15 +300,22 @@ const SlaughterPage = () => {
               )}
 
               <div className="flex gap-3 pt-4">
-                <Button 
-                  className="flex-1 h-16 text-xl font-black bg-green-600 hover:bg-green-700 shadow-lg text-white"
-                  onClick={() => {
-                    handleConfirmMarkAsSlaughtered(selectedSubForDrawer.id);
-                    setSelectedSubForDrawer(null);
-                  }}
-                >
-                  تأكيد الذبح
-                </Button>
+                {/* تعديل منطق الزر داخل البطاقة */}
+                {(selectedSubForDrawer.slaughterStatus === 'pending' || !selectedSubForDrawer.slaughterStatus) ? (
+                  <Button 
+                    className="flex-1 h-16 text-xl font-black bg-green-600 hover:bg-green-700 shadow-lg text-white"
+                    onClick={() => {
+                      handleConfirmMarkAsSlaughtered(selectedSubForDrawer.id);
+                      setSelectedSubForDrawer(null);
+                    }}
+                  >
+                    تأكيد الذبح
+                  </Button>
+                ) : (
+                  <div className="flex-1 h-16 flex items-center justify-center bg-green-50 border-2 border-green-200 rounded-xl text-green-700 font-bold text-lg">
+                    {selectedSubForDrawer.slaughterStatus === 'notified' ? "✅ تم الذبح والإشعار" : "✅ تم تسجيل الذبح"}
+                  </div>
+                )}
                 <Button variant="outline" className="w-24 h-16 text-lg border-2" onClick={() => setSelectedSubForDrawer(null)}>إغلاق</Button>
               </div>
             </div>
